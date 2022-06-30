@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     1.00
+// @version     1.01
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @run-at      document-end
@@ -313,9 +313,9 @@ function addAPIKeyInput(node) {
         let success = json.Success;
         if (success)
         {
-            TBS = json.TBS.toLocaleString('en-US');
+            TBS = json.TBS_Balanced.toLocaleString('en-US');
             Score = json.Score.toLocaleString('en-US');
-            divWhereToInject.innerHTML += '<div id="Tdup" style="color: red; font-size: 18px;"><b>TBS = '+ TBS + '<br />Score = '+ Score + '</b></div>';
+            divWhereToInject.innerHTML += '<div id="Tdup" style="color: red; font-size: 18px;"><b>TBS (balanced) = '+ TBS + '<br />Score = '+ Score + '</b></div>';
         }
         else
         {
