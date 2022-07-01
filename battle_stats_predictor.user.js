@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     1.01
+// @version     1.02
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @run-at      document-end
@@ -14,10 +14,9 @@
 // @author      TDup
 // ==/UserScript==
 
-let LOCAL_SCORE = localStorage["tdup.battleStatsPredictor.localScore"];
-let LOCAL_TBS = localStorage["tdup.battleStatsPredictor.localTBS"];
-let LOCAL_API_KEY = localStorage["tdup.battleStatsPredictor.apiKey"];
-let LOCAL_PLAYER_ID = localStorage["tdup.battleStatsPredictor.localPlayerId"];
+// let LOCAL_SCORE = localStorage["tdup.battleStatsPredictor.localScore"];
+// let LOCAL_TBS = localStorage["tdup.battleStatsPredictor.localTBS"];
+let LOCAL_API_KEY = localStorage["tdup.battleStatsPredictor.TornApiKey"];
 
 $("head").append (
     '<link '
@@ -158,7 +157,7 @@ function checkApiKey(key, cb) {
     //Code by finally.torn.FactionWallBattlestats
 	GM_xmlhttpRequest({
 		method: "GET",
-		url: `https://api.torn.com/user/?selections=&key=${key}`,
+		url: `https://api.torn.com/user/?comment=BattleStatsPredictorLoginselections=&key=${key}`,
 		onload: (r) => {
 			if (r.status == 429){
 				cb("Couldn't check (rate limit)");
@@ -180,9 +179,7 @@ function checkApiKey(key, cb) {
 			}
 			else {
 				LOCAL_API_KEY = key;
-				localStorage.setItem("tdup.battleStatsPredictor.apiKey", key);
-                LOCAL_PLAYER_ID = j.player_id;
-                localStorage.setItem("tdup.battleStatsPredictor.localPlayerId", j.player_id);
+				localStorage.setItem("tdup.battleStatsPredictor.TornApiKey", key);
 				cb(true);
 			}
 		},
@@ -193,7 +190,7 @@ function checkApiKey(key, cb) {
 }
 
 
-let apiKeyCheck = false;
+//let apiKeyCheck = false;
 function addAPIKeyInput(node) {
 	if (!node) return;
 
@@ -203,7 +200,7 @@ function addAPIKeyInput(node) {
 	apiKeyNode.className = "text faction-names finally-bs-api";
 	apiKeyNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
 	let apiKeyText = document.createElement("span");
-	apiKeyText.innerHTML = ((!LOCAL_API_KEY) ? "Set" : "Update") + " your API key: ";
+	apiKeyText.innerHTML = "Battle Stats Predictor - " + ((!LOCAL_API_KEY) ? "Set" : "Update") + " your API key: ";
 	let apiKeyInput = document.createElement("input");
 	let apiKeySave = document.createElement("input");
 	apiKeySave.type = "button";
@@ -211,14 +208,10 @@ function addAPIKeyInput(node) {
 	let apiKeyClose = document.createElement("input");
 	apiKeyClose.type = "button";
 	apiKeyClose.value = "Close";
-	// let wipeButton = document.createElement("input");
-	// wipeButton.type = "button";
-	// wipeButton.value = "Wipe & Reload";
 	apiKeyNode.appendChild(apiKeyText);
 	apiKeyNode.appendChild(apiKeyInput);
 	apiKeyNode.appendChild(apiKeySave);
 	apiKeyNode.appendChild(apiKeyClose);
-	// apiKeyNode.appendChild(wipeButton);
 
 	function checkApiKeyCb(r) {
 		if (r === true) {
@@ -239,12 +232,6 @@ function addAPIKeyInput(node) {
 	apiKeyClose.addEventListener("click", () => {
 		apiKeyNode.style.display = "none";
 	});
-	// wipeButton.addEventListener("click", () => {
-	// 	bsCache = {};
-	// 	localStorage["finally.torn.bs"] = JSON.stringify(bsCache);
-	// 	apiKeyNode.style.display = "none";
-	// 	window.location.reload();
-	// });
 
 	let apiKeyButton = document.createElement("a");
 	apiKeyButton.className = "t-clear h c-pointer  line-h24 right ";
@@ -253,17 +240,17 @@ function addAPIKeyInput(node) {
 	`;
 
 	apiKeyButton.addEventListener("click", () => {
-		apiKeyText.innerHTML = "Update your API key: ";
+		apiKeyText.innerHTML = "Battle Stats Predictor - Update your API key: ";
 		apiKeyNode.style.display = "block";
 	});
 
 	node.querySelector("#top-page-links-list").appendChild(apiKeyButton);
 	node.appendChild(apiKeyNode);
 
-	if (LOCAL_API_KEY && !apiKeyCheck) {
-		apiKeyCheck = true;
-		checkApiKey(LOCAL_API_KEY, checkApiKeyCb);
-	}
+	// if (LOCAL_API_KEY && !apiKeyCheck) {
+	// 	apiKeyCheck = true;
+	// 	checkApiKey(LOCAL_API_KEY, checkApiKeyCb);
+	// }
 }
 
 
@@ -272,8 +259,6 @@ function addAPIKeyInput(node) {
 
     var isInjected = false;
     var TargetId = -1;
-    var Score = "N/A";
-    var TBS = "N/A";
     var divWhereToInject;
 
     addAPIKeyInput(document.querySelector(".content-title"));
@@ -292,7 +277,10 @@ function addAPIKeyInput(node) {
                   }
                   divWhereToInject = el[i];
                   isInjected = true;
-                  fetchScoreAndTBSAsync(TargetId);
+                  if (LOCAL_API_KEY)
+                  {
+                      fetchScoreAndTBSAsync(TargetId);
+                  }
               }
 
               addAPIKeyInput(node.querySelector && node.querySelector(".content-title"));
@@ -313,13 +301,14 @@ function addAPIKeyInput(node) {
         let success = json.Success;
         if (success)
         {
-            TBS = json.TBS_Balanced.toLocaleString('en-US');
-            Score = json.Score.toLocaleString('en-US');
-            divWhereToInject.innerHTML += '<div id="Tdup" style="color: red; font-size: 18px;"><b>TBS (balanced) = '+ TBS + '<br />Score = '+ Score + '</b></div>';
+            let TBSBalanced = json.TBS_Balanced.toLocaleString('en-US');
+            let TBS = json.TBS.toLocaleString('en-US');
+            let Score = json.Score.toLocaleString('en-US');
+            divWhereToInject.innerHTML += '<div id="Tdup" style="color: red; font-size: 14px; text-align: center;">TBS_1 = '+ TBS + '<br /> TBS_2 = '+ TBSBalanced + '<br /> Battle Stats Score = '+ Score + '</div>';
         }
         else
         {
-             divWhereToInject.innerHTML += '<div id="Tdup" style="color: red; font-size: 18px;"><b>Error : ' + json.Reason+'</b></div>';
+             divWhereToInject.innerHTML += '<div id="Tdup" style="color: red; font-size: 14px;">Error : ' + json.Reason+'</div>';
         }
     }
 
@@ -327,7 +316,7 @@ function addAPIKeyInput(node) {
     return new Promise((resolve, reject) => {
         GM_xmlhttpRequest({
             method: 'GET',
-            url :`http://www.lol-manager.com/api/battlestats/${LOCAL_API_KEY}/${LOCAL_PLAYER_ID}/${targetId}`,
+            url :`http://www.lol-manager.com/api/battlestats/${LOCAL_API_KEY}/${targetId}`,
             headers: {
                 'Content-Type': 'application/json'
             },
