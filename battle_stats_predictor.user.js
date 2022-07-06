@@ -27,6 +27,7 @@ let LOCAL_STATS_STR = localStorage["tdup.battleStatsPredictor.comparisonStr"];
 let LOCAL_STATS_DEF = localStorage["tdup.battleStatsPredictor.comparisonDef"];
 let LOCAL_STATS_SPD = localStorage["tdup.battleStatsPredictor.comparisonSpd"];
 let LOCAL_STATS_DEX = localStorage["tdup.battleStatsPredictor.comparisonDex"];
+let LOCAL_TBS = localStorage["tdup.battleStatsPredictor.comparisonTbs"];
 
 $("head").append (
     '<link '
@@ -217,15 +218,17 @@ function UpdateLocalScore()
     if (LOCAL_STATS_STR && LOCAL_STATS_DEF && LOCAL_STATS_SPD && LOCAL_STATS_DEX)
     {
         LOCAL_SCORE = parseInt(Math.sqrt(LOCAL_STATS_STR) + Math.sqrt(LOCAL_STATS_DEF) + Math.sqrt(LOCAL_STATS_SPD) + Math.sqrt(LOCAL_STATS_DEX));
+        LOCAL_TBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_SPD) + parseInt(LOCAL_STATS_DEX);
     }
     else
     {
         LOCAL_SCORE = 0;
+        LOCAL_TBS = 0;
     }
 
     if (comparisonBattleStatsText!=undefined)
     {
-        comparisonBattleStatsText.innerHTML = "<br/> Battle Score = " +LOCAL_SCORE + "<br/><br/>";
+        comparisonBattleStatsText.innerHTML = "<br/> TBS = " + LOCAL_TBS.toLocaleString('en-US') + " | Battle Score = " + LOCAL_SCORE.toLocaleString('en-US'); + "<br/><br/>";
     }
 }
 
@@ -286,80 +289,9 @@ function addAPIKeyInput(node) {
     comparisonBattleStatsNode.appendChild(table);
 
 
-
-    // ************************** STR ***********************
-    let comparisonStr = document.createElement("label");
-    comparisonStr.innerHTML = "Str";
-    raw = table.insertRow(0);
-    cell = raw.insertCell(0);
-    cell.appendChild(comparisonStr);
-
-    scoreStrInput = document.createElement("input");
-    scoreStrInput.type='number';
-    if (LOCAL_STATS_STR)
-    {
-        scoreStrInput.value = LOCAL_STATS_STR;
-    }
-    scoreStrInput.addEventListener('change', () => {
-        if (scoreStrInput.value)  scoreStrInput.value = parseInt(scoreStrInput.value);
-        else scoreStrInput.value = 0;
-
-        LOCAL_STATS_STR = scoreStrInput.value;
-        UpdateLocalScore();
-    });
-    cell = raw.insertCell(1);
-    cell.appendChild(scoreStrInput);
-
-    // ************************** DEF ***********************
-    let comparisonDef = document.createElement("label");
-    comparisonDef.innerHTML = "Def";
-    raw = table.insertRow(0);
-    cell = raw.insertCell(0);
-    cell.appendChild(comparisonDef);
-
-    scoreDefInput = document.createElement("input");
-    scoreDefInput.type='number';
-    if (LOCAL_STATS_DEF)
-    {
-        scoreDefInput.value = LOCAL_STATS_DEF;
-    }
-    scoreDefInput.addEventListener('change', () => {
-        if (scoreDefInput.value)  scoreDefInput.value = parseInt(scoreDefInput.value);
-        else scoreDefInput.value = 0;
-
-        LOCAL_STATS_DEF = scoreDefInput.value;
-        UpdateLocalScore();
-    });
-    cell = raw.insertCell(1);
-    cell.appendChild(scoreDefInput);
-
-
-    // ************************** SPD ***********************
-    let comparisonSpd = document.createElement("label");
-    comparisonSpd.innerHTML = "Spd";
-    raw = table.insertRow(0);
-    cell = raw.insertCell(0);
-    cell.appendChild(comparisonSpd);
-
-    scoreSpdInput = document.createElement("input");
-    scoreSpdInput.type='number';
-    if (LOCAL_STATS_SPD)
-    {
-        scoreSpdInput.value = LOCAL_STATS_SPD;
-    }
-    scoreSpdInput.addEventListener('change', () => {
-        if (scoreSpdInput.value)  scoreSpdInput.value = parseInt(scoreSpdInput.value);
-        else scoreSpdInput.value = 0;
-
-        LOCAL_STATS_SPD = scoreSpdInput.value;
-        UpdateLocalScore();
-    });
-    cell = raw.insertCell(1);
-    cell.appendChild(scoreSpdInput);
-
     // ************************** DEX ***********************
     let comparisonDex = document.createElement("label");
-    comparisonDex.innerHTML = "Dex";
+    comparisonDex.innerHTML = '<div style="text-align: right">Dex&nbsp</div>';
     raw = table.insertRow(0);
     cell = raw.insertCell(0);
     cell.appendChild(comparisonDex);
@@ -378,15 +310,90 @@ function addAPIKeyInput(node) {
         UpdateLocalScore();
     });
     cell = raw.insertCell(1);
+    cell.style.textAlign = 'left';
     cell.appendChild(scoreDexInput);
 
-   raw = table.insertRow(0);
+    // ************************** SPD ***********************
+    let comparisonSpd = document.createElement("label");
+    comparisonSpd.innerHTML = '<div style="text-align: right">Spd&nbsp</div>';
+    raw = table.insertRow(0);
+    cell = raw.insertCell(0);
+    cell.appendChild(comparisonSpd);
+
+    scoreSpdInput = document.createElement("input");
+    scoreSpdInput.type = 'number';
+    if (LOCAL_STATS_SPD) {
+        scoreSpdInput.value = LOCAL_STATS_SPD;
+    }
+    scoreSpdInput.addEventListener('change', () => {
+        if (scoreSpdInput.value) scoreSpdInput.value = parseInt(scoreSpdInput.value);
+        else scoreSpdInput.value = 0;
+
+        LOCAL_STATS_SPD = scoreSpdInput.value;
+        UpdateLocalScore();
+    });
+    cell = raw.insertCell(1);
+    cell.style.textAlign = 'left';
+    cell.appendChild(scoreSpdInput);
+
+    // ************************** DEF ***********************
+    let comparisonDef = document.createElement("label");
+    comparisonDef.innerHTML = '<div style="text-align: right">Def&nbsp</div>';
+    raw = table.insertRow(0);
+    cell = raw.insertCell(0);
+    cell.appendChild(comparisonDef);
+
+    scoreDefInput = document.createElement("input");
+    scoreDefInput.type = 'number';
+    if (LOCAL_STATS_DEF) {
+        scoreDefInput.value = LOCAL_STATS_DEF;
+    }
+    scoreDefInput.addEventListener('change', () => {
+        if (scoreDefInput.value) scoreDefInput.value = parseInt(scoreDefInput.value);
+        else scoreDefInput.value = 0;
+
+        LOCAL_STATS_DEF = scoreDefInput.value;
+        UpdateLocalScore();
+    });
+    cell = raw.insertCell(1);
+    cell.style.textAlign = 'left';
+    cell.appendChild(scoreDefInput);
+
+    // ************************** STR ***********************
+    let comparisonStr = document.createElement("label");
+    comparisonStr.innerHTML = '<div style="text-align: right">Str&nbsp</div>';
+    raw = table.insertRow(0);
+    cell = raw.insertCell(0);
+    cell.appendChild(comparisonStr);
+
+    scoreStrInput = document.createElement("input");
+    scoreStrInput.type = 'number';
+    if (LOCAL_STATS_STR) {
+        scoreStrInput.value = LOCAL_STATS_STR;
+    }
+    scoreStrInput.addEventListener('change', () => {
+        if (scoreStrInput.value) scoreStrInput.value = parseInt(scoreStrInput.value);
+        else scoreStrInput.value = 0;
+
+        LOCAL_STATS_STR = scoreStrInput.value;
+        UpdateLocalScore();
+    });
+    cell = raw.insertCell(1);
+    cell.style.textAlign = 'left';
+    cell.appendChild(scoreStrInput);
+
+    raw = table.insertRow(0);
     cell = raw.insertCell(0);
     cell.colSpan = 2;
-    cell.innerHTML = "<br/><b>[Used to show comparison through colored UI] </b><br /><i>Comparison values (Any scenario you want : Your raw stats, your effective stats, someone else stats..) </i>";
+    cell.innerHTML = "<br/><b>[Used to show comparison through colored UI] </b><br /><i>Comparison values (Any scenario you want : Your raw stats, your effective stats, someone else stats..) </i><br/><br/>";
 
     comparisonBattleStatsText = document.createElement("span");
-    comparisonBattleStatsText.innerHTML = "<br/> Battle Score = " +LOCAL_SCORE + "<br/><br/>";
+    if (LOCAL_TBS && LOCAL_SCORE) {
+        comparisonBattleStatsText.innerHTML = "<br/> TBS = " + parseInt(LOCAL_TBS).toLocaleString('en-US') + " | Battle Score = " + parseInt(LOCAL_SCORE).toLocaleString('en-US'); + "<br/><br/>";
+    }
+    else {
+        comparisonBattleStatsText.innerHTML = "<br/> N/A <br/><br/>";
+    }
 
     comparisonBattleStatsNode.appendChild(comparisonBattleStatsText);
 
@@ -426,13 +433,13 @@ function addAPIKeyInput(node) {
             LOCAL_STATS_STR = parseInt(scoreStrInput.value);
             LOCAL_STATS_DEF = parseInt(scoreDefInput.value);
             LOCAL_STATS_SPD = parseInt(scoreSpdInput.value);
-            LOCAL_STATS_DEX = parseInt(scoreDexInput.value);
+            LOCAL_STATS_DEX = parseInt(scoreDexInput.value); 
             UpdateLocalScore();
         }
         else
         {
             // Wrong values, reset everything to 0
-            LOCAL_STATS_STR = LOCAL_STATS_DEF = LOCAL_STATS_SPD = LOCAL_STATS_DEX = LOCAL_SCORE = 0;
+            LOCAL_STATS_STR = LOCAL_STATS_DEF = LOCAL_STATS_SPD = LOCAL_STATS_DEX = LOCAL_SCORE = LOCAL_TBS = 0;
         }
 
         localStorage.setItem("tdup.battleStatsPredictor.comparisonStr", LOCAL_STATS_STR);
@@ -440,6 +447,8 @@ function addAPIKeyInput(node) {
         localStorage.setItem("tdup.battleStatsPredictor.comparisonSpd", LOCAL_STATS_SPD);
         localStorage.setItem("tdup.battleStatsPredictor.comparisonDex", LOCAL_STATS_DEX);
         localStorage.setItem("tdup.battleStatsPredictor.comparisonScore", LOCAL_SCORE);
+        localStorage.setItem("tdup.battleStatsPredictor.comparisonTbs", LOCAL_TBS);
+        
 
         location.reload();
         return false;
@@ -468,7 +477,6 @@ function addAPIKeyInput(node) {
     node.appendChild(comparisonBattleStatsNode);
     node.appendChild(buttonsNode);
 }
-
 
 (function() {
     'use strict';
@@ -577,18 +585,19 @@ function addAPIKeyInput(node) {
 
                 if (divSvgAttackToColor) divSvgAttackToColor.style.fill = colorTBS;
 
-                 divWhereToInject.innerHTML += '<div id="Tdup" style="font-size: 14px; text-align: center;">TBS_1 = '+ TBS + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0)+'%) </label>' +
+                
+                divWhereToInject.innerHTML += '<div title = "From the TBS model" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px">TBS_1 = '+ TBS + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0)+'%) </label>' +
                 '<br /> TBS_2 = '+ TBSBalanced+ '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0)+'%) </label></div>';
             }
             else
             {
-                  divWhereToInject.innerHTML += '<div id="Tdup" style="font-size: 14px; text-align: center;">TBS_1 = '+ TBS +
+                divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">TBS_1 = '+ TBS +
                 '<br /> TBS_2 = '+ TBSBalanced + '</div>';
             }
         }
         else
         {
-             divWhereToInject.innerHTML += '<div id="Tdup" style="font-size: 14px;">Error : ' + json.Reason+'</div>';
+            divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + json.Reason+'</div>';
         }
     }
 
