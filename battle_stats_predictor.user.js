@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     1.02
+// @version     1.10
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @run-at      document-end
@@ -14,9 +14,19 @@
 // @author      TDup
 // ==/UserScript==
 
-// let LOCAL_SCORE = localStorage["tdup.battleStatsPredictor.localScore"];
-// let LOCAL_TBS = localStorage["tdup.battleStatsPredictor.localTBS"];
+// Based on finally.torn.FactionWallBattlestats
+
+// Used for identification to the third party + doing torn api call when target stats are not cached yet
 let LOCAL_API_KEY = localStorage["tdup.battleStatsPredictor.TornApiKey"];
+
+// Used to compare players stats and show if you are weaker/stronger.
+// Important : THIS IS NOT SENT to the backend, you can type whatever you want, it'll be used only locally to compare with the predicted stats.
+var LOCAL_USE_COMPARE_MODE = localStorage["tdup.battleStatsPredictor.useCompareMode"] == "true";
+let LOCAL_SCORE = localStorage["tdup.battleStatsPredictor.comparisonScore"];
+let LOCAL_STATS_STR = localStorage["tdup.battleStatsPredictor.comparisonStr"];
+let LOCAL_STATS_DEF = localStorage["tdup.battleStatsPredictor.comparisonDef"];
+let LOCAL_STATS_SPD = localStorage["tdup.battleStatsPredictor.comparisonSpd"];
+let LOCAL_STATS_DEX = localStorage["tdup.battleStatsPredictor.comparisonDex"];
 
 $("head").append (
     '<link '
@@ -59,19 +69,33 @@ GM_addStyle(`
 }
 
 .finally-bs-api {
-	position: absolute;
+	//position: absolute;
 	background: var(--main-bg);
 	text-align: center;
 	left: 0;
 	top: 0;
 	width: 100%;
 	height: 100%;
+    padding-bottom : 5px;
+    padding-top : 5px;
+
 }
 
 .finally-bs-api > * {
 	margin: 0 5px;
 	padding: 5px;
 }
+
+
+.finally-bs-api > table, td, th, input {
+  border: 1px;
+}
+
+.finally-bs-api > table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
 
 .finally-bs-filter {
 	position: absolute !important;
@@ -154,7 +178,6 @@ function JSONparse(str) {
 }
 
 function checkApiKey(key, cb) {
-    //Code by finally.torn.FactionWallBattlestats
 	GM_xmlhttpRequest({
 		method: "GET",
 		url: `https://api.torn.com/user/?comment=BattleStatsPredictorLoginselections=&key=${key}`,
@@ -189,35 +212,204 @@ function checkApiKey(key, cb) {
 	})
 }
 
+function UpdateLocalScore()
+{
+    if (LOCAL_STATS_STR && LOCAL_STATS_DEF && LOCAL_STATS_SPD && LOCAL_STATS_DEX)
+    {
+        LOCAL_SCORE = parseInt(Math.sqrt(LOCAL_STATS_STR) + Math.sqrt(LOCAL_STATS_DEF) + Math.sqrt(LOCAL_STATS_SPD) + Math.sqrt(LOCAL_STATS_DEX));
+    }
+    else
+    {
+        LOCAL_SCORE = 0;
+    }
 
-//let apiKeyCheck = false;
+    if (comparisonBattleStatsText!=undefined)
+    {
+        comparisonBattleStatsText.innerHTML = "<br/> Battle Score = " +LOCAL_SCORE + "<br/><br/>";
+    }
+}
+
+var comparisonBattleStatsText;
+
+var scoreStrInput;
+var scoreDefInput;
+var scoreSpdInput;
+var scoreDexInput;
+
 function addAPIKeyInput(node) {
 	if (!node) return;
 
 	node.style.position = "relative";
 
+    // API KEY PART
 	let apiKeyNode = document.createElement("div");
 	apiKeyNode.className = "text faction-names finally-bs-api";
 	apiKeyNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
 	let apiKeyText = document.createElement("span");
 	apiKeyText.innerHTML = "Battle Stats Predictor - " + ((!LOCAL_API_KEY) ? "Set" : "Update") + " your API key: ";
 	let apiKeyInput = document.createElement("input");
-	let apiKeySave = document.createElement("input");
-	apiKeySave.type = "button";
-	apiKeySave.value = "Save";
-	let apiKeyClose = document.createElement("input");
-	apiKeyClose.type = "button";
-	apiKeyClose.value = "Close";
+    if (LOCAL_API_KEY)
+    {
+        apiKeyInput.value = LOCAL_API_KEY;
+    }
+
 	apiKeyNode.appendChild(apiKeyText);
 	apiKeyNode.appendChild(apiKeyInput);
-	apiKeyNode.appendChild(apiKeySave);
-	apiKeyNode.appendChild(apiKeyClose);
+
+    // COMPARISON STATS PART
+    let comparisonBattleStatsNode = document.createElement("div");
+    comparisonBattleStatsNode.className = "text faction-names finally-bs-api";
+
+    let checkbox = document.createElement('input');
+    checkbox.type = "checkbox";
+    checkbox.name = "name";
+    checkbox.value = "value";
+    checkbox.id = "id";
+    checkbox.checked =LOCAL_USE_COMPARE_MODE;
+    comparisonBattleStatsNode.style.display = (LOCAL_USE_COMPARE_MODE && !LOCAL_API_KEY) ? "block" : "none";
+
+    checkbox.addEventListener("change", () => {
+        LOCAL_USE_COMPARE_MODE = !LOCAL_USE_COMPARE_MODE;
+        comparisonBattleStatsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
+        localStorage.setItem("tdup.battleStatsPredictor.useCompareMode", LOCAL_USE_COMPARE_MODE);
+ 	});
+
+    apiKeyNode.appendChild(checkbox);
+
+    var checkboxLabel = document.createElement('label')
+    checkboxLabel.htmlFor = "id";
+    checkboxLabel.appendChild(document.createTextNode('Use compare mode'));
+    apiKeyNode.appendChild(checkboxLabel);
+
+    var cell, raw, table;
+    table = document.createElement('table');
+    comparisonBattleStatsNode.appendChild(table);
+
+
+
+    // ************************** STR ***********************
+    let comparisonStr = document.createElement("label");
+    comparisonStr.innerHTML = "Str";
+    raw = table.insertRow(0);
+    cell = raw.insertCell(0);
+    cell.appendChild(comparisonStr);
+
+    scoreStrInput = document.createElement("input");
+    scoreStrInput.type='number';
+    if (LOCAL_STATS_STR)
+    {
+        scoreStrInput.value = LOCAL_STATS_STR;
+    }
+    scoreStrInput.addEventListener('change', () => {
+        if (scoreStrInput.value)  scoreStrInput.value = parseInt(scoreStrInput.value);
+        else scoreStrInput.value = 0;
+
+        LOCAL_STATS_STR = scoreStrInput.value;
+        UpdateLocalScore();
+    });
+    cell = raw.insertCell(1);
+    cell.appendChild(scoreStrInput);
+
+    // ************************** DEF ***********************
+    let comparisonDef = document.createElement("label");
+    comparisonDef.innerHTML = "Def";
+    raw = table.insertRow(0);
+    cell = raw.insertCell(0);
+    cell.appendChild(comparisonDef);
+
+    scoreDefInput = document.createElement("input");
+    scoreDefInput.type='number';
+    if (LOCAL_STATS_DEF)
+    {
+        scoreDefInput.value = LOCAL_STATS_DEF;
+    }
+    scoreDefInput.addEventListener('change', () => {
+        if (scoreDefInput.value)  scoreDefInput.value = parseInt(scoreDefInput.value);
+        else scoreDefInput.value = 0;
+
+        LOCAL_STATS_DEF = scoreDefInput.value;
+        UpdateLocalScore();
+    });
+    cell = raw.insertCell(1);
+    cell.appendChild(scoreDefInput);
+
+
+    // ************************** SPD ***********************
+    let comparisonSpd = document.createElement("label");
+    comparisonSpd.innerHTML = "Spd";
+    raw = table.insertRow(0);
+    cell = raw.insertCell(0);
+    cell.appendChild(comparisonSpd);
+
+    scoreSpdInput = document.createElement("input");
+    scoreSpdInput.type='number';
+    if (LOCAL_STATS_SPD)
+    {
+        scoreSpdInput.value = LOCAL_STATS_SPD;
+    }
+    scoreSpdInput.addEventListener('change', () => {
+        if (scoreSpdInput.value)  scoreSpdInput.value = parseInt(scoreSpdInput.value);
+        else scoreSpdInput.value = 0;
+
+        LOCAL_STATS_SPD = scoreSpdInput.value;
+        UpdateLocalScore();
+    });
+    cell = raw.insertCell(1);
+    cell.appendChild(scoreSpdInput);
+
+    // ************************** DEX ***********************
+    let comparisonDex = document.createElement("label");
+    comparisonDex.innerHTML = "Dex";
+    raw = table.insertRow(0);
+    cell = raw.insertCell(0);
+    cell.appendChild(comparisonDex);
+
+    scoreDexInput = document.createElement("input");
+    scoreDexInput.type='number';
+    if (LOCAL_STATS_DEX)
+    {
+        scoreDexInput.value = LOCAL_STATS_DEX;
+    }
+    scoreDexInput.addEventListener('change', () => {
+        if (scoreDexInput.value)  scoreDexInput.value = parseInt(scoreDexInput.value);
+        else scoreDexInput.value = 0;
+
+        LOCAL_STATS_DEX = scoreDexInput.value;
+        UpdateLocalScore();
+    });
+    cell = raw.insertCell(1);
+    cell.appendChild(scoreDexInput);
+
+   raw = table.insertRow(0);
+    cell = raw.insertCell(0);
+    cell.colSpan = 2;
+    cell.innerHTML = "<br/><b>[Used to show comparison through colored UI] </b><br /><i>Comparison values (Any scenario you want : Your raw stats, your effective stats, someone else stats..) </i>";
+
+    comparisonBattleStatsText = document.createElement("span");
+    comparisonBattleStatsText.innerHTML = "<br/> Battle Score = " +LOCAL_SCORE + "<br/><br/>";
+
+    comparisonBattleStatsNode.appendChild(comparisonBattleStatsText);
+
+    let configPanelSave = document.createElement("input");
+	configPanelSave.type = "button";
+	configPanelSave.value = "Save & Reload";
+	let configPanelClose = document.createElement("input");
+	configPanelClose.type = "button";
+	configPanelClose.value = "Close";
+
+    let buttonsNode = document.createElement("div");
+    buttonsNode.className = "text faction-names finally-bs-api";
+    buttonsNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
+    buttonsNode.appendChild(configPanelSave);
+	buttonsNode.appendChild(configPanelClose);
+
 
 	function checkApiKeyCb(r) {
 		if (r === true) {
 			apiKeyNode.style.display = "none";
+            comparisonBattleStatsNode.style.display = "none";
+            buttonsNode.style.display = "none";
 			apiKeyInput.value = "";
-			// loadFactions();
 		}
 		else {
 			apiKeyNode.style.display = "block";
@@ -225,12 +417,37 @@ function addAPIKeyInput(node) {
 		}
 	}
 
-	apiKeySave.addEventListener("click", () => {
-		apiKeyText.innerHTML = "Checking key";
+	configPanelSave.addEventListener("click", () => {
+		apiKeyText.innerHTML = "Checking key and saving data";
 		checkApiKey(apiKeyInput.value, checkApiKeyCb);
+
+        if (scoreStrInput.value && scoreDefInput.value && scoreSpdInput.value && scoreDexInput.value)
+        {
+            LOCAL_STATS_STR = parseInt(scoreStrInput.value);
+            LOCAL_STATS_DEF = parseInt(scoreDefInput.value);
+            LOCAL_STATS_SPD = parseInt(scoreSpdInput.value);
+            LOCAL_STATS_DEX = parseInt(scoreDexInput.value);
+            UpdateLocalScore();
+        }
+        else
+        {
+            // Wrong values, reset everything to 0
+            LOCAL_STATS_STR = LOCAL_STATS_DEF = LOCAL_STATS_SPD = LOCAL_STATS_DEX = LOCAL_SCORE = 0;
+        }
+
+        localStorage.setItem("tdup.battleStatsPredictor.comparisonStr", LOCAL_STATS_STR);
+        localStorage.setItem("tdup.battleStatsPredictor.comparisonDef", LOCAL_STATS_DEF);
+        localStorage.setItem("tdup.battleStatsPredictor.comparisonSpd", LOCAL_STATS_SPD);
+        localStorage.setItem("tdup.battleStatsPredictor.comparisonDex", LOCAL_STATS_DEX);
+        localStorage.setItem("tdup.battleStatsPredictor.comparisonScore", LOCAL_SCORE);
+
+        location.reload();
+        return false;
 	});
-	apiKeyClose.addEventListener("click", () => {
+	configPanelClose.addEventListener("click", () => {
 		apiKeyNode.style.display = "none";
+        comparisonBattleStatsNode.style.display = "none";
+        buttonsNode.style.display = "none";
 	});
 
 	let apiKeyButton = document.createElement("a");
@@ -242,15 +459,14 @@ function addAPIKeyInput(node) {
 	apiKeyButton.addEventListener("click", () => {
 		apiKeyText.innerHTML = "Battle Stats Predictor - Update your API key: ";
 		apiKeyNode.style.display = "block";
+        comparisonBattleStatsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
+        buttonsNode.style.display = "block";
 	});
 
 	node.querySelector("#top-page-links-list").appendChild(apiKeyButton);
-	node.appendChild(apiKeyNode);
-
-	// if (LOCAL_API_KEY && !apiKeyCheck) {
-	// 	apiKeyCheck = true;
-	// 	checkApiKey(LOCAL_API_KEY, checkApiKeyCb);
-	// }
+    node.appendChild(apiKeyNode);
+    node.appendChild(comparisonBattleStatsNode);
+    node.appendChild(buttonsNode);
 }
 
 
@@ -260,6 +476,10 @@ function addAPIKeyInput(node) {
     var isInjected = false;
     var TargetId = -1;
     var divWhereToInject;
+
+    var svgAttackDivFound = false;
+    var divSvgAttackToColor;
+    var isAttackCurrentlyDisabled = false;
 
     addAPIKeyInput(document.querySelector(".content-title"));
 
@@ -283,6 +503,28 @@ function addAPIKeyInput(node) {
                   }
               }
 
+              if (!svgAttackDivFound && LOCAL_USE_COMPARE_MODE)
+              {
+                 var el2 = document.querySelectorAll('.profile-button-attack')
+                 for(i = 0; i < el2.length; ++i)
+                 {
+                     if (el2[i].className.includes("disabled"))
+                     {
+                        isAttackCurrentlyDisabled = true;
+
+//                          let cross = document.createElement("svg");
+//                          cross.fill = "rgba(217, 54, 0, 0.5)";
+//                          cross.stroke = "#d4d4d4";
+//                          cross.width = "46";
+
+//                          el2[i].appendChild(cross);
+                         //<svg xmlns="http://www.w3.org/2000/svg" fill="rgba(217, 54, 0, 0.5)" stroke="#d4d4d4" stroke-width="0" width="46" height="46" viewBox="551.393 356 44 44"><path d="M556.393,363l12.061,14-12.061,14,1,1,14-11.94,14,11.94,1-1-12.06-14,12.06-14-1-1-14,11.94-14-11.94Z"></path></svg>
+                     }
+                     divSvgAttackToColor = el2[i].children[0];
+                     svgAttackDivFound = true;
+                 }
+              }
+
               addAPIKeyInput(node.querySelector && node.querySelector(".content-title"));
           }
         }
@@ -295,6 +537,22 @@ function addAPIKeyInput(node) {
 
     observer.observe(document, {attributes: false, childList: true, characterData: false, subtree:true});
 
+    function getColorDifference(ratio)
+    {
+        if (ratio > 150)
+        {
+            return "#FF0000"; // red
+        }
+        else if (ratio > 50)
+        {
+            return "#FFA500"; // orange
+        }
+        else
+        {
+            return "#008000"; //green
+        }
+    }
+
     async function fetchScoreAndTBSAsync(targetId) {
         const json = await fetchScoreAndTBS(targetId);
 
@@ -303,12 +561,34 @@ function addAPIKeyInput(node) {
         {
             let TBSBalanced = json.TBS_Balanced.toLocaleString('en-US');
             let TBS = json.TBS.toLocaleString('en-US');
-            let Score = json.Score.toLocaleString('en-US');
-            divWhereToInject.innerHTML += '<div id="Tdup" style="color: red; font-size: 14px; text-align: center;">TBS_1 = '+ TBS + '<br /> TBS_2 = '+ TBSBalanced + '<br /> Battle Stats Score = '+ Score + '</div>';
+            let TargetScore = json.Score.toLocaleString('en-US');
+
+            if (LOCAL_USE_COMPARE_MODE)
+            {
+                var intTBS =parseInt(TBS.replaceAll(',',''));
+                var localTBS = parseInt(LOCAL_STATS_STR)+parseInt(LOCAL_STATS_DEF)+parseInt(LOCAL_STATS_DEX)+parseInt(LOCAL_STATS_SPD);
+                var tbs1Ratio = 100 * intTBS / localTBS;
+
+                var intTbsBalanced =parseInt(TBSBalanced.replaceAll(',',''));
+                var tbsBalancedRatio = 100 * intTbsBalanced / ((parseInt(LOCAL_SCORE) * parseInt(LOCAL_SCORE)) / 4);
+
+                var colorTBS = getColorDifference(tbs1Ratio);
+                var colorBalancedTBS = getColorDifference(tbsBalancedRatio);
+
+                if (divSvgAttackToColor) divSvgAttackToColor.style.fill = colorTBS;
+
+                 divWhereToInject.innerHTML += '<div id="Tdup" style="font-size: 14px; text-align: center;">TBS_1 = '+ TBS + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0)+'%) </label>' +
+                '<br /> TBS_2 = '+ TBSBalanced+ '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0)+'%) </label></div>';
+            }
+            else
+            {
+                  divWhereToInject.innerHTML += '<div id="Tdup" style="font-size: 14px; text-align: center;">TBS_1 = '+ TBS +
+                '<br /> TBS_2 = '+ TBSBalanced + '</div>';
+            }
         }
         else
         {
-             divWhereToInject.innerHTML += '<div id="Tdup" style="color: red; font-size: 14px;">Error : ' + json.Reason+'</div>';
+             divWhereToInject.innerHTML += '<div id="Tdup" style="font-size: 14px;">Error : ' + json.Reason+'</div>';
         }
     }
 
