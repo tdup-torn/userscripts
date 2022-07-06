@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     1.11
+// @version     2
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @run-at      document-end
@@ -392,7 +392,7 @@ function addAPIKeyInput(node) {
         comparisonBattleStatsText.innerHTML = "<br/> TBS = " + parseInt(LOCAL_TBS).toLocaleString('en-US') + " | Battle Score = " + parseInt(LOCAL_SCORE).toLocaleString('en-US'); + "<br/><br/>";
     }
     else {
-        comparisonBattleStatsText.innerHTML = "<br/> N/A <br/><br/>";
+        comparisonBattleStatsText.innerHTML = "<br/><br/><br/>";
     }
 
     comparisonBattleStatsNode.appendChild(comparisonBattleStatsText);
