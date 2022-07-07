@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     2
+// @version     2.01
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @run-at      document-end
@@ -29,10 +29,10 @@ let LOCAL_STATS_SPD = localStorage["tdup.battleStatsPredictor.comparisonSpd"];
 let LOCAL_STATS_DEX = localStorage["tdup.battleStatsPredictor.comparisonDex"];
 let LOCAL_TBS = localStorage["tdup.battleStatsPredictor.comparisonTbs"];
 
-$("head").append (
+$("head").append(
     '<link '
-  + 'href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" '
-  + 'rel="stylesheet" type="text/css">'
+    + 'href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" '
+    + 'rel="stylesheet" type="text/css">'
 );
 
 GM_addStyle(`
@@ -172,62 +172,58 @@ div.desc-wrap:not([class*='warDesc']) .faction-names {
 `);
 
 function JSONparse(str) {
-	try {
-		return JSON.parse(str);
-	} catch (e) {}
-	return null;
+    try {
+        return JSON.parse(str);
+    } catch (e) { }
+    return null;
 }
 
 function checkApiKey(key, cb) {
-	GM_xmlhttpRequest({
-		method: "GET",
-		url: `https://api.torn.com/user/?comment=BattleStatsPredictorLoginselections=&key=${key}`,
-		onload: (r) => {
-			if (r.status == 429){
-				cb("Couldn't check (rate limit)");
-				return;
-			}
-			if (r.status != 200){
-				cb(`Couldn't check (status code ${r.status})`);
-				return;
-			}
+    GM_xmlhttpRequest({
+        method: "GET",
+        url: `https://api.torn.com/user/?comment=BattleStatsPredictorLoginselections=&key=${key}`,
+        onload: (r) => {
+            if (r.status == 429) {
+                cb("Couldn't check (rate limit)");
+                return;
+            }
+            if (r.status != 200) {
+                cb(`Couldn't check (status code ${r.status})`);
+                return;
+            }
 
-			let j = JSONparse(r.responseText);
-			if (!j){
-				cb("Couldn't check (unexpected response)");
-				return;
-			}
+            let j = JSONparse(r.responseText);
+            if (!j) {
+                cb("Couldn't check (unexpected response)");
+                return;
+            }
 
-			if (!j.status) {
-				cb(j.message || "Wrong API key?");
-			}
-			else {
-				LOCAL_API_KEY = key;
-				localStorage.setItem("tdup.battleStatsPredictor.TornApiKey", key);
-				cb(true);
-			}
-		},
-		onabort: () => cb("Couldn't check (aborted)"),
-		onerror: () => cb("Couldn't check (error)"),
-		ontimeout: () => cb("Couldn't check (timeout)")
-	})
+            if (!j.status) {
+                cb(j.message || "Wrong API key?");
+            }
+            else {
+                LOCAL_API_KEY = key;
+                localStorage.setItem("tdup.battleStatsPredictor.TornApiKey", key);
+                cb(true);
+            }
+        },
+        onabort: () => cb("Couldn't check (aborted)"),
+        onerror: () => cb("Couldn't check (error)"),
+        ontimeout: () => cb("Couldn't check (timeout)")
+    })
 }
 
-function UpdateLocalScore()
-{
-    if (LOCAL_STATS_STR && LOCAL_STATS_DEF && LOCAL_STATS_SPD && LOCAL_STATS_DEX)
-    {
+function UpdateLocalScore() {
+    if (LOCAL_STATS_STR && LOCAL_STATS_DEF && LOCAL_STATS_SPD && LOCAL_STATS_DEX) {
         LOCAL_SCORE = parseInt(Math.sqrt(LOCAL_STATS_STR) + Math.sqrt(LOCAL_STATS_DEF) + Math.sqrt(LOCAL_STATS_SPD) + Math.sqrt(LOCAL_STATS_DEX));
         LOCAL_TBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_SPD) + parseInt(LOCAL_STATS_DEX);
     }
-    else
-    {
+    else {
         LOCAL_SCORE = 0;
         LOCAL_TBS = 0;
     }
 
-    if (comparisonBattleStatsText!=undefined)
-    {
+    if (comparisonBattleStatsText != undefined) {
         comparisonBattleStatsText.innerHTML = "<br/> TBS = " + LOCAL_TBS.toLocaleString('en-US') + " | Battle Score = " + LOCAL_SCORE.toLocaleString('en-US'); + "<br/><br/>";
     }
 }
@@ -240,23 +236,22 @@ var scoreSpdInput;
 var scoreDexInput;
 
 function addAPIKeyInput(node) {
-	if (!node) return;
+    if (!node) return;
 
-	node.style.position = "relative";
+    node.style.position = "relative";
 
     // API KEY PART
-	let apiKeyNode = document.createElement("div");
-	apiKeyNode.className = "text faction-names finally-bs-api";
-	apiKeyNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
-	let apiKeyText = document.createElement("span");
-	apiKeyText.innerHTML = "Battle Stats Predictor - " + ((!LOCAL_API_KEY) ? "Set" : "Update") + " your API key: ";
-	let apiKeyInput = document.createElement("input");
-    if (LOCAL_API_KEY)
-    {
+    let apiKeyNode = document.createElement("div");
+    apiKeyNode.className = "text faction-names finally-bs-api";
+    apiKeyNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
+    let apiKeyText = document.createElement("span");
+    apiKeyText.innerHTML = "Battle Stats Predictor - " + ((!LOCAL_API_KEY) ? "Set" : "Update") + " your API key: ";
+    let apiKeyInput = document.createElement("input");
+    if (LOCAL_API_KEY) {
         apiKeyInput.value = LOCAL_API_KEY;
     }
 
-	apiKeyNode.appendChild(apiKeyText);
+    apiKeyNode.appendChild(apiKeyText);
     apiKeyNode.appendChild(apiKeyInput);
 
     // USE COMPARE MODE PART
@@ -301,13 +296,12 @@ function addAPIKeyInput(node) {
     cell.appendChild(comparisonDex);
 
     scoreDexInput = document.createElement("input");
-    scoreDexInput.type='number';
-    if (LOCAL_STATS_DEX)
-    {
+    scoreDexInput.type = 'number';
+    if (LOCAL_STATS_DEX) {
         scoreDexInput.value = LOCAL_STATS_DEX;
     }
     scoreDexInput.addEventListener('change', () => {
-        if (scoreDexInput.value)  scoreDexInput.value = parseInt(scoreDexInput.value);
+        if (scoreDexInput.value) scoreDexInput.value = parseInt(scoreDexInput.value);
         else scoreDexInput.value = 0;
 
         LOCAL_STATS_DEX = scoreDexInput.value;
@@ -402,48 +396,46 @@ function addAPIKeyInput(node) {
     comparisonBattleStatsNode.appendChild(comparisonBattleStatsText);
 
     let configPanelSave = document.createElement("input");
-	configPanelSave.type = "button";
-	configPanelSave.value = "Save & Reload";
-	let configPanelClose = document.createElement("input");
-	configPanelClose.type = "button";
-	configPanelClose.value = "Close";
+    configPanelSave.type = "button";
+    configPanelSave.value = "Save & Reload";
+    let configPanelClose = document.createElement("input");
+    configPanelClose.type = "button";
+    configPanelClose.value = "Close";
 
     let buttonsNode = document.createElement("div");
     buttonsNode.className = "text faction-names finally-bs-api";
     buttonsNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
     buttonsNode.appendChild(configPanelSave);
-	buttonsNode.appendChild(configPanelClose);
+    buttonsNode.appendChild(configPanelClose);
 
 
-	function checkApiKeyCb(r) {
-		if (r === true) {
-			apiKeyNode.style.display = "none";
+    function checkApiKeyCb(r) {
+        if (r === true) {
+            apiKeyNode.style.display = "none";
             comparisonBattleStatsNode.style.display = "none";
             buttonsNode.style.display = "none";
             compareCheckBoxNode.style.display = "none";
-			apiKeyInput.value = "";
-		}
-		else {
+            apiKeyInput.value = "";
+        }
+        else {
             apiKeyNode.style.display = "block";
             compareCheckBoxNode.style.display = "block";
-			apiKeyText.innerHTML = `${r}: `;
-		}
-	}
+            apiKeyText.innerHTML = `${r}: `;
+        }
+    }
 
-	configPanelSave.addEventListener("click", () => {
-		apiKeyText.innerHTML = "Checking key and saving data";
-		checkApiKey(apiKeyInput.value, checkApiKeyCb);
+    configPanelSave.addEventListener("click", () => {
+        apiKeyText.innerHTML = "Checking key and saving data";
+        checkApiKey(apiKeyInput.value, checkApiKeyCb);
 
-        if (scoreStrInput.value && scoreDefInput.value && scoreSpdInput.value && scoreDexInput.value)
-        {
+        if (scoreStrInput.value && scoreDefInput.value && scoreSpdInput.value && scoreDexInput.value) {
             LOCAL_STATS_STR = parseInt(scoreStrInput.value);
             LOCAL_STATS_DEF = parseInt(scoreDefInput.value);
             LOCAL_STATS_SPD = parseInt(scoreSpdInput.value);
-            LOCAL_STATS_DEX = parseInt(scoreDexInput.value); 
+            LOCAL_STATS_DEX = parseInt(scoreDexInput.value);
             UpdateLocalScore();
         }
-        else
-        {
+        else {
             // Wrong values, reset everything to 0
             LOCAL_STATS_STR = LOCAL_STATS_DEF = LOCAL_STATS_SPD = LOCAL_STATS_DEX = LOCAL_SCORE = LOCAL_TBS = 0;
         }
@@ -454,40 +446,40 @@ function addAPIKeyInput(node) {
         localStorage.setItem("tdup.battleStatsPredictor.comparisonDex", LOCAL_STATS_DEX);
         localStorage.setItem("tdup.battleStatsPredictor.comparisonScore", LOCAL_SCORE);
         localStorage.setItem("tdup.battleStatsPredictor.comparisonTbs", LOCAL_TBS);
-        
+
 
         location.reload();
         return false;
-	});
-	configPanelClose.addEventListener("click", () => {
-		apiKeyNode.style.display = "none";
+    });
+    configPanelClose.addEventListener("click", () => {
+        apiKeyNode.style.display = "none";
         comparisonBattleStatsNode.style.display = "none";
         buttonsNode.style.display = "none";
         compareCheckBoxNode.style.display = "none";
-	});
+    });
 
-	let apiKeyButton = document.createElement("a");
-	apiKeyButton.className = "t-clear h c-pointer  line-h24 right ";
-	apiKeyButton.innerHTML = `
+    let apiKeyButton = document.createElement("a");
+    apiKeyButton.className = "t-clear h c-pointer  line-h24 right ";
+    apiKeyButton.innerHTML = `
 		<i class="fa fa-cog" aria-hidden="true"></i><span> Update Battle Stats Predictor settings</span>
 	`;
 
-	apiKeyButton.addEventListener("click", () => {
-		apiKeyText.innerHTML = "Battle Stats Predictor - Update your API key: ";
-		apiKeyNode.style.display = "block";
+    apiKeyButton.addEventListener("click", () => {
+        apiKeyText.innerHTML = "Battle Stats Predictor - Update your API key: ";
+        apiKeyNode.style.display = "block";
         comparisonBattleStatsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
         buttonsNode.style.display = "block";
         compareCheckBoxNode.style.display = "block";
-	});
+    });
 
-	node.querySelector("#top-page-links-list").appendChild(apiKeyButton);
+    node.querySelector("#top-page-links-list").appendChild(apiKeyButton);
     node.appendChild(apiKeyNode);
     node.appendChild(compareCheckBoxNode);
     node.appendChild(comparisonBattleStatsNode);
     node.appendChild(buttonsNode);
 }
 
-(function() {
+(function () {
     'use strict';
 
     var isInjected = false;
@@ -500,136 +492,135 @@ function addAPIKeyInput(node) {
 
     addAPIKeyInput(document.querySelector(".content-title"));
 
-    var observer = new MutationObserver(function(mutations, observer) {
-      mutations.forEach(function(mutation) {
-        for (const node of mutation.addedNodes) {
-          if (node.querySelector)
-          {
-              var el = document.querySelectorAll('.empty-block')
-              for(var i = 0; i < el.length; ++i)
-              {
-                  if (isInjected)
-                  {
-                    break;
-                  }
-                  divWhereToInject = el[i];
-                  isInjected = true;
-                  if (LOCAL_API_KEY)
-                  {
-                      fetchScoreAndTBSAsync(TargetId);
-                  }
-              }
+    var observer = new MutationObserver(function (mutations, observer) {
+        mutations.forEach(function (mutation) {
+            for (const node of mutation.addedNodes) {
+                if (node.querySelector) {
+                    var el = document.querySelectorAll('.empty-block')
+                    for (var i = 0; i < el.length; ++i) {
+                        if (isInjected) {
+                            break;
+                        }
+                        divWhereToInject = el[i];
+                        isInjected = true;
+                        if (LOCAL_API_KEY) {
+                            fetchScoreAndTBSAsync(TargetId);
+                        }
+                    }
 
-              if (!svgAttackDivFound && LOCAL_USE_COMPARE_MODE)
-              {
-                 var el2 = document.querySelectorAll('.profile-button-attack')
-                 for(i = 0; i < el2.length; ++i)
-                 {
-                     if (el2[i].className.includes("disabled"))
-                     {
-                        isAttackCurrentlyDisabled = true;
+                    if (!svgAttackDivFound && LOCAL_USE_COMPARE_MODE) {
+                        var el2 = document.querySelectorAll('.profile-button-attack')
+                        for (i = 0; i < el2.length; ++i) {
+                            if (el2[i].className.includes("disabled")) {
+                                isAttackCurrentlyDisabled = true;
 
-//                          let cross = document.createElement("svg");
-//                          cross.fill = "rgba(217, 54, 0, 0.5)";
-//                          cross.stroke = "#d4d4d4";
-//                          cross.width = "46";
+                                //                          let cross = document.createElement("svg");
+                                //                          cross.fill = "rgba(217, 54, 0, 0.5)";
+                                //                          cross.stroke = "#d4d4d4";
+                                //                          cross.width = "46";
 
-//                          el2[i].appendChild(cross);
-                         //<svg xmlns="http://www.w3.org/2000/svg" fill="rgba(217, 54, 0, 0.5)" stroke="#d4d4d4" stroke-width="0" width="46" height="46" viewBox="551.393 356 44 44"><path d="M556.393,363l12.061,14-12.061,14,1,1,14-11.94,14,11.94,1-1-12.06-14,12.06-14-1-1-14,11.94-14-11.94Z"></path></svg>
-                     }
-                     divSvgAttackToColor = el2[i].children[0];
-                     svgAttackDivFound = true;
-                 }
-              }
+                                //                          el2[i].appendChild(cross);
+                                //<svg xmlns="http://www.w3.org/2000/svg" fill="rgba(217, 54, 0, 0.5)" stroke="#d4d4d4" stroke-width="0" width="46" height="46" viewBox="551.393 356 44 44"><path d="M556.393,363l12.061,14-12.061,14,1,1,14-11.94,14,11.94,1-1-12.06-14,12.06-14-1-1-14,11.94-14-11.94Z"></path></svg>
+                            }
+                            divSvgAttackToColor = el2[i].children[0];
+                            svgAttackDivFound = true;
+                        }
+                    }
 
-              addAPIKeyInput(node.querySelector && node.querySelector(".content-title"));
-          }
-        }
-      });
+                    addAPIKeyInput(node.querySelector && node.querySelector(".content-title"));
+                }
+            }
+        });
     });
 
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     TargetId = urlParams.get('XID');
 
-    observer.observe(document, {attributes: false, childList: true, characterData: false, subtree:true});
+    observer.observe(document, { attributes: false, childList: true, characterData: false, subtree: true });
 
-    function getColorDifference(ratio)
-    {
-        if (ratio > 150)
-        {
+    function getColorDifference(ratio) {
+        if (ratio > 150) {
             return "#FF0000"; // red
         }
-        else if (ratio > 50)
-        {
+        else if (ratio > 50) {
             return "#FFA500"; // orange
         }
-        else
-        {
+        else {
             return "#008000"; //green
         }
     }
 
+    var FAIL = 0;
+    var SUCCESS = 1;
+    var TOO_WEAK = 2;
+    var TOO_STRONG = 3;
+
     async function fetchScoreAndTBSAsync(targetId) {
         const json = await fetchScoreAndTBS(targetId);
 
-        let success = json.Success;
-        if (success)
-        {
-            let TBSBalanced = json.TBS_Balanced.toLocaleString('en-US');
-            let TBS = json.TBS.toLocaleString('en-US');
-            let TargetScore = json.Score.toLocaleString('en-US');
+        let result = json.Result;
+        switch (result) {
+            case FAIL:
+                divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + json.Reason + '</div>';
+                return;
+            case TOO_WEAK:
+                divWhereToInject.innerHTML += '<div title = "Player is too weak" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#008000;">Player is too weak to give a proper estimation (soon&#169;)</label></div>';
+                return;
+            case TOO_STRONG:
+                divWhereToInject.innerHTML += '<div title = "Player is too strong" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#FF0000;">Player is too strong to give a proper estimation (soon&#169;)</label></div>';
+                return;
+            case SUCCESS:
+                {
+                    let TBSBalanced = json.TBS_Balanced.toLocaleString('en-US');
+                    let TBS = json.TBS.toLocaleString('en-US');
+                    let TargetScore = json.Score.toLocaleString('en-US');
 
-            if (LOCAL_USE_COMPARE_MODE)
-            {
-                var intTBS =parseInt(TBS.replaceAll(',',''));
-                var localTBS = parseInt(LOCAL_STATS_STR)+parseInt(LOCAL_STATS_DEF)+parseInt(LOCAL_STATS_DEX)+parseInt(LOCAL_STATS_SPD);
-                var tbs1Ratio = 100 * intTBS / localTBS;
+                    if (LOCAL_USE_COMPARE_MODE) {
+                        var intTBS = parseInt(TBS.replaceAll(',', ''));
+                        var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
+                        var tbs1Ratio = 100 * intTBS / localTBS;
 
-                var intTbsBalanced =parseInt(TBSBalanced.replaceAll(',',''));
-                var tbsBalancedRatio = 100 * intTbsBalanced / ((parseInt(LOCAL_SCORE) * parseInt(LOCAL_SCORE)) / 4);
+                        var intTbsBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
+                        var tbsBalancedRatio = 100 * intTbsBalanced / ((parseInt(LOCAL_SCORE) * parseInt(LOCAL_SCORE)) / 4);
 
-                var colorTBS = getColorDifference(tbs1Ratio);
-                var colorBalancedTBS = getColorDifference(tbsBalancedRatio);
+                        var colorTBS = getColorDifference(tbs1Ratio);
+                        var colorBalancedTBS = getColorDifference(tbsBalancedRatio);
 
-                if (divSvgAttackToColor) divSvgAttackToColor.style.fill = colorTBS;
+                        if (divSvgAttackToColor) divSvgAttackToColor.style.fill = colorTBS;
 
-                
-                divWhereToInject.innerHTML += '<div title = "From the TBS model" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px">TBS_1 = '+ TBS + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0)+'%) </label>' +
-                '<br /> TBS_2 = '+ TBSBalanced+ '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0)+'%) </label></div>';
-            }
-            else
-            {
-                divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">TBS_1 = '+ TBS +
-                '<br /> TBS_2 = '+ TBSBalanced + '</div>';
-            }
-        }
-        else
-        {
-            divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + json.Reason+'</div>';
+                        divWhereToInject.innerHTML += '<div title = "From the TBS model" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px">TBS_1 = ' + TBS + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label>' +
+                            '<br /> TBS_2 = ' + TBSBalanced + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
+                    }
+                    else {
+                        divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">TBS_1 = ' + TBS +
+                            '<br /> TBS_2 = ' + TBSBalanced + '</div>';
+                    }
+                }
+                break;                
         }
     }
 
     function fetchScoreAndTBS(targetId) {
-    return new Promise((resolve, reject) => {
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url :`http://www.lol-manager.com/api/battlestats/${LOCAL_API_KEY}/${targetId}`,
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            onload: (response) => {
-                try {
-                    resolve(JSON.parse(response.responseText));
-                } catch(err) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: `http://www.lol-manager.com/api/battlestats/${LOCAL_API_KEY}/${targetId}`,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                onload: (response) => {
+                    try {
+                        resolve(JSON.parse(response.responseText));
+                    } catch (err) {
+                        reject(err);
+                    }
+                },
+                onerror: (err) => {
                     reject(err);
                 }
-            },
-            onerror: (err) => {
-                reject(err);
-            }
+            });
         });
-    });
-}
+    }
 
 })();
