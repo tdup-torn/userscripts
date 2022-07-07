@@ -257,32 +257,36 @@ function addAPIKeyInput(node) {
     }
 
 	apiKeyNode.appendChild(apiKeyText);
-	apiKeyNode.appendChild(apiKeyInput);
+    apiKeyNode.appendChild(apiKeyInput);
 
-    // COMPARISON STATS PART
-    let comparisonBattleStatsNode = document.createElement("div");
-    comparisonBattleStatsNode.className = "text faction-names finally-bs-api";
+    // USE COMPARE MODE PART
+    let compareCheckBoxNode = document.createElement("div");
+    compareCheckBoxNode.className = "text faction-names finally-bs-api";
+    compareCheckBoxNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
 
     let checkbox = document.createElement('input');
     checkbox.type = "checkbox";
     checkbox.name = "name";
     checkbox.value = "value";
     checkbox.id = "id";
-    checkbox.checked =LOCAL_USE_COMPARE_MODE;
-    comparisonBattleStatsNode.style.display = (LOCAL_USE_COMPARE_MODE && !LOCAL_API_KEY) ? "block" : "none";
-
+    checkbox.checked = LOCAL_USE_COMPARE_MODE;
     checkbox.addEventListener("change", () => {
         LOCAL_USE_COMPARE_MODE = !LOCAL_USE_COMPARE_MODE;
         comparisonBattleStatsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
         localStorage.setItem("tdup.battleStatsPredictor.useCompareMode", LOCAL_USE_COMPARE_MODE);
- 	});
-
-    apiKeyNode.appendChild(checkbox);
+    });
 
     var checkboxLabel = document.createElement('label')
     checkboxLabel.htmlFor = "id";
     checkboxLabel.appendChild(document.createTextNode('Use compare mode'));
-    apiKeyNode.appendChild(checkboxLabel);
+    compareCheckBoxNode.appendChild(checkboxLabel);
+
+    compareCheckBoxNode.appendChild(checkbox);
+
+    // COMPARISON STATS PART
+    let comparisonBattleStatsNode = document.createElement("div");
+    comparisonBattleStatsNode.className = "text faction-names finally-bs-api";
+    comparisonBattleStatsNode.style.display = (LOCAL_USE_COMPARE_MODE && !LOCAL_API_KEY) ? "block" : "none";
 
     var cell, raw, table;
     table = document.createElement('table');
@@ -416,10 +420,12 @@ function addAPIKeyInput(node) {
 			apiKeyNode.style.display = "none";
             comparisonBattleStatsNode.style.display = "none";
             buttonsNode.style.display = "none";
+            compareCheckBoxNode.style.display = "none";
 			apiKeyInput.value = "";
 		}
 		else {
-			apiKeyNode.style.display = "block";
+            apiKeyNode.style.display = "block";
+            compareCheckBoxNode.style.display = "block";
 			apiKeyText.innerHTML = `${r}: `;
 		}
 	}
@@ -457,6 +463,7 @@ function addAPIKeyInput(node) {
 		apiKeyNode.style.display = "none";
         comparisonBattleStatsNode.style.display = "none";
         buttonsNode.style.display = "none";
+        compareCheckBoxNode.style.display = "none";
 	});
 
 	let apiKeyButton = document.createElement("a");
@@ -470,10 +477,12 @@ function addAPIKeyInput(node) {
 		apiKeyNode.style.display = "block";
         comparisonBattleStatsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
         buttonsNode.style.display = "block";
+        compareCheckBoxNode.style.display = "block";
 	});
 
 	node.querySelector("#top-page-links-list").appendChild(apiKeyButton);
     node.appendChild(apiKeyNode);
+    node.appendChild(compareCheckBoxNode);
     node.appendChild(comparisonBattleStatsNode);
     node.appendChild(buttonsNode);
 }
