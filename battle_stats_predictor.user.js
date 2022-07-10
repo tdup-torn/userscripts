@@ -29,6 +29,8 @@ let LOCAL_STATS_SPD = localStorage["tdup.battleStatsPredictor.comparisonSpd"];
 let LOCAL_STATS_DEX = localStorage["tdup.battleStatsPredictor.comparisonDex"];
 let LOCAL_TBS = localStorage["tdup.battleStatsPredictor.comparisonTbs"];
 
+let LOCAL_IS_FETCHING_STATS = localStorage["tdup.battleStatsPredictor.isFecthingStats"];
+
 $("head").append(
     '<link '
     + 'href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" '
@@ -178,10 +180,15 @@ function JSONparse(str) {
     return null;
 }
 
-function checkApiKey(key, cb) {
-    GM_xmlhttpRequest({
+async function checkApiKey(key, retrieveStats, cb) {
+    var urlToUse = "https://api.torn.com/user/?";
+    if (retrieveStats)
+        urlToUse += "selections=battlestats&";
+
+    urlToUse += "comment=BattleStatsPredictorLoginselections&key=" + key;
+    return await GM_xmlhttpRequest({
         method: "GET",
-        url: `https://api.torn.com/user/?comment=BattleStatsPredictorLoginselections=&key=${key}`,
+        url: urlToUse,
         onload: (r) => {
             if (r.status == 429) {
                 cb("Couldn't check (rate limit)");
@@ -198,12 +205,32 @@ function checkApiKey(key, cb) {
                 return;
             }
 
-            if (!j.status) {
+            if (j.error && j.error.code > 0) {
+                cb("No permission to retrieve stats");
+                return;
+            }
+
+            if (j.status != undefined && !j.status) {
                 cb(j.message || "Wrong API key?");
             }
             else {
-                LOCAL_API_KEY = key;
-                localStorage.setItem("tdup.battleStatsPredictor.TornApiKey", key);
+                if (retrieveStats) {
+                    LOCAL_STATS_STR = parseInt(j.strength);
+                    LOCAL_STATS_DEF = parseInt(j.defense);
+                    LOCAL_STATS_SPD = parseInt(j.speed);
+                    LOCAL_STATS_DEX = parseInt(j.dexterity);
+
+                    scoreStrInput.value = LOCAL_STATS_STR;
+                    scoreDefInput.value = LOCAL_STATS_DEF;
+                    scoreSpdInput.value = LOCAL_STATS_SPD;
+                    scoreDexInput.value = LOCAL_STATS_DEX;
+
+                    localStorage.setItem("tdup.battleStatsPredictor.comparisonStr", LOCAL_STATS_STR);
+                    localStorage.setItem("tdup.battleStatsPredictor.comparisonDef", LOCAL_STATS_DEF);
+                    localStorage.setItem("tdup.battleStatsPredictor.comparisonSpd", LOCAL_STATS_SPD);
+                    localStorage.setItem("tdup.battleStatsPredictor.comparisonDex", LOCAL_STATS_DEX);
+                }
+                
                 cb(true);
             }
         },
@@ -213,7 +240,10 @@ function checkApiKey(key, cb) {
     })
 }
 
-function UpdateLocalScore() {
+function UpdateLocalScore(value) {
+    apiKeyText.innerHTML = "Battle Stats Predictor - " + ((!LOCAL_API_KEY) ? "Set" : "Update") + " your API key: ";
+    setBattleStats.disabled = false;
+
     if (LOCAL_STATS_STR && LOCAL_STATS_DEF && LOCAL_STATS_SPD && LOCAL_STATS_DEX) {
         LOCAL_SCORE = parseInt(Math.sqrt(LOCAL_STATS_STR) + Math.sqrt(LOCAL_STATS_DEF) + Math.sqrt(LOCAL_STATS_SPD) + Math.sqrt(LOCAL_STATS_DEX));
         LOCAL_TBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_SPD) + parseInt(LOCAL_STATS_DEX);
@@ -234,6 +264,8 @@ var scoreStrInput;
 var scoreDefInput;
 var scoreSpdInput;
 var scoreDexInput;
+var apiKeyText;
+var setBattleStats;
 
 function addAPIKeyInput(node) {
     if (!node) return;
@@ -244,15 +276,20 @@ function addAPIKeyInput(node) {
     let apiKeyNode = document.createElement("div");
     apiKeyNode.className = "text faction-names finally-bs-api";
     apiKeyNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
-    let apiKeyText = document.createElement("span");
+    apiKeyText = document.createElement("span");
     apiKeyText.innerHTML = "Battle Stats Predictor - " + ((!LOCAL_API_KEY) ? "Set" : "Update") + " your API key: ";
     let apiKeyInput = document.createElement("input");
     if (LOCAL_API_KEY) {
         apiKeyInput.value = LOCAL_API_KEY;
     }
+    let apiRegister = document.createElement("span");
+    apiRegister.innerHTML = '<a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile" target="_blank">Create a basic key</a>';
+    apiRegister.innerHTML += '<a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile,battlestats" target="_blank">Create a key with access to your battle stats. Those are not transmited to our server.</a>';
+    
 
     apiKeyNode.appendChild(apiKeyText);
     apiKeyNode.appendChild(apiKeyInput);
+    apiKeyNode.appendChild(apiRegister);
 
     // USE COMPARE MODE PART
     let compareCheckBoxNode = document.createElement("div");
@@ -287,12 +324,18 @@ function addAPIKeyInput(node) {
     table = document.createElement('table');
     comparisonBattleStatsNode.appendChild(table);
 
+    setBattleStats = document.createElement("input");
+    setBattleStats.type = "button";
+    setBattleStats.value = "Set with my battlestats";
+    comparisonBattleStatsNode.appendChild(setBattleStats);
+
 
     // ************************** DEX ***********************
     let comparisonDex = document.createElement("label");
     comparisonDex.innerHTML = '<div style="text-align: right">Dex&nbsp</div>';
     raw = table.insertRow(0);
     cell = raw.insertCell(0);
+    cell.width = '50%';
     cell.appendChild(comparisonDex);
 
     scoreDexInput = document.createElement("input");
@@ -395,6 +438,7 @@ function addAPIKeyInput(node) {
 
     comparisonBattleStatsNode.appendChild(comparisonBattleStatsText);
 
+
     let configPanelSave = document.createElement("input");
     configPanelSave.type = "button";
     configPanelSave.value = "Save & Reload";
@@ -408,14 +452,12 @@ function addAPIKeyInput(node) {
     buttonsNode.appendChild(configPanelSave);
     buttonsNode.appendChild(configPanelClose);
 
-
     function checkApiKeyCb(r) {
         if (r === true) {
             apiKeyNode.style.display = "none";
             comparisonBattleStatsNode.style.display = "none";
             buttonsNode.style.display = "none";
             compareCheckBoxNode.style.display = "none";
-            apiKeyInput.value = "";
         }
         else {
             apiKeyNode.style.display = "block";
@@ -424,9 +466,18 @@ function addAPIKeyInput(node) {
         }
     }
 
+
+    setBattleStats.addEventListener("click", () => {
+        checkApiKey(apiKeyInput.value, true, UpdateLocalScore);
+        setBattleStats.disabled = true;
+    });
+
     configPanelSave.addEventListener("click", () => {
         apiKeyText.innerHTML = "Checking key and saving data";
-        checkApiKey(apiKeyInput.value, checkApiKeyCb);
+        checkApiKey(apiKeyInput.value, false, checkApiKeyCb);
+
+        LOCAL_API_KEY = apiKeyInput.value;
+        localStorage.setItem("tdup.battleStatsPredictor.TornApiKey", LOCAL_API_KEY);
 
         if (scoreStrInput.value && scoreDefInput.value && scoreSpdInput.value && scoreDexInput.value) {
             LOCAL_STATS_STR = parseInt(scoreStrInput.value);
@@ -446,7 +497,6 @@ function addAPIKeyInput(node) {
         localStorage.setItem("tdup.battleStatsPredictor.comparisonDex", LOCAL_STATS_DEX);
         localStorage.setItem("tdup.battleStatsPredictor.comparisonScore", LOCAL_SCORE);
         localStorage.setItem("tdup.battleStatsPredictor.comparisonTbs", LOCAL_TBS);
-
 
         location.reload();
         return false;
@@ -589,15 +639,15 @@ function addAPIKeyInput(node) {
 
                         if (divSvgAttackToColor) divSvgAttackToColor.style.fill = colorTBS;
 
-                        divWhereToInject.innerHTML += '<div title = "From the TBS model" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px">TBS_1 = ' + TBS + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label>' +
-                            '<br /> TBS_2 = ' + TBSBalanced + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
+                        divWhereToInject.innerHTML += '<div title = "From the TBS model" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px">TBS (Model-TBS-) = ' + TBS + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label>' +
+                            '<br /> TBS (ModelScore) = ' + TBSBalanced + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
                     }
                     else {
                         divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">TBS_1 = ' + TBS +
                             '<br /> TBS_2 = ' + TBSBalanced + '</div>';
                     }
                 }
-                break;                
+                break;
         }
     }
 
