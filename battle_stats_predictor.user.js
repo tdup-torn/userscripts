@@ -1,9 +1,15 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     2.01
+// @version     3
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
+// @match       https://www.torn.com/bringafriend.php*
+// @match       https://www.torn.com/halloffame.php*
+// @match       https://www.torn.com/forums.php*
+// @match       https://www.torn.com/index.php?page=people*
+// @match       https://www.torn.com/factions.php*
+// @match       https://www.torn.com/page.php*
 // @run-at      document-end
 // @grant       GM_addStyle
 // @grant       GM_xmlhttpRequest
@@ -28,8 +34,6 @@ let LOCAL_STATS_DEF = localStorage["tdup.battleStatsPredictor.comparisonDef"];
 let LOCAL_STATS_SPD = localStorage["tdup.battleStatsPredictor.comparisonSpd"];
 let LOCAL_STATS_DEX = localStorage["tdup.battleStatsPredictor.comparisonDex"];
 let LOCAL_TBS = localStorage["tdup.battleStatsPredictor.comparisonTbs"];
-
-let LOCAL_IS_FETCHING_STATS = localStorage["tdup.battleStatsPredictor.isFecthingStats"];
 
 $("head").append(
     '<link '
@@ -266,9 +270,15 @@ var scoreSpdInput;
 var scoreDexInput;
 var apiKeyText;
 var setBattleStats;
+var mainNode;
 
 function addAPIKeyInput(node) {
     if (!node) return;
+
+    mainNode = node;
+    var topPageLinksList = node.querySelector("#top-page-links-list");
+    if (topPageLinksList == undefined)
+        return;
 
     node.style.position = "relative";
 
@@ -283,8 +293,8 @@ function addAPIKeyInput(node) {
         apiKeyInput.value = LOCAL_API_KEY;
     }
     let apiRegister = document.createElement("span");
-    apiRegister.innerHTML = '<a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile" target="_blank">Create a basic key</a>';
-    apiRegister.innerHTML += '<a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile,battlestats" target="_blank">Create a key with access to your battle stats. Those are not transmited to our server.</a>';
+    apiRegister.innerHTML = '<div style="margin-top: 5px;"><a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile" target="_blank">Create a basic key</a></div>';
+    apiRegister.innerHTML += '<div style="margin-top: 5px;"><a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile,battlestats" target="_blank">Create a key with access to your battle stats. Those are not transmited to our server.</a></div>';
     
 
     apiKeyNode.appendChild(apiKeyText);
@@ -515,14 +525,23 @@ function addAPIKeyInput(node) {
 	`;
 
     apiKeyButton.addEventListener("click", () => {
-        apiKeyText.innerHTML = "Battle Stats Predictor - Update your API key: ";
-        apiKeyNode.style.display = "block";
-        comparisonBattleStatsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
-        buttonsNode.style.display = "block";
-        compareCheckBoxNode.style.display = "block";
+        if (apiKeyNode.style.display == "block") {
+            apiKeyNode.style.display = "none";
+            comparisonBattleStatsNode.style.display = "none";
+            buttonsNode.style.display = "none";
+            compareCheckBoxNode.style.display = "none";
+        }
+        else {
+            apiKeyText.innerHTML = "Battle Stats Predictor - Update your API key: ";
+            apiKeyNode.style.display = "block";
+            comparisonBattleStatsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
+            buttonsNode.style.display = "block";
+            compareCheckBoxNode.style.display = "block";
+        }
+
     });
 
-    node.querySelector("#top-page-links-list").appendChild(apiKeyButton);
+    topPageLinksList.appendChild(apiKeyButton);
     node.appendChild(apiKeyNode);
     node.appendChild(compareCheckBoxNode);
     node.appendChild(comparisonBattleStatsNode);
@@ -532,6 +551,11 @@ function addAPIKeyInput(node) {
 (function () {
     'use strict';
 
+    //if (document.location == "test")
+    //{
+
+    //}
+
     var isInjected = false;
     var TargetId = -1;
     var divWhereToInject;
@@ -539,6 +563,8 @@ function addAPIKeyInput(node) {
     var svgAttackDivFound = false;
     var divSvgAttackToColor;
     var isAttackCurrentlyDisabled = false;
+
+    var dictDivPerPlayer = {};
 
     addAPIKeyInput(document.querySelector(".content-title"));
 
@@ -577,11 +603,67 @@ function addAPIKeyInput(node) {
                         }
                     }
 
-                    addAPIKeyInput(node.querySelector && node.querySelector(".content-title"));
+                    // for pages with several players
+                    el = document.querySelectorAll('.user.name')
+                    for (i = 0; i < el.length; ++i) {
+                        {
+                            var iter = el[i];
+                            var toSplit = iter.innerHTML;
+                            var myArray = toSplit.split("[");
+                            if (myArray.length < 2)
+                                continue;
+
+                            myArray = myArray[1].split("]");
+                            if (myArray.length < 1)
+                                continue;
+
+                            var playerId = parseInt(myArray[0]);
+                            if (!(playerId in dictDivPerPlayer))
+                            {
+                                dictDivPerPlayer[playerId] = el[i];
+                                FetchInfoForPlayer(playerId);
+                            }
+                        }
+
+                        addAPIKeyInput(node.querySelector && node.querySelector(".content-title"));
+                    }
                 }
             }
         });
     });
+
+    async function FetchInfoForPlayer(targetId) {
+        const json = await fetchScoreAndTBS(targetId);
+
+        let result = json.Result;
+        switch (result) {
+            case FAIL:
+                dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><img style="background-color:' + colorTBS + '; border-radius: 50%;" width="16" height="16" src="https://www.freeiconspng.com/uploads/sign-red-error-icon-1.png" /></div>' + dictDivPerPlayer[targetId].innerHTML;
+                //divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + json.Reason + '</div>';
+                return;
+            case TOO_WEAK:
+                //divWhereToInject.innerHTML += '<div title = "Player is too weak" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#008000;">Player is too weak to give a proper estimation (soon&#169;)</label></div>';
+                //return;
+            case TOO_STRONG:
+                //divWhereToInject.innerHTML += '<div title = "Player is too strong" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#FF0000;">Player is too strong to give a proper estimation (soon&#169;)</label></div>';
+                //return;
+            case SUCCESS:
+                {
+                    if (LOCAL_USE_COMPARE_MODE) {
+                        let TBSBalanced = json.TBS_Balanced.toLocaleString('en-US');
+                        let TBS = json.TBS.toLocaleString('en-US');
+                        var intTBS = parseInt(TBS.replaceAll(',', ''));
+                        var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
+                        var tbs1Ratio = 100 * intTBS / localTBS;
+                        var colorTBS = getColorDifference(tbs1Ratio);
+                        var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID="+targetId;
+
+                        dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '"><img style="background-color:' + colorTBS +'; border-radius: 50%;" width="16" height="16" src="https://cdn2.iconfinder.com/data/icons/gaming-outline/32/sword_battle_rpg_weapon_attack_game-512.png" /></a></div>' + dictDivPerPlayer[targetId].innerHTML;
+                    }
+                    return;
+                }
+        }
+    }
 
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
@@ -615,10 +697,10 @@ function addAPIKeyInput(node) {
                 divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + json.Reason + '</div>';
                 return;
             case TOO_WEAK:
-                divWhereToInject.innerHTML += '<div title = "Player is too weak" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#008000;">Player is too weak to give a proper estimation (soon&#169;)</label></div>';
+                divWhereToInject.innerHTML += '<div title = "Player is too weak" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#008000;">Player is too weak to give a proper estimation (score:'+ json.Score + ')</label></div>';
                 return;
             case TOO_STRONG:
-                divWhereToInject.innerHTML += '<div title = "Player is too strong" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#FF0000;">Player is too strong to give a proper estimation (soon&#169;)</label></div>';
+                divWhereToInject.innerHTML += '<div title = "Player is too strong" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#FF0000;">Player is too strong to give a proper estimation (score:' + json.Score + ')</label></div>';
                 return;
             case SUCCESS:
                 {
