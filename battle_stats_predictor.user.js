@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     3
+// @version     3.1
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -234,7 +234,7 @@ async function checkApiKey(key, retrieveStats, cb) {
                     localStorage.setItem("tdup.battleStatsPredictor.comparisonSpd", LOCAL_STATS_SPD);
                     localStorage.setItem("tdup.battleStatsPredictor.comparisonDex", LOCAL_STATS_DEX);
                 }
-                
+
                 cb(true);
             }
         },
@@ -295,7 +295,7 @@ function addAPIKeyInput(node) {
     let apiRegister = document.createElement("span");
     apiRegister.innerHTML = '<div style="margin-top: 5px;"><a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile" target="_blank">Create a basic key</a></div>';
     apiRegister.innerHTML += '<div style="margin-top: 5px;"><a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile,battlestats" target="_blank">Create a key with access to your battle stats. Those are not transmited to our server.</a></div>';
-    
+
 
     apiKeyNode.appendChild(apiKeyText);
     apiKeyNode.appendChild(apiKeyInput);
@@ -572,60 +572,90 @@ function addAPIKeyInput(node) {
         mutations.forEach(function (mutation) {
             for (const node of mutation.addedNodes) {
                 if (node.querySelector) {
-                    var el = document.querySelectorAll('.empty-block')
-                    for (var i = 0; i < el.length; ++i) {
-                        if (isInjected) {
-                            break;
-                        }
-                        divWhereToInject = el[i];
-                        isInjected = true;
-                        if (LOCAL_API_KEY) {
-                            fetchScoreAndTBSAsync(TargetId);
-                        }
+                    if (window.location.href == "https://www.torn.com/factions.php?step=your#/") {
+                        continue;
                     }
-
-                    if (!svgAttackDivFound && LOCAL_USE_COMPARE_MODE) {
-                        var el2 = document.querySelectorAll('.profile-button-attack')
-                        for (i = 0; i < el2.length; ++i) {
-                            if (el2[i].className.includes("disabled")) {
-                                isAttackCurrentlyDisabled = true;
-
-                                //                          let cross = document.createElement("svg");
-                                //                          cross.fill = "rgba(217, 54, 0, 0.5)";
-                                //                          cross.stroke = "#d4d4d4";
-                                //                          cross.width = "46";
-
-                                //                          el2[i].appendChild(cross);
-                                //<svg xmlns="http://www.w3.org/2000/svg" fill="rgba(217, 54, 0, 0.5)" stroke="#d4d4d4" stroke-width="0" width="46" height="46" viewBox="551.393 356 44 44"><path d="M556.393,363l12.061,14-12.061,14,1,1,14-11.94,14,11.94,1-1-12.06-14,12.06-14-1-1-14,11.94-14-11.94Z"></path></svg>
+                    if (window.location.href.includes("https://www.torn.com/profiles.php")) {
+                        var el = document.querySelectorAll('.empty-block')
+                        for (var i = 0; i < el.length; ++i) {
+                            if (isInjected) {
+                                break;
                             }
-                            divSvgAttackToColor = el2[i].children[0];
-                            svgAttackDivFound = true;
-                        }
-                    }
-
-                    // for pages with several players
-                    el = document.querySelectorAll('.user.name')
-                    for (i = 0; i < el.length; ++i) {
-                        {
-                            var iter = el[i];
-                            var toSplit = iter.innerHTML;
-                            var myArray = toSplit.split("[");
-                            if (myArray.length < 2)
-                                continue;
-
-                            myArray = myArray[1].split("]");
-                            if (myArray.length < 1)
-                                continue;
-
-                            var playerId = parseInt(myArray[0]);
-                            if (!(playerId in dictDivPerPlayer))
-                            {
-                                dictDivPerPlayer[playerId] = el[i];
-                                FetchInfoForPlayer(playerId);
+                            divWhereToInject = el[i];
+                            isInjected = true;
+                            if (LOCAL_API_KEY) {
+                                fetchScoreAndTBSAsync(TargetId);
                             }
                         }
 
-                        addAPIKeyInput(node.querySelector && node.querySelector(".content-title"));
+                        if (!svgAttackDivFound && LOCAL_USE_COMPARE_MODE) {
+                            var el2 = document.querySelectorAll('.profile-button-attack')
+                            for (i = 0; i < el2.length; ++i) {
+                                if (el2[i].className.includes("disabled")) {
+                                    isAttackCurrentlyDisabled = true;
+
+                                    //                          let cross = document.createElement("svg");
+                                    //                          cross.fill = "rgba(217, 54, 0, 0.5)";
+                                    //                          cross.stroke = "#d4d4d4";
+                                    //                          cross.width = "46";
+
+                                    //                          el2[i].appendChild(cross);
+                                    //<svg xmlns="http://www.w3.org/2000/svg" fill="rgba(217, 54, 0, 0.5)" stroke="#d4d4d4" stroke-width="0" width="46" height="46" viewBox="551.393 356 44 44"><path d="M556.393,363l12.061,14-12.061,14,1,1,14-11.94,14,11.94,1-1-12.06-14,12.06-14-1-1-14,11.94-14-11.94Z"></path></svg>
+                                }
+                                divSvgAttackToColor = el2[i].children[0];
+                                svgAttackDivFound = true;
+                            }
+                        }
+                    } else {
+                        if (LOCAL_USE_COMPARE_MODE) {
+
+                            if (window.location.href.includes("https://www.torn.com/factions.php")) {
+                                // for faction page
+                                el = node.querySelectorAll('a');
+                                for (i = 0; i < el.length; ++i) {
+                                    var iter = el[i];
+                                    if (iter.href != null) {
+                                        //"https://www.torn.com/profiles.php?XID=2139172"
+                                        var myArray = iter.href.split("?XID=");
+                                        if (myArray.length == 2) {
+                                            var playerId = parseInt(myArray[1]);
+                                            if (!(playerId in dictDivPerPlayer)) {
+                                                dictDivPerPlayer[playerId] = el[i];
+                                                FetchInfoForPlayer(playerId);
+                                            }
+                                        }
+                                    }
+
+                                }
+                                //addAPIKeyInput(node.querySelector && node.querySelector(".content-title"));
+                            }
+
+                            else {
+                                // for pages with several players
+                                el = document.querySelectorAll('.user.name')
+                                for (i = 0; i < el.length; ++i) {
+                                    {
+                                        var iter = el[i];
+                                        var toSplit = iter.innerHTML;
+                                        var myArray = toSplit.split("[");
+                                        if (myArray.length < 2)
+                                            continue;
+
+                                        myArray = myArray[1].split("]");
+                                        if (myArray.length < 1)
+                                            continue;
+
+                                        var playerId = parseInt(myArray[0]);
+                                        if (!(playerId in dictDivPerPlayer)) {
+                                            dictDivPerPlayer[playerId] = el[i];
+                                            FetchInfoForPlayer(playerId);
+                                        }
+                                    }
+
+                                    //addAPIKeyInput(node.querySelector && node.querySelector(".content-title"));
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -642,23 +672,26 @@ function addAPIKeyInput(node) {
                 //divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + json.Reason + '</div>';
                 return;
             case TOO_WEAK:
-                //divWhereToInject.innerHTML += '<div title = "Player is too weak" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#008000;">Player is too weak to give a proper estimation (soon&#169;)</label></div>';
-                //return;
+            //divWhereToInject.innerHTML += '<div title = "Player is too weak" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#008000;">Player is too weak to give a proper estimation (soon&#169;)</label></div>';
+            //return;
             case TOO_STRONG:
-                //divWhereToInject.innerHTML += '<div title = "Player is too strong" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#FF0000;">Player is too strong to give a proper estimation (soon&#169;)</label></div>';
-                //return;
+            //divWhereToInject.innerHTML += '<div title = "Player is too strong" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#FF0000;">Player is too strong to give a proper estimation (soon&#169;)</label></div>';
+            //return;
             case SUCCESS:
                 {
                     if (LOCAL_USE_COMPARE_MODE) {
-                        let TBSBalanced = json.TBS_Balanced.toLocaleString('en-US');
                         let TBS = json.TBS.toLocaleString('en-US');
-                        var intTBS = parseInt(TBS.replaceAll(',', ''));
-                        var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
-                        var tbs1Ratio = 100 * intTBS / localTBS;
-                        var colorTBS = getColorDifference(tbs1Ratio);
-                        var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID="+targetId;
+                        let TBSBalanced = json.TBS_Balanced.toLocaleString('en-US');
 
-                        dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '"><img style="background-color:' + colorTBS +'; border-radius: 50%;" width="16" height="16" src="https://cdn2.iconfinder.com/data/icons/gaming-outline/32/sword_battle_rpg_weapon_attack_game-512.png" /></a></div>' + dictDivPerPlayer[targetId].innerHTML;
+                        var intTBS = parseInt(TBS.replaceAll(',', ''));
+                        var intTBSBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
+
+                        var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
+                        var ratioComparedToUs = 50 * (intTBS + intTBSBalanced) / localTBS;
+                        var colorTBS = getColorDifference(ratioComparedToUs);
+                        var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
+
+                        dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '"><img style="background-color:' + colorTBS + '; border-radius: 50%;" width="16" height="16" src="https://cdn2.iconfinder.com/data/icons/gaming-outline/32/sword_battle_rpg_weapon_attack_game-512.png" /></a></div>' + dictDivPerPlayer[targetId].innerHTML;
                     }
                     return;
                 }
@@ -697,7 +730,7 @@ function addAPIKeyInput(node) {
                 divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + json.Reason + '</div>';
                 return;
             case TOO_WEAK:
-                divWhereToInject.innerHTML += '<div title = "Player is too weak" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#008000;">Player is too weak to give a proper estimation (score:'+ json.Score + ')</label></div>';
+                divWhereToInject.innerHTML += '<div title = "Player is too weak" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#008000;">Player is too weak to give a proper estimation (score:' + json.Score + ')</label></div>';
                 return;
             case TOO_STRONG:
                 divWhereToInject.innerHTML += '<div title = "Player is too strong" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#FF0000;">Player is too strong to give a proper estimation (score:' + json.Score + ')</label></div>';
@@ -719,7 +752,10 @@ function addAPIKeyInput(node) {
                         var colorTBS = getColorDifference(tbs1Ratio);
                         var colorBalancedTBS = getColorDifference(tbsBalancedRatio);
 
-                        if (divSvgAttackToColor) divSvgAttackToColor.style.fill = colorTBS;
+                        var ratioComparedToUs = 50 * (intTBS + intTbsBalanced) / localTBS;
+                        var colorComparedToUs = getColorDifference(ratioComparedToUs);
+
+                        if (divSvgAttackToColor) divSvgAttackToColor.style.fill = colorComparedToUs;
 
                         divWhereToInject.innerHTML += '<div title = "From the TBS model" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px">TBS (Model-TBS-) = ' + TBS + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label>' +
                             '<br /> TBS (ModelScore) = ' + TBSBalanced + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
