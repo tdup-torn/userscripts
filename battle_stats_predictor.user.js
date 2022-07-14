@@ -1,12 +1,11 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     3.1
+// @version     3.3
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
 // @match       https://www.torn.com/halloffame.php*
-// @match       https://www.torn.com/forums.php*
 // @match       https://www.torn.com/index.php?page=people*
 // @match       https://www.torn.com/factions.php*
 // @match       https://www.torn.com/page.php*
@@ -34,6 +33,15 @@ let LOCAL_STATS_DEF = localStorage["tdup.battleStatsPredictor.comparisonDef"];
 let LOCAL_STATS_SPD = localStorage["tdup.battleStatsPredictor.comparisonSpd"];
 let LOCAL_STATS_DEX = localStorage["tdup.battleStatsPredictor.comparisonDex"];
 let LOCAL_TBS = localStorage["tdup.battleStatsPredictor.comparisonTbs"];
+
+var comparisonBattleStatsText;
+var scoreStrInput;
+var scoreDefInput;
+var scoreSpdInput;
+var scoreDexInput;
+var apiKeyText;
+var setBattleStats;
+var mainNode;
 
 $("head").append(
     '<link '
@@ -184,7 +192,7 @@ function JSONparse(str) {
     return null;
 }
 
-async function checkApiKey(key, retrieveStats, cb) {
+async function VerifyIfAPIKeyValid(key, retrieveStats, callback) {
     var urlToUse = "https://api.torn.com/user/?";
     if (retrieveStats)
         urlToUse += "selections=battlestats&";
@@ -195,27 +203,27 @@ async function checkApiKey(key, retrieveStats, cb) {
         url: urlToUse,
         onload: (r) => {
             if (r.status == 429) {
-                cb("Couldn't check (rate limit)");
+                callback("Couldn't check (rate limit)");
                 return;
             }
             if (r.status != 200) {
-                cb(`Couldn't check (status code ${r.status})`);
+                callback(`Couldn't check (status code ${r.status})`);
                 return;
             }
 
             let j = JSONparse(r.responseText);
             if (!j) {
-                cb("Couldn't check (unexpected response)");
+                callback("Couldn't check (unexpected response)");
                 return;
             }
 
             if (j.error && j.error.code > 0) {
-                cb("No permission to retrieve stats");
+                callback("No permission to retrieve stats");
                 return;
             }
 
             if (j.status != undefined && !j.status) {
-                cb(j.message || "Wrong API key?");
+                callback(j.message || "Wrong API key?");
             }
             else {
                 if (retrieveStats) {
@@ -235,12 +243,12 @@ async function checkApiKey(key, retrieveStats, cb) {
                     localStorage.setItem("tdup.battleStatsPredictor.comparisonDex", LOCAL_STATS_DEX);
                 }
 
-                cb(true);
+                callback(true);
             }
         },
-        onabort: () => cb("Couldn't check (aborted)"),
-        onerror: () => cb("Couldn't check (error)"),
-        ontimeout: () => cb("Couldn't check (timeout)")
+        onabort: () => callback("Couldn't check (aborted)"),
+        onerror: () => callback("Couldn't check (error)"),
+        ontimeout: () => callback("Couldn't check (timeout)")
     })
 }
 
@@ -262,17 +270,7 @@ function UpdateLocalScore(value) {
     }
 }
 
-var comparisonBattleStatsText;
-
-var scoreStrInput;
-var scoreDefInput;
-var scoreSpdInput;
-var scoreDexInput;
-var apiKeyText;
-var setBattleStats;
-var mainNode;
-
-function addAPIKeyInput(node) {
+function InjectOptionMenu(node) {
     if (!node) return;
 
     mainNode = node;
@@ -462,7 +460,7 @@ function addAPIKeyInput(node) {
     buttonsNode.appendChild(configPanelSave);
     buttonsNode.appendChild(configPanelClose);
 
-    function checkApiKeyCb(r) {
+    function OnAPIKeyValidationCallback(r) {
         if (r === true) {
             apiKeyNode.style.display = "none";
             comparisonBattleStatsNode.style.display = "none";
@@ -476,15 +474,14 @@ function addAPIKeyInput(node) {
         }
     }
 
-
     setBattleStats.addEventListener("click", () => {
-        checkApiKey(apiKeyInput.value, true, UpdateLocalScore);
+        VerifyIfAPIKeyValid(apiKeyInput.value, true, UpdateLocalScore);
         setBattleStats.disabled = true;
     });
 
     configPanelSave.addEventListener("click", () => {
         apiKeyText.innerHTML = "Checking key and saving data";
-        checkApiKey(apiKeyInput.value, false, checkApiKeyCb);
+        VerifyIfAPIKeyValid(apiKeyInput.value, false, OnAPIKeyValidationCallback);
 
         LOCAL_API_KEY = apiKeyInput.value;
         localStorage.setItem("tdup.battleStatsPredictor.TornApiKey", LOCAL_API_KEY);
@@ -551,32 +548,23 @@ function addAPIKeyInput(node) {
 (function () {
     'use strict';
 
-    //if (document.location == "test")
-    //{
-
-    //}
-
     var isInjected = false;
     var TargetId = -1;
     var divWhereToInject;
 
     var svgAttackDivFound = false;
     var divSvgAttackToColor;
-    var isAttackCurrentlyDisabled = false;
 
     var dictDivPerPlayer = {};
 
-    addAPIKeyInput(document.querySelector(".content-title"));
+    InjectOptionMenu(document.querySelector(".content-title"));
 
     var observer = new MutationObserver(function (mutations, observer) {
         mutations.forEach(function (mutation) {
             for (const node of mutation.addedNodes) {
                 if (node.querySelector) {
-                    if (window.location.href == "https://www.torn.com/factions.php?step=your#/") {
-                        continue;
-                    }
                     if (window.location.href.includes("https://www.torn.com/profiles.php")) {
-                        var el = document.querySelectorAll('.empty-block')
+                        var el = node.querySelectorAll('.empty-block')
                         for (var i = 0; i < el.length; ++i) {
                             if (isInjected) {
                                 break;
@@ -589,19 +577,8 @@ function addAPIKeyInput(node) {
                         }
 
                         if (!svgAttackDivFound && LOCAL_USE_COMPARE_MODE) {
-                            var el2 = document.querySelectorAll('.profile-button-attack')
+                            var el2 = node.querySelectorAll('.profile-button-attack')
                             for (i = 0; i < el2.length; ++i) {
-                                if (el2[i].className.includes("disabled")) {
-                                    isAttackCurrentlyDisabled = true;
-
-                                    //                          let cross = document.createElement("svg");
-                                    //                          cross.fill = "rgba(217, 54, 0, 0.5)";
-                                    //                          cross.stroke = "#d4d4d4";
-                                    //                          cross.width = "46";
-
-                                    //                          el2[i].appendChild(cross);
-                                    //<svg xmlns="http://www.w3.org/2000/svg" fill="rgba(217, 54, 0, 0.5)" stroke="#d4d4d4" stroke-width="0" width="46" height="46" viewBox="551.393 356 44 44"><path d="M556.393,363l12.061,14-12.061,14,1,1,14-11.94,14,11.94,1-1-12.06-14,12.06-14-1-1-14,11.94-14-11.94Z"></path></svg>
-                                }
                                 divSvgAttackToColor = el2[i].children[0];
                                 svgAttackDivFound = true;
                             }
@@ -613,15 +590,42 @@ function addAPIKeyInput(node) {
                                 // for faction page
                                 el = node.querySelectorAll('a');
                                 for (i = 0; i < el.length; ++i) {
+                                    var isDone = false;
                                     var iter = el[i];
                                     if (iter.href != null) {
                                         //"https://www.torn.com/profiles.php?XID=2139172"
                                         var myArray = iter.href.split("?XID=");
                                         if (myArray.length == 2) {
-                                            var playerId = parseInt(myArray[1]);
-                                            if (!(playerId in dictDivPerPlayer)) {
-                                                dictDivPerPlayer[playerId] = el[i];
-                                                FetchInfoForPlayer(playerId);
+                                            for (var j = 0; j < iter.children.length; ++j) {
+                                                if (isDone) {
+                                                    break;
+                                                }
+                                                var children = iter.children[j];
+                                                for (var k = 0; k < children.children.length; ++k) {
+
+                                                    if (children != undefined && children.tagName != undefined && children.tagName == "IMG") {
+                                                        var playerId = parseInt(myArray[1]);
+                                                        if (!(playerId in dictDivPerPlayer)) {
+                                                            dictDivPerPlayer[playerId] = subChildren;
+                                                            FetchInfoForPlayer(playerId);
+                                                            isDone = true;
+                                                            break;
+                                                        }
+                                                    }
+                                                    else {
+                                                        var subChildren = children.children[k];
+                                                        if (subChildren != undefined && subChildren.tagName != undefined && subChildren.tagName == "IMG") {
+
+                                                            var playerId = parseInt(myArray[1]);
+                                                            if (!(playerId in dictDivPerPlayer)) {
+                                                                dictDivPerPlayer[playerId] = children;
+                                                                FetchInfoForPlayer(playerId);
+                                                                isDone = true;
+                                                                break;
+                                                            }                                                           
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
