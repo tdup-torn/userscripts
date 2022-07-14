@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     3.4
+// @version     3.5
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -756,7 +756,7 @@ function InjectOptionMenu(node) {
                         var colorTBS = getColorDifference(tbs1Ratio);
                         var colorBalancedTBS = getColorDifference(tbsBalancedRatio);
 
-                        var averageModelTBS = (intTBS + intTbsBalanced) / 2;
+                        var averageModelTBS = parseInt((intTBS + intTbsBalanced) / 2);
                         var ratioComparedToUs = 100 * averageModelTBS / localTBS;
                         var colorComparedToUs = getColorDifference(ratioComparedToUs);
 
