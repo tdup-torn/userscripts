@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     3.3
+// @version     3.4
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -756,13 +756,16 @@ function InjectOptionMenu(node) {
                         var colorTBS = getColorDifference(tbs1Ratio);
                         var colorBalancedTBS = getColorDifference(tbsBalancedRatio);
 
-                        var ratioComparedToUs = 50 * (intTBS + intTbsBalanced) / localTBS;
+                        var averageModelTBS = (intTBS + intTbsBalanced) / 2;
+                        var ratioComparedToUs = 100 * averageModelTBS / localTBS;
                         var colorComparedToUs = getColorDifference(ratioComparedToUs);
 
                         if (divSvgAttackToColor) divSvgAttackToColor.style.fill = colorComparedToUs;
 
-                        divWhereToInject.innerHTML += '<div title = "From the TBS model" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px">TBS (Model-TBS-) = ' + TBS + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label>' +
-                            '<br /> TBS (ModelScore) = ' + TBSBalanced + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
+                        divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:10px">TBS = ' + averageModelTBS.toLocaleString('en-US') + '<label style="color:' + colorComparedToUs + '";"> (' + ratioComparedToUs.toFixed(0) + '%) </label></div>';
+
+                        //divWhereToInject.innerHTML += '<div title = "From the TBS model" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px">TBS (Model-TBS-) = ' + TBS + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label>' +
+                        //    '<br /> TBS (ModelScore) = ' + TBSBalanced + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
                     }
                     else {
                         divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">TBS_1 = ' + TBS +
