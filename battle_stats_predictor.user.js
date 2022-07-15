@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     3.5
+// @version     3.6
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -33,6 +33,16 @@ let LOCAL_STATS_DEF = localStorage["tdup.battleStatsPredictor.comparisonDef"];
 let LOCAL_STATS_SPD = localStorage["tdup.battleStatsPredictor.comparisonSpd"];
 let LOCAL_STATS_DEX = localStorage["tdup.battleStatsPredictor.comparisonDex"];
 let LOCAL_TBS = localStorage["tdup.battleStatsPredictor.comparisonTbs"];
+
+let LOCAL_SHOW_PREDICTION_DETAILS = localStorage["tdup.battleStatsPredictor.showPredictionDetails"] == "true";
+
+const LOCAL_COLORS = [
+    { maxValue: 50, color: '#9EBDBA', canModify: true },
+    { maxValue: 70, color: '#008000', canModify: true},
+    { maxValue: 150, color: '#FFA500', canModify: true},
+    { maxValue: 500, color: '#FF0000', canModify: true},
+    { maxValue: 100000000, color: '#000000', canModify: false},
+];
 
 var comparisonBattleStatsText;
 var scoreStrInput;
@@ -313,8 +323,9 @@ function InjectOptionMenu(node) {
     checkbox.addEventListener("change", () => {
         LOCAL_USE_COMPARE_MODE = !LOCAL_USE_COMPARE_MODE;
         comparisonBattleStatsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
+        colorSettingsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
         localStorage.setItem("tdup.battleStatsPredictor.useCompareMode", LOCAL_USE_COMPARE_MODE);
-    });
+    });    
 
     var checkboxLabel = document.createElement('label')
     checkboxLabel.htmlFor = "id";
@@ -322,6 +333,33 @@ function InjectOptionMenu(node) {
     compareCheckBoxNode.appendChild(checkboxLabel);
 
     compareCheckBoxNode.appendChild(checkbox);
+
+    // USE SHOW PREDICTION DETAILS
+    let PredictionDetailsBoxNode = document.createElement("div");
+    PredictionDetailsBoxNode.className = "text faction-names finally-bs-api";
+    PredictionDetailsBoxNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
+
+    let checkboxPredictionDetails = document.createElement('input');
+    checkboxPredictionDetails.type = "checkbox";
+    checkboxPredictionDetails.name = "name";
+    checkboxPredictionDetails.value = "value";
+    checkboxPredictionDetails.id = "id";
+    checkboxPredictionDetails.checked = LOCAL_SHOW_PREDICTION_DETAILS;
+    checkboxPredictionDetails.addEventListener("change", () => {
+        LOCAL_SHOW_PREDICTION_DETAILS = !LOCAL_SHOW_PREDICTION_DETAILS;        
+    });
+
+    var checkboxPredictionDetailsLabel = document.createElement('label')
+    checkboxPredictionDetailsLabel.htmlFor = "id";
+    checkboxPredictionDetailsLabel.appendChild(document.createTextNode('Display prediction details'));
+    PredictionDetailsBoxNode.appendChild(checkboxPredictionDetailsLabel);
+
+    PredictionDetailsBoxNode.appendChild(checkboxPredictionDetails);
+    
+
+    let colorSettingsNode = document.createElement("div");
+    colorSettingsNode.className = "text faction-names finally-bs-api";
+    colorSettingsNode.style.display = (LOCAL_USE_COMPARE_MODE && !LOCAL_API_KEY) ? "block" : "none";
 
     // COMPARISON STATS PART
     let comparisonBattleStatsNode = document.createElement("div");
@@ -446,6 +484,43 @@ function InjectOptionMenu(node) {
 
     comparisonBattleStatsNode.appendChild(comparisonBattleStatsText);
 
+    
+    function AddColorPanel(document, colorSettingsNode, colorItem, id)
+    {               
+        let divColor1 = document.createElement("div");
+
+        let text = document.createElement("label");
+        text.innerHTML = 'Until %';
+        divColor1.appendChild(text);
+
+        let colorInput2 = document.createElement("input");
+        colorInput2.type = 'number';
+        colorInput2.value = parseInt(colorItem.maxValue);
+        colorInput2.width = '40';
+        colorInput2.disabled = !colorItem.canModify;
+        divColor1.appendChild(colorInput2);
+        colorItem.inputNumber = colorInput2;        
+
+        let color1 = document.createElement("input");
+        color1.type = "color";
+        color1.value = colorItem.color;
+        divColor1.appendChild(color1);
+        colorItem.inputColor = color1;
+
+        colorSettingsNode.appendChild(divColor1);
+    }
+
+    for (var i = 0; i < LOCAL_COLORS.length; ++i) {
+        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_" + i];
+        if (color != undefined) {
+            LOCAL_COLORS[i].color = color;
+        }
+        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_" + i];
+        if (maxvalue != undefined) {
+            LOCAL_COLORS[i].maxValue = parseInt(maxvalue);
+        }
+        AddColorPanel(document, colorSettingsNode, LOCAL_COLORS[i]);
+    }
 
     let configPanelSave = document.createElement("input");
     configPanelSave.type = "button";
@@ -464,12 +539,15 @@ function InjectOptionMenu(node) {
         if (r === true) {
             apiKeyNode.style.display = "none";
             comparisonBattleStatsNode.style.display = "none";
+            colorSettingsNode.style.display = "none";
             buttonsNode.style.display = "none";
             compareCheckBoxNode.style.display = "none";
+            PredictionDetailsBoxNode.style.display = "none";
         }
         else {
             apiKeyNode.style.display = "block";
             compareCheckBoxNode.style.display = "block";
+            PredictionDetailsBoxNode.style.display = "block";
             apiKeyText.innerHTML = `${r}: `;
         }
     }
@@ -504,6 +582,15 @@ function InjectOptionMenu(node) {
         localStorage.setItem("tdup.battleStatsPredictor.comparisonDex", LOCAL_STATS_DEX);
         localStorage.setItem("tdup.battleStatsPredictor.comparisonScore", LOCAL_SCORE);
         localStorage.setItem("tdup.battleStatsPredictor.comparisonTbs", LOCAL_TBS);
+        localStorage.setItem("tdup.battleStatsPredictor.showPredictionDetails", LOCAL_SHOW_PREDICTION_DETAILS);
+
+        for (var i = 0; i < LOCAL_COLORS.length; ++i) {
+            LOCAL_COLORS[i].color = LOCAL_COLORS[i].inputColor.value;
+            localStorage.setItem("tdup.battleStatsPredictor.colorSettings_color_" + i, LOCAL_COLORS[i].color);
+
+            LOCAL_COLORS[i].maxValue = LOCAL_COLORS[i].inputNumber.value;
+            localStorage.setItem("tdup.battleStatsPredictor.colorSettings_maxValue_" + i, LOCAL_COLORS[i].maxValue);
+        }
 
         location.reload();
         return false;
@@ -511,8 +598,10 @@ function InjectOptionMenu(node) {
     configPanelClose.addEventListener("click", () => {
         apiKeyNode.style.display = "none";
         comparisonBattleStatsNode.style.display = "none";
+        colorSettingsNode.style.display = "none";
         buttonsNode.style.display = "none";
         compareCheckBoxNode.style.display = "none";
+        PredictionDetailsBoxNode.style.display = "none";
     });
 
     let apiKeyButton = document.createElement("a");
@@ -525,23 +614,29 @@ function InjectOptionMenu(node) {
         if (apiKeyNode.style.display == "block") {
             apiKeyNode.style.display = "none";
             comparisonBattleStatsNode.style.display = "none";
+            colorSettingsNode.style.display = "none";
             buttonsNode.style.display = "none";
             compareCheckBoxNode.style.display = "none";
+            PredictionDetailsBoxNode.style.display = "none";
         }
         else {
             apiKeyText.innerHTML = "Battle Stats Predictor - Update your API key: ";
             apiKeyNode.style.display = "block";
             comparisonBattleStatsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
+            colorSettingsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
             buttonsNode.style.display = "block";
             compareCheckBoxNode.style.display = "block";
+            PredictionDetailsBoxNode.style.display = "block";
         }
 
     });
 
     topPageLinksList.appendChild(apiKeyButton);
     node.appendChild(apiKeyNode);
+    node.appendChild(PredictionDetailsBoxNode);
     node.appendChild(compareCheckBoxNode);
     node.appendChild(comparisonBattleStatsNode);
+    node.appendChild(colorSettingsNode);
     node.appendChild(buttonsNode);
 }
 
@@ -558,6 +653,21 @@ function InjectOptionMenu(node) {
     var dictDivPerPlayer = {};
 
     InjectOptionMenu(document.querySelector(".content-title"));
+
+    var shouldStop = false;
+    if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
+        shouldStop = true;
+        if (window.location.href.startsWith("https://www.torn.com/factions.php?step=profile")) {
+            shouldStop = false;
+        }
+        if (window.location.href == "https://www.torn.com/factions.php?step=your#/tab=info") {
+            shouldStop = false;
+        }
+    }
+
+    if (shouldStop) {
+        return;
+    }
 
     var observer = new MutationObserver(function (mutations, observer) {
         mutations.forEach(function (mutation) {
@@ -706,18 +816,26 @@ function InjectOptionMenu(node) {
     const urlParams = new URLSearchParams(queryString);
     TargetId = urlParams.get('XID');
 
+    for (var i = 0; i < LOCAL_COLORS.length; ++i) {
+        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_" + i];
+        if (color != undefined) {
+            LOCAL_COLORS[i].color = color;
+        }
+        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_" + i];
+        if (maxvalue != undefined) {
+            LOCAL_COLORS[i].maxValue = parseInt(maxvalue);
+        }
+    }
+
     observer.observe(document, { attributes: false, childList: true, characterData: false, subtree: true });
 
     function getColorDifference(ratio) {
-        if (ratio > 150) {
-            return "#FF0000"; // red
+        for (var i = 0; i < LOCAL_COLORS.length; ++i) {
+            if (ratio < LOCAL_COLORS[i].maxValue) {
+                return LOCAL_COLORS[i].color;
+            }
         }
-        else if (ratio > 50) {
-            return "#FFA500"; // orange
-        }
-        else {
-            return "#008000"; //green
-        }
+        return "#ffc0cb"; //pink
     }
 
     var FAIL = 0;
@@ -734,42 +852,60 @@ function InjectOptionMenu(node) {
                 divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + json.Reason + '</div>';
                 return;
             case TOO_WEAK:
-                divWhereToInject.innerHTML += '<div title = "Player is too weak" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#008000;">Player is too weak to give a proper estimation (score:' + json.Score + ')</label></div>';
-                return;
             case TOO_STRONG:
-                divWhereToInject.innerHTML += '<div title = "Player is too strong" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#FF0000;">Player is too strong to give a proper estimation (score:' + json.Score + ')</label></div>';
-                return;
             case SUCCESS:
                 {
                     let TBSBalanced = json.TBS_Balanced.toLocaleString('en-US');
                     let TBS = json.TBS.toLocaleString('en-US');
                     let TargetScore = json.Score.toLocaleString('en-US');
+                    var intTBS = parseInt(TBS.replaceAll(',', ''));
+                    var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
+                    var tbs1Ratio = 100 * intTBS / localTBS;
+
+                    var intTbsBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
+                    var tbsBalancedRatio = 100 * intTbsBalanced / ((parseInt(LOCAL_SCORE) * parseInt(LOCAL_SCORE)) / 4);
+
+                    var colorTBS = getColorDifference(tbs1Ratio);
+                    var colorBalancedTBS = getColorDifference(tbsBalancedRatio);
+
+                    var averageModelTBS = parseInt((intTBS + intTbsBalanced) / 2);
+                    var ratioComparedToUs = 100 * averageModelTBS / localTBS;
+                    var colorComparedToUs = getColorDifference(ratioComparedToUs);
 
                     if (LOCAL_USE_COMPARE_MODE) {
-                        var intTBS = parseInt(TBS.replaceAll(',', ''));
-                        var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
-                        var tbs1Ratio = 100 * intTBS / localTBS;
+                        if (divSvgAttackToColor) {
+                            divSvgAttackToColor.style.fill = colorComparedToUs;
+                        }
 
-                        var intTbsBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
-                        var tbsBalancedRatio = 100 * intTbsBalanced / ((parseInt(LOCAL_SCORE) * parseInt(LOCAL_SCORE)) / 4);
+                        if (result == TOO_STRONG) {
+                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">Too strong to give a proper estimation</div >';
+                        } else if (result == TOO_WEAK) {
+                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">Too weak to give a proper estimation</div >';
+                        }
+                        else {
+                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">TBS = ' + averageModelTBS.toLocaleString('en-US') + '<label style="color:' + colorComparedToUs + '";"> (' + ratioComparedToUs.toFixed(0) + '%) </label></div >';  
+                        }
 
-                        var colorTBS = getColorDifference(tbs1Ratio);
-                        var colorBalancedTBS = getColorDifference(tbsBalancedRatio);
-
-                        var averageModelTBS = parseInt((intTBS + intTbsBalanced) / 2);
-                        var ratioComparedToUs = 100 * averageModelTBS / localTBS;
-                        var colorComparedToUs = getColorDifference(ratioComparedToUs);
-
-                        if (divSvgAttackToColor) divSvgAttackToColor.style.fill = colorComparedToUs;
-
-                        divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:10px">TBS = ' + averageModelTBS.toLocaleString('en-US') + '<label style="color:' + colorComparedToUs + '";"> (' + ratioComparedToUs.toFixed(0) + '%) </label></div>';
-
-                        //divWhereToInject.innerHTML += '<div title = "From the TBS model" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px">TBS (Model-TBS-) = ' + TBS + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label>' +
-                        //    '<br /> TBS (ModelScore) = ' + TBSBalanced + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
+                        if (LOCAL_SHOW_PREDICTION_DETAILS) {
+                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:5px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label></div>';
+                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:5px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
+                        }
                     }
                     else {
-                        divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">TBS_1 = ' + TBS +
-                            '<br /> TBS_2 = ' + TBSBalanced + '</div>';
+
+                        if (result == TOO_STRONG) {
+                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">Too strong to give a proper estimation</div >';
+                        } else if (result == TOO_WEAK) {
+                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">Too weak to give a proper estimation</div >';
+                        }
+                        else {
+                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">TBS = ' + averageModelTBS.toLocaleString('en-US')+ '</div >';
+                        }
+
+                        if (LOCAL_SHOW_PREDICTION_DETAILS) {
+                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:5px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '</div>';
+                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:5px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '</div>';
+                        }
                     }
                 }
                 break;
