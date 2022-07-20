@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     3.7
+// @version     3.9
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -108,7 +108,7 @@ async function GetPlayerFromTornAPI(key, retrieveStats, callback) {
         urlToUse += "selections=battlestats&";
 
     urlToUse += "comment=BSPredictor&key=" + key;
-    return await GM_xmlhttpRequest({
+    GM_xmlhttpRequest({
         method: "GET",
         url: urlToUse,
         onload: (r) => {
@@ -479,16 +479,12 @@ function InjectOptionMenu(node) {
 
     let configPanelSave = document.createElement("input");
     configPanelSave.type = "button";
-    configPanelSave.value = "Save & Reload";
-    let configPanelClose = document.createElement("input");
-    configPanelClose.type = "button";
-    configPanelClose.value = "Close";
+    configPanelSave.value = "Save";
 
     let buttonsNode = document.createElement("div");
     buttonsNode.className = "text faction-names finally-bs-api";
     buttonsNode.style.display = (!LOCAL_API_KEY_IS_VALID) ? "block" : "none";
     buttonsNode.appendChild(configPanelSave);
-    buttonsNode.appendChild(configPanelClose);
 
     function OnAPIKeyValidationCallback(r) {
         if (r === true) {
@@ -558,16 +554,8 @@ function InjectOptionMenu(node) {
             localStorage.setItem("tdup.battleStatsPredictor.colorSettings_maxValue_" + i, LOCAL_COLORS[i].maxValue);
         }
 
-        location.reload();
-        return false;
-    });
-    configPanelClose.addEventListener("click", () => {
-        apiKeyNode.style.display = "none";
-        comparisonBattleStatsNode.style.display = "none";
-        colorSettingsNode.style.display = "none";
-        buttonsNode.style.display = "none";
-        compareCheckBoxNode.style.display = "none";
-        PredictionDetailsBoxNode.style.display = "none";
+        //location.reload();
+        //return false;
     });
 
     let apiKeyButton = document.createElement("a");
