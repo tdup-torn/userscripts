@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     3.9
+// @version     4.0
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -235,6 +235,12 @@ function InjectOptionMenu(node) {
         apiKeyInput.value = LOCAL_API_KEY;
     }
 
+    apiKeyInput.addEventListener("change", () => {
+        if (errorAPIKeyInvalid) {
+            errorAPIKeyInvalid.style.display = "none";
+        }
+    });    
+
     apiKeyNode.appendChild(apiKeyText);
     apiKeyNode.appendChild(apiKeyInput);
 
@@ -265,6 +271,7 @@ function InjectOptionMenu(node) {
     checkbox.value = "value";
     checkbox.id = "id";
     checkbox.checked = LOCAL_USE_COMPARE_MODE;
+ 
     checkbox.addEventListener("change", () => {
         LOCAL_USE_COMPARE_MODE = !LOCAL_USE_COMPARE_MODE;
         comparisonBattleStatsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
@@ -479,7 +486,7 @@ function InjectOptionMenu(node) {
 
     let configPanelSave = document.createElement("input");
     configPanelSave.type = "button";
-    configPanelSave.value = "Save";
+    configPanelSave.value = "Save and reload";
 
     let buttonsNode = document.createElement("div");
     buttonsNode.className = "text faction-names finally-bs-api";
@@ -501,6 +508,8 @@ function InjectOptionMenu(node) {
             PredictionDetailsBoxNode.style.display = "block";
             apiKeyText.innerHTML = `${r}: `;
         }
+
+        location.reload();
     }
 
     setBattleStats.addEventListener("click", () => {
