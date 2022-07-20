@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     3.6
+// @version     3.7
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -23,6 +23,8 @@
 
 // Used for identification to the third party + doing torn api call when target stats are not cached yet
 let LOCAL_API_KEY = localStorage["tdup.battleStatsPredictor.TornApiKey"];
+let LOCAL_API_KEY_IS_VALID = localStorage["tdup.battleStatsPredictor.TornApiKeyValid"] == "true";
+let LOCAL_API_KEY_CAN_FETCH_BATTLE_STATS = localStorage["tdup.battleStatsPredictor.TornApiKeyCanFetchBattleStats"] == "true";
 
 // Used to compare players stats and show if you are weaker/stronger.
 // Important : THIS IS NOT SENT to the backend, you can type whatever you want, it'll be used only locally to compare with the predicted stats.
@@ -44,6 +46,9 @@ const LOCAL_COLORS = [
     { maxValue: 100000000, color: '#000000', canModify: false},
 ];
 
+var errorAPIKeyInvalid;
+var errorImportBattleStats;
+var successImportBattleStats;
 var comparisonBattleStatsText;
 var scoreStrInput;
 var scoreDefInput;
@@ -60,41 +65,7 @@ $("head").append(
 );
 
 GM_addStyle(`
-@media screen and (max-width: 1000px) {
-	.members-cont .bs {
-		display: none;
-	}
-}
-
-.members-cont .level {
-	width: 27px !important;
-}
-
-.members-cont .id {
-	padding-left: 5px !important;
-	width: 28px !important;
-}
-
-.members-cont .points {
-	width: 42px !important;
-}
-
-.finally-bs-stat {
-	font-family: monospace;
-}
-
-.finally-bs-stat > span {
-	display: inline-block;
-	width: 55px;
-	text-align: right;
-}
-
-.faction-names {
-	position: relative;
-}
-
 .finally-bs-api {
-	//position: absolute;
 	background: var(--main-bg);
 	text-align: center;
 	left: 0;
@@ -103,14 +74,12 @@ GM_addStyle(`
 	height: 100%;
     padding-bottom : 5px;
     padding-top : 5px;
-
 }
 
 .finally-bs-api > * {
 	margin: 0 5px;
 	padding: 5px;
 }
-
 
 .finally-bs-api > table, td, th, input {
   border: 1px;
@@ -121,77 +90,8 @@ GM_addStyle(`
   border-collapse: collapse;
 }
 
-
-.finally-bs-filter {
-	position: absolute !important;
-	top: 25px !important;
-	left: 0;
-	right: 0;
-	margin-left: auto;
-	margin-right: auto;
-	width: 120px;
-	cursor: pointer;
-}
-.finally-bs-filter > input {
-	display: block !important;
-	width: 100px;
-}
-
-.finally-bs-swap {
-	position: absolute;
-	top: 0px;
-	left: 0;
-	right: 0;
-	margin-left: auto;
-	margin-right: auto;
-	width: 100px;
-	cursor: pointer;
-}
-
-.finally-bs-activeIcon {
-	display: block !important;
-}
-
-.finally-bs-asc {
-	border-bottom: 6px solid var(--sort-arrow-color);
-	border-left: 6px solid transparent;
-	border-right: 6px solid transparent;
-	border-top: 0 solid transparent;
-	height: 0;
-	top: -8px;
-	width: 0;
-}
-
-.finally-bs-desc {
-	border-bottom: 0 solid transparent;
-	border-left: 6px solid transparent;
-	border-right: 6px solid transparent;
-	border-top: 6px solid var(--sort-arrow-border-color);
-	height: 0;
-	top: -1px;
-	width: 0;
-}
-
 .finally-bs-col {
 	text-overflow: clip !important;
-}
-
-.raid-members-list .level:not(.bs) {
-	width: 16px !important;
-}
-
-div.desc-wrap:not([class*='warDesc']) .finally-bs-swap {
-  display: none;
-}
-
-div.desc-wrap:not([class*='warDesc']) .faction-names {
-  padding-top: 100px !important;
-}
-
-
-
-.re_spy_title, .re_spy_col {
-  display: none !important;
 }
 `);
 
@@ -202,16 +102,23 @@ function JSONparse(str) {
     return null;
 }
 
-async function VerifyIfAPIKeyValid(key, retrieveStats, callback) {
+async function GetPlayerFromTornAPI(key, retrieveStats, callback) {
     var urlToUse = "https://api.torn.com/user/?";
     if (retrieveStats)
         urlToUse += "selections=battlestats&";
 
-    urlToUse += "comment=BattleStatsPredictorLoginselections&key=" + key;
+    urlToUse += "comment=BSPredictor&key=" + key;
     return await GM_xmlhttpRequest({
         method: "GET",
         url: urlToUse,
         onload: (r) => {
+
+            LOCAL_API_KEY_IS_VALID = false;
+            localStorage.setItem("tdup.battleStatsPredictor.TornApiKeyValid", LOCAL_API_KEY_IS_VALID);
+
+            LOCAL_API_KEY_CAN_FETCH_BATTLE_STATS = false;
+            localStorage.setItem("tdup.battleStatsPredictor.TornApiKeyCanFetchBattleStats", LOCAL_API_KEY_CAN_FETCH_BATTLE_STATS);  
+
             if (r.status == 429) {
                 callback("Couldn't check (rate limit)");
                 return;
@@ -236,7 +143,11 @@ async function VerifyIfAPIKeyValid(key, retrieveStats, callback) {
                 callback(j.message || "Wrong API key?");
             }
             else {
+                LOCAL_API_KEY_IS_VALID = true;
+                localStorage.setItem("tdup.battleStatsPredictor.TornApiKeyValid", LOCAL_API_KEY_IS_VALID);
+
                 if (retrieveStats) {
+                    
                     LOCAL_STATS_STR = parseInt(j.strength);
                     LOCAL_STATS_DEF = parseInt(j.defense);
                     LOCAL_STATS_SPD = parseInt(j.speed);
@@ -251,6 +162,9 @@ async function VerifyIfAPIKeyValid(key, retrieveStats, callback) {
                     localStorage.setItem("tdup.battleStatsPredictor.comparisonDef", LOCAL_STATS_DEF);
                     localStorage.setItem("tdup.battleStatsPredictor.comparisonSpd", LOCAL_STATS_SPD);
                     localStorage.setItem("tdup.battleStatsPredictor.comparisonDex", LOCAL_STATS_DEX);
+
+                    LOCAL_API_KEY_CAN_FETCH_BATTLE_STATS = true;
+                    localStorage.setItem("tdup.battleStatsPredictor.TornApiKeyCanFetchBattleStats", LOCAL_API_KEY_CAN_FETCH_BATTLE_STATS);                    
                 }
 
                 callback(true);
@@ -262,7 +176,27 @@ async function VerifyIfAPIKeyValid(key, retrieveStats, callback) {
     })
 }
 
-function UpdateLocalScore(value) {
+function UpdateLocalScore(value) {    
+    if (value != undefined && value != 0 && value != true) {
+        errorImportBattleStats.innerHTML = 'Error while fetching battle stats : ' + value + '.<br /> If you want this to work, you need to use an API key with read access to your battle stats.<br />You can create one by <a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile,battlestats" target="_blank">clicking here</a>';
+        errorImportBattleStats.style.display = "block";
+
+        if (errorAPIKeyInvalid)
+            errorAPIKeyInvalid.style.display = "block";
+
+        return;
+    }
+    else {
+
+        if (value === true) {
+            successImportBattleStats.style.display = "block";
+        }
+        errorImportBattleStats.style.display = "none";
+
+        if (errorAPIKeyInvalid)
+            errorAPIKeyInvalid.style.display = "none";        
+    }
+    
     apiKeyText.innerHTML = "Battle Stats Predictor - " + ((!LOCAL_API_KEY) ? "Set" : "Update") + " your API key: ";
     setBattleStats.disabled = false;
 
@@ -293,26 +227,37 @@ function InjectOptionMenu(node) {
     // API KEY PART
     let apiKeyNode = document.createElement("div");
     apiKeyNode.className = "text faction-names finally-bs-api";
-    apiKeyNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
+    apiKeyNode.style.display = (!LOCAL_API_KEY_IS_VALID) ? "block" : "none";
     apiKeyText = document.createElement("span");
-    apiKeyText.innerHTML = "Battle Stats Predictor - " + ((!LOCAL_API_KEY) ? "Set" : "Update") + " your API key: ";
+    apiKeyText.innerHTML = "Battle Stats Predictor - " + ((!LOCAL_API_KEY_IS_VALID) ? "Set" : "Update") + " your API key: ";
     let apiKeyInput = document.createElement("input");
     if (LOCAL_API_KEY) {
         apiKeyInput.value = LOCAL_API_KEY;
     }
-    let apiRegister = document.createElement("span");
-    apiRegister.innerHTML = '<div style="margin-top: 5px;"><a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile" target="_blank">Create a basic key</a></div>';
-    apiRegister.innerHTML += '<div style="margin-top: 5px;"><a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile,battlestats" target="_blank">Create a key with access to your battle stats. Those are not transmited to our server.</a></div>';
-
 
     apiKeyNode.appendChild(apiKeyText);
     apiKeyNode.appendChild(apiKeyInput);
-    apiKeyNode.appendChild(apiRegister);
+
+    if (!LOCAL_API_KEY_IS_VALID) {
+
+        if (LOCAL_API_KEY) {
+            errorAPIKeyInvalid = document.createElement("label");
+            errorAPIKeyInvalid.innerHTML = 'Error this API key seems invalid';
+            errorAPIKeyInvalid.style.backgroundColor = 'red';
+            errorAPIKeyInvalid.style.display = "block";
+            apiKeyNode.appendChild(errorAPIKeyInvalid);
+        }
+
+        let apiRegister = document.createElement("span");
+        apiRegister.innerHTML = '<div style="margin-top: 5px;"><a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile" target="_blank">Create a basic key (you wont be able to import your battle stats automatically below)</a></div>';
+        apiRegister.innerHTML += '<div style="margin-top: 5px;"><a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile,battlestats" target="_blank">Create a key with access to your battle stats (Those are not transmited to our server)</a></div>';
+        apiKeyNode.appendChild(apiRegister);
+    }   
 
     // USE COMPARE MODE PART
     let compareCheckBoxNode = document.createElement("div");
     compareCheckBoxNode.className = "text faction-names finally-bs-api";
-    compareCheckBoxNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
+    compareCheckBoxNode.style.display = (!LOCAL_API_KEY_IS_VALID) ? "block" : "none";
 
     let checkbox = document.createElement('input');
     checkbox.type = "checkbox";
@@ -337,7 +282,7 @@ function InjectOptionMenu(node) {
     // USE SHOW PREDICTION DETAILS
     let PredictionDetailsBoxNode = document.createElement("div");
     PredictionDetailsBoxNode.className = "text faction-names finally-bs-api";
-    PredictionDetailsBoxNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
+    PredictionDetailsBoxNode.style.display = (!LOCAL_API_KEY_IS_VALID) ? "block" : "none";
 
     let checkboxPredictionDetails = document.createElement('input');
     checkboxPredictionDetails.type = "checkbox";
@@ -359,26 +304,41 @@ function InjectOptionMenu(node) {
 
     let colorSettingsNode = document.createElement("div");
     colorSettingsNode.className = "text faction-names finally-bs-api";
-    colorSettingsNode.style.display = (LOCAL_USE_COMPARE_MODE && !LOCAL_API_KEY) ? "block" : "none";
+    colorSettingsNode.style.display = (LOCAL_USE_COMPARE_MODE && !LOCAL_API_KEY_IS_VALID) ? "block" : "none";
 
     // COMPARISON STATS PART
     let comparisonBattleStatsNode = document.createElement("div");
     comparisonBattleStatsNode.className = "text faction-names finally-bs-api";
-    comparisonBattleStatsNode.style.display = (LOCAL_USE_COMPARE_MODE && !LOCAL_API_KEY) ? "block" : "none";
+    comparisonBattleStatsNode.style.display = (LOCAL_USE_COMPARE_MODE && !LOCAL_API_KEY_IS_VALID) ? "block" : "none";
+    comparisonBattleStatsNode.style.backgroundColor = 'khaki';
 
     var cell, raw, table;
     table = document.createElement('table');
-    comparisonBattleStatsNode.appendChild(table);
 
     setBattleStats = document.createElement("input");
+    setBattleStats.style.marginTop = '5px';
+    setBattleStats.style.marginBottom= '5px';
     setBattleStats.type = "button";
-    setBattleStats.value = "Set with my battlestats";
+    setBattleStats.value = "Import my battle stats";
     comparisonBattleStatsNode.appendChild(setBattleStats);
 
+    successImportBattleStats = document.createElement("label");
+    successImportBattleStats.innerHTML = 'Battle stats updated!';
+    successImportBattleStats.style.color = 'forestgreen';
+    successImportBattleStats.style.display = "none";
+    comparisonBattleStatsNode.appendChild(successImportBattleStats);
+
+    errorImportBattleStats = document.createElement("label");
+    errorImportBattleStats.innerHTML = 'Error while fetching battle stats';
+    errorImportBattleStats.style.backgroundColor = 'red';
+    errorImportBattleStats.style.display = "none";   
+    comparisonBattleStatsNode.appendChild(errorImportBattleStats);
+
+    comparisonBattleStatsNode.appendChild(table);
 
     // ************************** DEX ***********************
     let comparisonDex = document.createElement("label");
-    comparisonDex.innerHTML = '<div style="text-align: right">Dex&nbsp</div>';
+    comparisonDex.innerHTML = '<div style="text-align: right; margin-right:10px;">Dex&nbsp</div>';
     raw = table.insertRow(0);
     cell = raw.insertCell(0);
     cell.width = '50%';
@@ -402,7 +362,7 @@ function InjectOptionMenu(node) {
 
     // ************************** SPD ***********************
     let comparisonSpd = document.createElement("label");
-    comparisonSpd.innerHTML = '<div style="text-align: right">Spd&nbsp</div>';
+    comparisonSpd.innerHTML = '<div style="text-align: right; margin-right:10px;">Spd&nbsp</div>';
     raw = table.insertRow(0);
     cell = raw.insertCell(0);
     cell.appendChild(comparisonSpd);
@@ -425,7 +385,7 @@ function InjectOptionMenu(node) {
 
     // ************************** DEF ***********************
     let comparisonDef = document.createElement("label");
-    comparisonDef.innerHTML = '<div style="text-align: right">Def&nbsp</div>';
+    comparisonDef.innerHTML = '<div style="text-align: right; margin-right:10px;">Def&nbsp</div>';
     raw = table.insertRow(0);
     cell = raw.insertCell(0);
     cell.appendChild(comparisonDef);
@@ -448,7 +408,7 @@ function InjectOptionMenu(node) {
 
     // ************************** STR ***********************
     let comparisonStr = document.createElement("label");
-    comparisonStr.innerHTML = '<div style="text-align: right">Str&nbsp</div>';
+    comparisonStr.innerHTML = '<div style="text-align: right; margin-right:10px;">Str&nbsp</div>';
     raw = table.insertRow(0);
     cell = raw.insertCell(0);
     cell.appendChild(comparisonStr);
@@ -468,11 +428,6 @@ function InjectOptionMenu(node) {
     cell = raw.insertCell(1);
     cell.style.textAlign = 'left';
     cell.appendChild(scoreStrInput);
-
-    raw = table.insertRow(0);
-    cell = raw.insertCell(0);
-    cell.colSpan = 2;
-    cell.innerHTML = "<br/><b>[Used to show comparison through colored UI] </b><br /><i>Comparison values (Any scenario you want : Your raw stats, your effective stats, someone else stats..) </i><br/><br/>";
 
     comparisonBattleStatsText = document.createElement("span");
     if (LOCAL_TBS && LOCAL_SCORE) {
@@ -531,7 +486,7 @@ function InjectOptionMenu(node) {
 
     let buttonsNode = document.createElement("div");
     buttonsNode.className = "text faction-names finally-bs-api";
-    buttonsNode.style.display = (!LOCAL_API_KEY) ? "block" : "none";
+    buttonsNode.style.display = (!LOCAL_API_KEY_IS_VALID) ? "block" : "none";
     buttonsNode.appendChild(configPanelSave);
     buttonsNode.appendChild(configPanelClose);
 
@@ -553,16 +508,27 @@ function InjectOptionMenu(node) {
     }
 
     setBattleStats.addEventListener("click", () => {
-        VerifyIfAPIKeyValid(apiKeyInput.value, true, UpdateLocalScore);
+        if (errorAPIKeyInvalid)
+            errorAPIKeyInvalid.style.display = "none";
+
+        errorImportBattleStats.style.display = "none";
+        successImportBattleStats.style.display = "none";
+        LOCAL_API_KEY = apiKeyInput.value;
+        GetPlayerFromTornAPI(apiKeyInput.value, true, UpdateLocalScore);
         setBattleStats.disabled = true;
     });
 
     configPanelSave.addEventListener("click", () => {
+        if (errorAPIKeyInvalid)
+            errorAPIKeyInvalid.style.display = "none";
+
+        errorImportBattleStats.style.display = "none";
         apiKeyText.innerHTML = "Checking key and saving data";
-        VerifyIfAPIKeyValid(apiKeyInput.value, false, OnAPIKeyValidationCallback);
 
         LOCAL_API_KEY = apiKeyInput.value;
         localStorage.setItem("tdup.battleStatsPredictor.TornApiKey", LOCAL_API_KEY);
+
+        GetPlayerFromTornAPI(apiKeyInput.value, false, OnAPIKeyValidationCallback);
 
         if (scoreStrInput.value && scoreDefInput.value && scoreSpdInput.value && scoreDexInput.value) {
             LOCAL_STATS_STR = parseInt(scoreStrInput.value);
@@ -652,8 +618,6 @@ function InjectOptionMenu(node) {
 
     var dictDivPerPlayer = {};
 
-    InjectOptionMenu(document.querySelector(".content-title"));
-
     var shouldStop = false;
     if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
         shouldStop = true;
@@ -669,6 +633,10 @@ function InjectOptionMenu(node) {
         return;
     }
 
+    if (window.location.href.includes("https://www.torn.com/profiles.php")) {
+        InjectOptionMenu(document.querySelector(".content-title"));
+    }
+
     var observer = new MutationObserver(function (mutations, observer) {
         mutations.forEach(function (mutation) {
             for (const node of mutation.addedNodes) {
@@ -681,7 +649,7 @@ function InjectOptionMenu(node) {
                             }
                             divWhereToInject = el[i];
                             isInjected = true;
-                            if (LOCAL_API_KEY) {
+                            if (LOCAL_API_KEY_IS_VALID) {
                                 fetchScoreAndTBSAsync(TargetId);
                             }
                         }
@@ -739,9 +707,7 @@ function InjectOptionMenu(node) {
                                             }
                                         }
                                     }
-
                                 }
-                                //addAPIKeyInput(node.querySelector && node.querySelector(".content-title"));
                             }
 
                             else {
@@ -765,8 +731,6 @@ function InjectOptionMenu(node) {
                                             FetchInfoForPlayer(playerId);
                                         }
                                     }
-
-                                    //addAPIKeyInput(node.querySelector && node.querySelector(".content-title"));
                                 }
                             }
                         }
@@ -783,14 +747,7 @@ function InjectOptionMenu(node) {
         switch (result) {
             case FAIL:
                 dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><img style="background-color:' + colorTBS + '; border-radius: 50%;" width="16" height="16" src="https://www.freeiconspng.com/uploads/sign-red-error-icon-1.png" /></div>' + dictDivPerPlayer[targetId].innerHTML;
-                //divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + json.Reason + '</div>';
                 return;
-            case TOO_WEAK:
-            //divWhereToInject.innerHTML += '<div title = "Player is too weak" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#008000;">Player is too weak to give a proper estimation (soon&#169;)</label></div>';
-            //return;
-            case TOO_STRONG:
-            //divWhereToInject.innerHTML += '<div title = "Player is too strong" style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px"><label style="color:#FF0000;">Player is too strong to give a proper estimation (soon&#169;)</label></div>';
-            //return;
             case SUCCESS:
                 {
                     if (LOCAL_USE_COMPARE_MODE) {
@@ -805,7 +762,7 @@ function InjectOptionMenu(node) {
                         var colorTBS = getColorDifference(ratioComparedToUs);
                         var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
 
-                        dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '"><img style="background-color:' + colorTBS + '; border-radius: 50%;" width="16" height="16" src="https://cdn2.iconfinder.com/data/icons/gaming-outline/32/sword_battle_rpg_weapon_attack_game-512.png" /></a></div>' + dictDivPerPlayer[targetId].innerHTML;
+                        dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '"><img style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>' + dictDivPerPlayer[targetId].innerHTML;
                     }
                     return;
                 }
