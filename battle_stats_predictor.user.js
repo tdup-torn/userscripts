@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     4.0
+// @version     4.1
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -9,6 +9,7 @@
 // @match       https://www.torn.com/index.php?page=people*
 // @match       https://www.torn.com/factions.php*
 // @match       https://www.torn.com/page.php*
+// @match       https://www.torn.com/joblist.php*
 // @run-at      document-end
 // @grant       GM_addStyle
 // @grant       GM_xmlhttpRequest
@@ -189,7 +190,7 @@ function UpdateLocalScore(value) {
     else {
 
         if (value === true) {
-            successImportBattleStats.style.display = "block";
+            successImportBattleStats.style.visibility = "visible";
         }
         errorImportBattleStats.style.display = "none";
 
@@ -332,7 +333,7 @@ function InjectOptionMenu(node) {
     successImportBattleStats = document.createElement("label");
     successImportBattleStats.innerHTML = 'Battle stats updated!';
     successImportBattleStats.style.color = 'forestgreen';
-    successImportBattleStats.style.display = "none";
+    successImportBattleStats.style.visibility = "hidden";
     comparisonBattleStatsNode.appendChild(successImportBattleStats);
 
     errorImportBattleStats = document.createElement("label");
@@ -517,7 +518,7 @@ function InjectOptionMenu(node) {
             errorAPIKeyInvalid.style.display = "none";
 
         errorImportBattleStats.style.display = "none";
-        successImportBattleStats.style.display = "none";
+        successImportBattleStats.style.visibility = "hidden";
         LOCAL_API_KEY = apiKeyInput.value;
         GetPlayerFromTornAPI(apiKeyInput.value, true, UpdateLocalScore);
         setBattleStats.disabled = true;
