@@ -10,6 +10,7 @@
 // @match       https://www.torn.com/factions.php*
 // @match       https://www.torn.com/page.php*
 // @match       https://www.torn.com/joblist.php*
+// @match       https://www.torn.com/page.php?sid=russianRoulette#/*
 // @run-at      document-end
 // @grant       GM_addStyle
 // @grant       GM_xmlhttpRequest
@@ -21,6 +22,8 @@
 // ==/UserScript==
 
 // Based on finally.torn.FactionWallBattlestats
+
+var logVerbose = false;
 
 // Used for identification to the third party + doing torn api call when target stats are not cached yet
 let LOCAL_API_KEY = localStorage["tdup.battleStatsPredictor.TornApiKey"];
@@ -37,15 +40,22 @@ let LOCAL_STATS_SPD = localStorage["tdup.battleStatsPredictor.comparisonSpd"];
 let LOCAL_STATS_DEX = localStorage["tdup.battleStatsPredictor.comparisonDex"];
 let LOCAL_TBS = localStorage["tdup.battleStatsPredictor.comparisonTbs"];
 
+let LOCAL_PREDICTION_VERSION_ON_SERVER = localStorage["tdup.battleStatsPredictor.PredictionVersionOnServer"];
+
 let LOCAL_SHOW_PREDICTION_DETAILS = localStorage["tdup.battleStatsPredictor.showPredictionDetails"] == "true";
 
 const LOCAL_COLORS = [
     { maxValue: 50, color: '#9EBDBA', canModify: true },
-    { maxValue: 70, color: '#008000', canModify: true},
-    { maxValue: 150, color: '#FFA500', canModify: true},
-    { maxValue: 500, color: '#FF0000', canModify: true},
-    { maxValue: 100000000, color: '#000000', canModify: false},
+    { maxValue: 70, color: '#008000', canModify: true },
+    { maxValue: 150, color: '#FFA500', canModify: true },
+    { maxValue: 500, color: '#FF0000', canModify: true },
+    { maxValue: 100000000, color: '#000000', canModify: false },
 ];
+
+var FAIL = 0;
+var SUCCESS = 1;
+var TOO_WEAK = 2;
+var TOO_STRONG = 3
 
 var errorAPIKeyInvalid;
 var errorImportBattleStats;
@@ -96,6 +106,30 @@ GM_addStyle(`
 }
 `);
 
+function LogInfo(value) {
+    console.log(value);
+}
+
+function GetPredictionFromCache(playerId) {
+    var key = "tdup.battleStatsPredictor.cache.prediction." + playerId;
+
+    if (localStorage[key] == "[object Object]")
+        localStorage.removeItem(key);
+
+    if (localStorage[key] != undefined)
+        return JSON.parse(localStorage[key]);
+
+    return undefined;
+}
+
+function SetPredictionInCache(playerId, prediction) {
+    if (prediction.Result == FAIL) {
+        return;
+    }
+    var key = "tdup.battleStatsPredictor.cache.prediction." + playerId;
+    localStorage[key] = JSON.stringify(prediction);
+}
+
 function JSONparse(str) {
     try {
         return JSON.parse(str);
@@ -118,7 +152,7 @@ async function GetPlayerFromTornAPI(key, retrieveStats, callback) {
             localStorage.setItem("tdup.battleStatsPredictor.TornApiKeyValid", LOCAL_API_KEY_IS_VALID);
 
             LOCAL_API_KEY_CAN_FETCH_BATTLE_STATS = false;
-            localStorage.setItem("tdup.battleStatsPredictor.TornApiKeyCanFetchBattleStats", LOCAL_API_KEY_CAN_FETCH_BATTLE_STATS);  
+            localStorage.setItem("tdup.battleStatsPredictor.TornApiKeyCanFetchBattleStats", LOCAL_API_KEY_CAN_FETCH_BATTLE_STATS);
 
             if (r.status == 429) {
                 callback("Couldn't check (rate limit)");
@@ -148,7 +182,7 @@ async function GetPlayerFromTornAPI(key, retrieveStats, callback) {
                 localStorage.setItem("tdup.battleStatsPredictor.TornApiKeyValid", LOCAL_API_KEY_IS_VALID);
 
                 if (retrieveStats) {
-                    
+
                     LOCAL_STATS_STR = parseInt(j.strength);
                     LOCAL_STATS_DEF = parseInt(j.defense);
                     LOCAL_STATS_SPD = parseInt(j.speed);
@@ -165,7 +199,7 @@ async function GetPlayerFromTornAPI(key, retrieveStats, callback) {
                     localStorage.setItem("tdup.battleStatsPredictor.comparisonDex", LOCAL_STATS_DEX);
 
                     LOCAL_API_KEY_CAN_FETCH_BATTLE_STATS = true;
-                    localStorage.setItem("tdup.battleStatsPredictor.TornApiKeyCanFetchBattleStats", LOCAL_API_KEY_CAN_FETCH_BATTLE_STATS);                    
+                    localStorage.setItem("tdup.battleStatsPredictor.TornApiKeyCanFetchBattleStats", LOCAL_API_KEY_CAN_FETCH_BATTLE_STATS);
                 }
 
                 callback(true);
@@ -177,7 +211,7 @@ async function GetPlayerFromTornAPI(key, retrieveStats, callback) {
     })
 }
 
-function UpdateLocalScore(value) {    
+function UpdateLocalScore(value) {
     if (value != undefined && value != 0 && value != true) {
         errorImportBattleStats.innerHTML = 'Error while fetching battle stats : ' + value + '.<br /> If you want this to work, you need to use an API key with read access to your battle stats.<br />You can create one by <a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile,battlestats" target="_blank">clicking here</a>';
         errorImportBattleStats.style.display = "block";
@@ -195,9 +229,9 @@ function UpdateLocalScore(value) {
         errorImportBattleStats.style.display = "none";
 
         if (errorAPIKeyInvalid)
-            errorAPIKeyInvalid.style.display = "none";        
+            errorAPIKeyInvalid.style.display = "none";
     }
-    
+
     apiKeyText.innerHTML = "Battle Stats Predictor - " + ((!LOCAL_API_KEY) ? "Set" : "Update") + " your API key: ";
     setBattleStats.disabled = false;
 
@@ -214,6 +248,8 @@ function UpdateLocalScore(value) {
         comparisonBattleStatsText.innerHTML = "<br/> TBS = " + LOCAL_TBS.toLocaleString('en-US') + " | Battle Score = " + LOCAL_SCORE.toLocaleString('en-US'); + "<br/><br/>";
     }
 }
+
+
 
 function InjectOptionMenu(node) {
     if (!node) return;
@@ -240,7 +276,7 @@ function InjectOptionMenu(node) {
         if (errorAPIKeyInvalid) {
             errorAPIKeyInvalid.style.display = "none";
         }
-    });    
+    });
 
     apiKeyNode.appendChild(apiKeyText);
     apiKeyNode.appendChild(apiKeyInput);
@@ -259,7 +295,7 @@ function InjectOptionMenu(node) {
         apiRegister.innerHTML = '<div style="margin-top: 5px;"><a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile" target="_blank">Create a basic key (you wont be able to import your battle stats automatically below)</a></div>';
         apiRegister.innerHTML += '<div style="margin-top: 5px;"><a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BattleStatsPredictor&user=basic,personalstats,profile,battlestats" target="_blank">Create a key with access to your battle stats (Those are not transmited to our server)</a></div>';
         apiKeyNode.appendChild(apiRegister);
-    }   
+    }
 
     // USE COMPARE MODE PART
     let compareCheckBoxNode = document.createElement("div");
@@ -272,13 +308,13 @@ function InjectOptionMenu(node) {
     checkbox.value = "value";
     checkbox.id = "id";
     checkbox.checked = LOCAL_USE_COMPARE_MODE;
- 
+
     checkbox.addEventListener("change", () => {
         LOCAL_USE_COMPARE_MODE = !LOCAL_USE_COMPARE_MODE;
         comparisonBattleStatsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
         colorSettingsNode.style.display = LOCAL_USE_COMPARE_MODE ? "block" : "none";
         localStorage.setItem("tdup.battleStatsPredictor.useCompareMode", LOCAL_USE_COMPARE_MODE);
-    });    
+    });
 
     var checkboxLabel = document.createElement('label')
     checkboxLabel.htmlFor = "id";
@@ -299,7 +335,7 @@ function InjectOptionMenu(node) {
     checkboxPredictionDetails.id = "id";
     checkboxPredictionDetails.checked = LOCAL_SHOW_PREDICTION_DETAILS;
     checkboxPredictionDetails.addEventListener("change", () => {
-        LOCAL_SHOW_PREDICTION_DETAILS = !LOCAL_SHOW_PREDICTION_DETAILS;        
+        LOCAL_SHOW_PREDICTION_DETAILS = !LOCAL_SHOW_PREDICTION_DETAILS;
     });
 
     var checkboxPredictionDetailsLabel = document.createElement('label')
@@ -308,7 +344,7 @@ function InjectOptionMenu(node) {
     PredictionDetailsBoxNode.appendChild(checkboxPredictionDetailsLabel);
 
     PredictionDetailsBoxNode.appendChild(checkboxPredictionDetails);
-    
+
 
     let colorSettingsNode = document.createElement("div");
     colorSettingsNode.className = "text faction-names finally-bs-api";
@@ -325,7 +361,7 @@ function InjectOptionMenu(node) {
 
     setBattleStats = document.createElement("input");
     setBattleStats.style.marginTop = '5px';
-    setBattleStats.style.marginBottom= '5px';
+    setBattleStats.style.marginBottom = '5px';
     setBattleStats.type = "button";
     setBattleStats.value = "Import my battle stats";
     comparisonBattleStatsNode.appendChild(setBattleStats);
@@ -339,7 +375,7 @@ function InjectOptionMenu(node) {
     errorImportBattleStats = document.createElement("label");
     errorImportBattleStats.innerHTML = 'Error while fetching battle stats';
     errorImportBattleStats.style.backgroundColor = 'red';
-    errorImportBattleStats.style.display = "none";   
+    errorImportBattleStats.style.display = "none";
     comparisonBattleStatsNode.appendChild(errorImportBattleStats);
 
     comparisonBattleStatsNode.appendChild(table);
@@ -447,9 +483,8 @@ function InjectOptionMenu(node) {
 
     comparisonBattleStatsNode.appendChild(comparisonBattleStatsText);
 
-    
-    function AddColorPanel(document, colorSettingsNode, colorItem, id)
-    {               
+
+    function AddColorPanel(document, colorSettingsNode, colorItem, id) {
         let divColor1 = document.createElement("div");
 
         let text = document.createElement("label");
@@ -462,7 +497,7 @@ function InjectOptionMenu(node) {
         colorInput2.width = '40';
         colorInput2.disabled = !colorItem.canModify;
         divColor1.appendChild(colorInput2);
-        colorItem.inputNumber = colorInput2;        
+        colorItem.inputNumber = colorInput2;
 
         let color1 = document.createElement("input");
         color1.type = "color";
@@ -634,6 +669,7 @@ function InjectOptionMenu(node) {
     if (window.location.href.includes("https://www.torn.com/profiles.php")) {
         InjectOptionMenu(document.querySelector(".content-title"));
     }
+    FetchServerVersion();
 
     var observer = new MutationObserver(function (mutations, observer) {
         mutations.forEach(function (mutation) {
@@ -648,7 +684,7 @@ function InjectOptionMenu(node) {
                             divWhereToInject = el[i];
                             isInjected = true;
                             if (LOCAL_API_KEY_IS_VALID) {
-                                fetchScoreAndTBSAsync(TargetId);
+                                GetPredictionForPlayer(TargetId, OnProfilePlayerStatsRetrieved);
                             }
                         }
 
@@ -662,7 +698,7 @@ function InjectOptionMenu(node) {
                     } else {
                         if (LOCAL_USE_COMPARE_MODE) {
 
-                            if (window.location.href.includes("https://www.torn.com/factions.php")) {
+                            if (window.location.href.includes("https://www.torn.com/factions.php") || window.location.href.includes("https://www.torn.com/page.php?sid=russianRoulette")) {
                                 // for faction page
                                 el = node.querySelectorAll('a');
                                 for (i = 0; i < el.length; ++i) {
@@ -682,8 +718,8 @@ function InjectOptionMenu(node) {
                                                     if (children != undefined && children.tagName != undefined && children.tagName == "IMG") {
                                                         var playerId = parseInt(myArray[1]);
                                                         if (!(playerId in dictDivPerPlayer)) {
-                                                            dictDivPerPlayer[playerId] = subChildren;
-                                                            FetchInfoForPlayer(playerId);
+                                                            dictDivPerPlayer[playerId] = children;
+                                                            GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
                                                             isDone = true;
                                                             break;
                                                         }
@@ -695,10 +731,10 @@ function InjectOptionMenu(node) {
                                                             var playerId = parseInt(myArray[1]);
                                                             if (!(playerId in dictDivPerPlayer)) {
                                                                 dictDivPerPlayer[playerId] = children;
-                                                                FetchInfoForPlayer(playerId);
+                                                                GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
                                                                 isDone = true;
                                                                 break;
-                                                            }                                                           
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -726,7 +762,7 @@ function InjectOptionMenu(node) {
                                         var playerId = parseInt(myArray[0]);
                                         if (!(playerId in dictDivPerPlayer)) {
                                             dictDivPerPlayer[playerId] = el[i];
-                                            FetchInfoForPlayer(playerId);
+                                            GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
                                         }
                                     }
                                 }
@@ -738,10 +774,8 @@ function InjectOptionMenu(node) {
         });
     });
 
-    async function FetchInfoForPlayer(targetId) {
-        const json = await fetchScoreAndTBS(targetId);
-
-        let result = json.Result;
+    function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
+        let result = prediction.Result;
         switch (result) {
             case FAIL:
                 dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><img style="background-color:' + colorTBS + '; border-radius: 50%;" width="16" height="16" src="https://www.freeiconspng.com/uploads/sign-red-error-icon-1.png" /></div>' + dictDivPerPlayer[targetId].innerHTML;
@@ -749,8 +783,8 @@ function InjectOptionMenu(node) {
             case SUCCESS:
                 {
                     if (LOCAL_USE_COMPARE_MODE) {
-                        let TBS = json.TBS.toLocaleString('en-US');
-                        let TBSBalanced = json.TBS_Balanced.toLocaleString('en-US');
+                        let TBS = prediction.TBS.toLocaleString('en-US');
+                        let TBSBalanced = prediction.TBS_Balanced.toLocaleString('en-US');
 
                         var intTBS = parseInt(TBS.replaceAll(',', ''));
                         var intTBSBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
@@ -793,26 +827,24 @@ function InjectOptionMenu(node) {
         return "#ffc0cb"; //pink
     }
 
-    var FAIL = 0;
-    var SUCCESS = 1;
-    var TOO_WEAK = 2;
-    var TOO_STRONG = 3;
+    function OnProfilePlayerStatsRetrieved(playerId, prediction) {
+        if (prediction == undefined) {
+            return;
+        }
 
-    async function fetchScoreAndTBSAsync(targetId) {
-        const json = await fetchScoreAndTBS(targetId);
+        SetPredictionInCache(playerId, prediction);
 
-        let result = json.Result;
-        switch (result) {
+        switch (prediction.Result) {
             case FAIL:
-                divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + json.Reason + '</div>';
+                divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + prediction.Reason + '</div>';
                 return;
             case TOO_WEAK:
             case TOO_STRONG:
             case SUCCESS:
                 {
-                    let TBSBalanced = json.TBS_Balanced.toLocaleString('en-US');
-                    let TBS = json.TBS.toLocaleString('en-US');
-                    let TargetScore = json.Score.toLocaleString('en-US');
+                    let TBSBalanced = prediction.TBS_Balanced.toLocaleString('en-US');
+                    let TBS = prediction.TBS.toLocaleString('en-US');
+                    let TargetScore = prediction.Score.toLocaleString('en-US');
                     var intTBS = parseInt(TBS.replaceAll(',', ''));
                     var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
                     var tbs1Ratio = 100 * intTBS / localTBS;
@@ -832,34 +864,37 @@ function InjectOptionMenu(node) {
                             divSvgAttackToColor.style.fill = colorComparedToUs;
                         }
 
-                        if (result == TOO_STRONG) {
-                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">Too strong to give a proper estimation</div >';
-                        } else if (result == TOO_WEAK) {
-                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">Too weak to give a proper estimation</div >';
+                        if (prediction.Result == TOO_STRONG) {
+                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too strong to give a proper estimation</div >';
+                        } else if (prediction.Result == TOO_WEAK) {
+                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too weak to give a proper estimation</div >';
                         }
                         else {
-                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">TBS = ' + averageModelTBS.toLocaleString('en-US') + '<label style="color:' + colorComparedToUs + '";"> (' + ratioComparedToUs.toFixed(0) + '%) </label></div >';  
+                            //divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">TBS = ' + FormatBattleStats(averageModelTBS) + '<label style="color:' + colorComparedToUs + '";"> (' + ratioComparedToUs.toFixed(0) + '%) </label></div >';
+                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px"><img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' + FormatBattleStats(averageModelTBS) + ' <label style = "color:' + colorComparedToUs + '"; "> (' + ratioComparedToUs.toFixed(0) + '%) </label></div >';
                         }
 
                         if (LOCAL_SHOW_PREDICTION_DETAILS) {
-                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:5px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label></div>';
-                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:5px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
+                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:2px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label></div>';
+                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:2px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
+                            if (prediction.fromCache)
+                                divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: center;"><img src="https://cdn1.iconfinder.com/data/icons/database-1-1/100/database-20-128.png"  width="12" height="12"/></div>';
                         }
                     }
                     else {
 
-                        if (result == TOO_STRONG) {
-                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">Too strong to give a proper estimation</div >';
-                        } else if (result == TOO_WEAK) {
-                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">Too weak to give a proper estimation</div >';
+                        if (prediction.Result == TOO_STRONG) {
+                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too strong to give a proper estimation</div >';
+                        } else if (prediction.Result == TOO_WEAK) {
+                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too weak to give a proper estimation</div >';
                         }
                         else {
-                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">TBS = ' + averageModelTBS.toLocaleString('en-US')+ '</div >';
+                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px"><img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' + FormatBattleStats(averageModelTBS) + '</div >';
                         }
 
                         if (LOCAL_SHOW_PREDICTION_DETAILS) {
-                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:5px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '</div>';
-                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:5px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '</div>';
+                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:2px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '</div>';
+                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:2px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '</div>';
                         }
                     }
                 }
@@ -867,7 +902,94 @@ function InjectOptionMenu(node) {
         }
     }
 
-    function fetchScoreAndTBS(targetId) {
+    function FormatBattleStats(number) {
+        var localized = number.toLocaleString('en-US');
+        var myArray = localized.split(",");
+        if (myArray.length < 1)
+            return 'ERROR';
+
+        var toReturn = myArray[0];
+        if (toReturn < 100) {
+            if (parseInt(myArray[1][0]) != 0) {
+                toReturn += ',' + myArray[1][0];
+            }
+        }
+        switch (myArray.length) {
+            case 2:
+                toReturn += "k";
+                break;
+            case 3:
+                toReturn += "m";
+                break;
+            case 4:
+                toReturn += "b";
+                break;
+            case 5:
+                toReturn += "t";
+                break;
+        }
+
+        return toReturn;
+    }
+
+    //for (key in localStorage) {
+    //    if (key.substring(0, 9) == 'firebase:') {
+    //        localStorage.removeItem(key);
+    //    }
+    //}
+
+    async function GetPredictionForPlayer(targetId, callback) {
+        var prediction = GetPredictionFromCache(targetId);
+        if (prediction != undefined) {
+            var isPredictionValid = true;
+            let expirationDate = Date.now() - 864E5*1000;// 864E5;
+            let predictionDate = new Date(prediction.PredictionDate).getTime();
+            if ((predictionDate < expirationDate) || (prediction.Version != parseInt(LOCAL_PREDICTION_VERSION_ON_SERVER))) {
+                var key = "tdup.battleStatsPredictor.cache.prediction." + targetId;
+                localStorage.removeItem(key);
+                isPredictionValid = false;
+            }
+
+            if (isPredictionValid) {
+                prediction.fromCache = true;
+                callback(targetId, prediction);
+                LogInfo("Prediction for target" + targetId + " found in the cache");
+                return;
+            }
+        }
+
+        LogInfo("Prediction for target" + targetId + " not found in the cache, asking server..");
+        const json = await FetchScoreAndTBS(targetId);
+        LogInfo("Prediction for target" + targetId + " not found in the cache, value retrieved");
+        callback(targetId, json);
+    }
+
+    function FetchServerVersion() {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: `http://www.lol-manager.com/api/battlestats/`,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                onload: (response) => {
+                    try {
+                        if (parseInt(response.responseText)) {
+                            LOCAL_PREDICTION_VERSION_ON_SERVER = parseInt(response.responseText);
+                            localStorage.setItem("tdup.battleStatsPredictor.PredictionVersionOnServer", LOCAL_PREDICTION_VERSION_ON_SERVER);
+                        }
+                    } catch (err) {
+                        reject(err);
+                    }
+                },
+                onerror: (err) => {
+                    reject(err);
+                }
+            });
+        });
+    }
+
+    function FetchScoreAndTBS(targetId) {
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
                 method: 'GET',
