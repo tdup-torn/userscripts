@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     4.2
+// @version     4.3
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -10,7 +10,6 @@
 // @match       https://www.torn.com/factions.php*
 // @match       https://www.torn.com/page.php*
 // @match       https://www.torn.com/joblist.php*
-// @match       https://www.torn.com/page.php?sid=russianRoulette#/*
 // @run-at      document-end
 // @grant       GM_addStyle
 // @grant       GM_xmlhttpRequest
@@ -354,7 +353,6 @@ function InjectOptionMenu(node) {
     let comparisonBattleStatsNode = document.createElement("div");
     comparisonBattleStatsNode.className = "text faction-names finally-bs-api";
     comparisonBattleStatsNode.style.display = (LOCAL_USE_COMPARE_MODE && !LOCAL_API_KEY_IS_VALID) ? "block" : "none";
-    comparisonBattleStatsNode.style.backgroundColor = 'khaki';
 
     var cell, raw, table;
     table = document.createElement('table');
