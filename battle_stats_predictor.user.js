@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     4.5
+// @version     4.6
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -17,7 +17,6 @@
 // @grant       GM_getValue
 // @connect     api.torn.com
 // @connect     www.lol-manager.com
-// @connect     localhost
 // @author      TDup
 // ==/UserScript==
 
@@ -312,7 +311,6 @@ function InjectOptionMenu(node) {
     subscriptionNode.className = "text faction-names style-bs-api";
     subscriptionNode.style.display = (!LOCAL_API_KEY_IS_VALID) ? "block" : "none";
     subscriptionEndText = document.createElement("div");
-    subscriptionEndText.innerHTML = "Subscription end: ";
     subscriptionNode.appendChild(subscriptionEndText);
 
     // USE COMPARE MODE PART
@@ -765,7 +763,6 @@ function InjectOptionMenu(node) {
                                     }
                                 }
                             }
-
                             else {
                                 // for pages with several players
                                 el = document.querySelectorAll('.user.name')
@@ -823,9 +820,11 @@ function InjectOptionMenu(node) {
         }
     }
 
-    const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString);
-    TargetId = urlParams.get('XID');
+
+    var canonical = document.querySelector("link[rel='canonical']").href;
+    const urlParams = new URLSearchParams(canonical);
+    TargetId = urlParams.get('https://www.torn.com/profiles.php?XID');   
+
 
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
         var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_" + i];
@@ -852,7 +851,7 @@ function InjectOptionMenu(node) {
     function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         if (prediction == undefined) {
             return;
-        }      
+        }
 
         if (subscriptionEndText != undefined) {
             var dateNow = new Date();
@@ -874,7 +873,7 @@ function InjectOptionMenu(node) {
                 subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Your subscription ends in '
                     + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
                     + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                    + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br />You can extend your subscription for 2xan/month (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a>)</div>';
+                    + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br />You can extend it for 2xan/month (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a>)</div>';
             }
         }
 
@@ -920,8 +919,9 @@ function InjectOptionMenu(node) {
                         if (LOCAL_SHOW_PREDICTION_DETAILS) {
                             divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:2px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label></div>';
                             divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:2px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
-                            if (prediction.fromCache)
+                            if (prediction.fromCache) {
                                 divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: center;"><img src="https://cdn1.iconfinder.com/data/icons/database-1-1/100/database-20-128.png"  width="12" height="12"/></div>';
+                            }
                         }
                     }
                     else {
@@ -948,8 +948,9 @@ function InjectOptionMenu(node) {
     function FormatBattleStats(number) {
         var localized = number.toLocaleString('en-US');
         var myArray = localized.split(",");
-        if (myArray.length < 1)
+        if (myArray.length < 1) {
             return 'ERROR';
+        }
 
         var toReturn = myArray[0];
         if (toReturn < 100) {
@@ -976,6 +977,10 @@ function InjectOptionMenu(node) {
     }
 
     async function GetPredictionForPlayer(targetId, callback) {
+        if (targetId == undefined || targetId < 1) {
+            return;
+        }
+
         if (LOCAL_DATE_SUBSCRIPTION_END != undefined) {
             var prediction = GetPredictionFromCache(targetId);
             if (prediction != undefined) {
@@ -1001,12 +1006,12 @@ function InjectOptionMenu(node) {
         const newPrediction = await FetchScoreAndTBS(targetId);
         LogInfo("Prediction for target" + targetId + " not found in the cache, value retrieved");
         if (newPrediction != undefined) {
-            SetPredictionInCache(targetId, newPrediction); 
+            SetPredictionInCache(targetId, newPrediction);
 
             var subscriptionEnd = new Date(newPrediction.SubscriptionEnd);
             LOCAL_DATE_SUBSCRIPTION_END = subscriptionEnd;
-            localStorage.setItem("tdup.battleStatsPredictor.dateSubscriptionEnd", LOCAL_DATE_SUBSCRIPTION_END);            
-        }        
+            localStorage.setItem("tdup.battleStatsPredictor.dateSubscriptionEnd", LOCAL_DATE_SUBSCRIPTION_END);
+        }
         callback(targetId, newPrediction);
     }
 
