@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     4.4
+// @version     4.5
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -874,7 +874,7 @@ function InjectOptionMenu(node) {
                 subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Your subscription ends in '
                     + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
                     + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                    + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '</div>';
+                    + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br />You can extend your subscription for 2xan/month (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a>)</div>';
             }
         }
 
