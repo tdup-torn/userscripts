@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     4.6
+// @version     4.7
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -821,10 +821,12 @@ function InjectOptionMenu(node) {
     }
 
 
-    var canonical = document.querySelector("link[rel='canonical']").href;
-    const urlParams = new URLSearchParams(canonical);
-    TargetId = urlParams.get('https://www.torn.com/profiles.php?XID');   
-
+    var canonical = document.querySelector("link[rel='canonical']");
+    if (canonical != undefined) {
+        var hrefCanon = canonical.href; 
+        const urlParams = new URLSearchParams(hrefCanon);
+        TargetId = urlParams.get('https://www.torn.com/profiles.php?XID');   
+    }
 
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
         var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_" + i];
