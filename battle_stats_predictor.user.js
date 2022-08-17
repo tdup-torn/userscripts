@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     4.3
+// @version     4.4
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -17,10 +17,9 @@
 // @grant       GM_getValue
 // @connect     api.torn.com
 // @connect     www.lol-manager.com
+// @connect     localhost
 // @author      TDup
 // ==/UserScript==
-
-// Based on finally.torn.FactionWallBattlestats
 
 var logVerbose = false;
 
@@ -42,6 +41,7 @@ let LOCAL_TBS = localStorage["tdup.battleStatsPredictor.comparisonTbs"];
 let LOCAL_PREDICTION_VERSION_ON_SERVER = localStorage["tdup.battleStatsPredictor.PredictionVersionOnServer"];
 
 let LOCAL_SHOW_PREDICTION_DETAILS = localStorage["tdup.battleStatsPredictor.showPredictionDetails"] == "true";
+let LOCAL_DATE_SUBSCRIPTION_END = localStorage["tdup.battleStatsPredictor.dateSubscriptionEnd"];
 
 const LOCAL_COLORS = [
     { maxValue: 50, color: '#9EBDBA', canModify: true },
@@ -65,9 +65,12 @@ var scoreDefInput;
 var scoreSpdInput;
 var scoreDexInput;
 var apiKeyText;
+var subscriptionEndText;
+var dateSubscriptionEndUtc;
 var setBattleStats;
 var mainNode;
 
+// Css / option menu based on finally.torn.FactionWallBattlestats script (Thanks!)
 $("head").append(
     '<link '
     + 'href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" '
@@ -75,7 +78,7 @@ $("head").append(
 );
 
 GM_addStyle(`
-.finally-bs-api {
+.style-bs-api {
 	background: var(--main-bg);
 	text-align: center;
 	left: 0;
@@ -86,16 +89,16 @@ GM_addStyle(`
     padding-top : 5px;
 }
 
-.finally-bs-api > * {
+.style-bs-api > * {
 	margin: 0 5px;
 	padding: 5px;
 }
 
-.finally-bs-api > table, td, th, input {
+.style-bs-api > table, td, th, input {
   border: 1px;
 }
 
-.finally-bs-api > table {
+.style-bs-api > table {
   width: 100%;
   border-collapse: collapse;
 }
@@ -127,6 +130,14 @@ function SetPredictionInCache(playerId, prediction) {
     }
     var key = "tdup.battleStatsPredictor.cache.prediction." + playerId;
     localStorage[key] = JSON.stringify(prediction);
+}
+
+function CleanPredictionsCache() {
+    for (key in localStorage) {
+        if (key.startsWith('tdup.battleStatsPredictor.cache.prediction.')) {
+            localStorage.removeItem(key);
+        }
+    }
 }
 
 function JSONparse(str) {
@@ -262,7 +273,7 @@ function InjectOptionMenu(node) {
 
     // API KEY PART
     let apiKeyNode = document.createElement("div");
-    apiKeyNode.className = "text faction-names finally-bs-api";
+    apiKeyNode.className = "text faction-names style-bs-api";
     apiKeyNode.style.display = (!LOCAL_API_KEY_IS_VALID) ? "block" : "none";
     apiKeyText = document.createElement("span");
     apiKeyText.innerHTML = "Battle Stats Predictor - " + ((!LOCAL_API_KEY_IS_VALID) ? "Set" : "Update") + " your API key: ";
@@ -296,9 +307,17 @@ function InjectOptionMenu(node) {
         apiKeyNode.appendChild(apiRegister);
     }
 
+    // SUBSCRIPTION PART
+    let subscriptionNode = document.createElement("div");
+    subscriptionNode.className = "text faction-names style-bs-api";
+    subscriptionNode.style.display = (!LOCAL_API_KEY_IS_VALID) ? "block" : "none";
+    subscriptionEndText = document.createElement("div");
+    subscriptionEndText.innerHTML = "Subscription end: ";
+    subscriptionNode.appendChild(subscriptionEndText);
+
     // USE COMPARE MODE PART
     let compareCheckBoxNode = document.createElement("div");
-    compareCheckBoxNode.className = "text faction-names finally-bs-api";
+    compareCheckBoxNode.className = "text faction-names style-bs-api";
     compareCheckBoxNode.style.display = (!LOCAL_API_KEY_IS_VALID) ? "block" : "none";
 
     let checkbox = document.createElement('input');
@@ -324,7 +343,7 @@ function InjectOptionMenu(node) {
 
     // USE SHOW PREDICTION DETAILS
     let PredictionDetailsBoxNode = document.createElement("div");
-    PredictionDetailsBoxNode.className = "text faction-names finally-bs-api";
+    PredictionDetailsBoxNode.className = "text faction-names style-bs-api";
     PredictionDetailsBoxNode.style.display = (!LOCAL_API_KEY_IS_VALID) ? "block" : "none";
 
     let checkboxPredictionDetails = document.createElement('input');
@@ -339,19 +358,19 @@ function InjectOptionMenu(node) {
 
     var checkboxPredictionDetailsLabel = document.createElement('label')
     checkboxPredictionDetailsLabel.htmlFor = "id";
-    checkboxPredictionDetailsLabel.appendChild(document.createTextNode('Display prediction details'));
+    checkboxPredictionDetailsLabel.appendChild(document.createTextNode('Debug Mode'));
     PredictionDetailsBoxNode.appendChild(checkboxPredictionDetailsLabel);
 
     PredictionDetailsBoxNode.appendChild(checkboxPredictionDetails);
 
 
     let colorSettingsNode = document.createElement("div");
-    colorSettingsNode.className = "text faction-names finally-bs-api";
+    colorSettingsNode.className = "text faction-names style-bs-api";
     colorSettingsNode.style.display = (LOCAL_USE_COMPARE_MODE && !LOCAL_API_KEY_IS_VALID) ? "block" : "none";
 
     // COMPARISON STATS PART
     let comparisonBattleStatsNode = document.createElement("div");
-    comparisonBattleStatsNode.className = "text faction-names finally-bs-api";
+    comparisonBattleStatsNode.className = "text faction-names style-bs-api";
     comparisonBattleStatsNode.style.display = (LOCAL_USE_COMPARE_MODE && !LOCAL_API_KEY_IS_VALID) ? "block" : "none";
 
     var cell, raw, table;
@@ -366,7 +385,7 @@ function InjectOptionMenu(node) {
 
     successImportBattleStats = document.createElement("label");
     successImportBattleStats.innerHTML = 'Battle stats updated!';
-    successImportBattleStats.style.color = 'forestgreen';
+    successImportBattleStats.style.color = '#1E88E5';
     successImportBattleStats.style.visibility = "hidden";
     comparisonBattleStatsNode.appendChild(successImportBattleStats);
 
@@ -523,7 +542,7 @@ function InjectOptionMenu(node) {
     configPanelSave.value = "Save and reload";
 
     let buttonsNode = document.createElement("div");
-    buttonsNode.className = "text faction-names finally-bs-api";
+    buttonsNode.className = "text faction-names style-bs-api";
     buttonsNode.style.display = (!LOCAL_API_KEY_IS_VALID) ? "block" : "none";
     buttonsNode.appendChild(configPanelSave);
 
@@ -535,11 +554,13 @@ function InjectOptionMenu(node) {
             buttonsNode.style.display = "none";
             compareCheckBoxNode.style.display = "none";
             PredictionDetailsBoxNode.style.display = "none";
+            subscriptionNode.style.display = "none";
         }
         else {
             apiKeyNode.style.display = "block";
             compareCheckBoxNode.style.display = "block";
             PredictionDetailsBoxNode.style.display = "block";
+            subscriptionNode.style.display = "block";
             apiKeyText.innerHTML = `${r}: `;
         }
 
@@ -615,6 +636,7 @@ function InjectOptionMenu(node) {
             buttonsNode.style.display = "none";
             compareCheckBoxNode.style.display = "none";
             PredictionDetailsBoxNode.style.display = "none";
+            subscriptionNode.style.display = "none";
         }
         else {
             apiKeyText.innerHTML = "Battle Stats Predictor - Update your API key: ";
@@ -624,12 +646,14 @@ function InjectOptionMenu(node) {
             buttonsNode.style.display = "block";
             compareCheckBoxNode.style.display = "block";
             PredictionDetailsBoxNode.style.display = "block";
+            subscriptionNode.style.display = "block";
         }
 
     });
 
     topPageLinksList.appendChild(apiKeyButton);
     node.appendChild(apiKeyNode);
+    node.appendChild(subscriptionNode);
     node.appendChild(PredictionDetailsBoxNode);
     node.appendChild(compareCheckBoxNode);
     node.appendChild(comparisonBattleStatsNode);
@@ -828,9 +852,31 @@ function InjectOptionMenu(node) {
     function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         if (prediction == undefined) {
             return;
-        }
+        }      
 
-        SetPredictionInCache(playerId, prediction);
+        if (subscriptionEndText != undefined) {
+            var dateNow = new Date();
+            var offsetInMinute = dateNow.getTimezoneOffset();
+            var dateSubscriptionEnd = new Date(LOCAL_DATE_SUBSCRIPTION_END);
+            dateSubscriptionEnd.setMinutes(dateSubscriptionEnd.getMinutes() - offsetInMinute);
+            var time_difference = dateSubscriptionEnd - dateNow;
+            if (time_difference < 0) {
+                CleanPredictionsCache();
+                subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for 2xan/month (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a>)</div>';
+            }
+            else {
+                var days_difference = parseInt(time_difference / (1000 * 60 * 60 * 24));
+                var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
+                hours_difference %= 24;
+                var minutes_difference = parseInt(time_difference / (1000 * 60));
+                minutes_difference %= 60;
+
+                subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Your subscription ends in '
+                    + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
+                    + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
+                    + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '</div>';
+            }
+        }
 
         switch (prediction.Result) {
             case FAIL:
@@ -868,7 +914,6 @@ function InjectOptionMenu(node) {
                             divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too weak to give a proper estimation</div >';
                         }
                         else {
-                            //divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:5px">TBS = ' + FormatBattleStats(averageModelTBS) + '<label style="color:' + colorComparedToUs + '";"> (' + ratioComparedToUs.toFixed(0) + '%) </label></div >';
                             divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px"><img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' + FormatBattleStats(averageModelTBS) + ' <label style = "color:' + colorComparedToUs + '"; "> (' + ratioComparedToUs.toFixed(0) + '%) </label></div >';
                         }
 
@@ -930,36 +975,39 @@ function InjectOptionMenu(node) {
         return toReturn;
     }
 
-    //for (key in localStorage) {
-    //    if (key.substring(0, 9) == 'firebase:') {
-    //        localStorage.removeItem(key);
-    //    }
-    //}
-
     async function GetPredictionForPlayer(targetId, callback) {
-        var prediction = GetPredictionFromCache(targetId);
-        if (prediction != undefined) {
-            var isPredictionValid = true;
-            let expirationDate = Date.now() - 864E5*1000;// 864E5;
-            let predictionDate = new Date(prediction.PredictionDate).getTime();
-            if ((predictionDate < expirationDate) || (prediction.Version != parseInt(LOCAL_PREDICTION_VERSION_ON_SERVER))) {
-                var key = "tdup.battleStatsPredictor.cache.prediction." + targetId;
-                localStorage.removeItem(key);
-                isPredictionValid = false;
-            }
+        if (LOCAL_DATE_SUBSCRIPTION_END != undefined) {
+            var prediction = GetPredictionFromCache(targetId);
+            if (prediction != undefined) {
+                var isPredictionValid = true;
+                let expirationDate = Date.now() - 864E5 * 1000;
+                let predictionDate = new Date(prediction.PredictionDate).getTime();
+                if ((predictionDate < expirationDate) || (prediction.Version != parseInt(LOCAL_PREDICTION_VERSION_ON_SERVER))) {
+                    var key = "tdup.battleStatsPredictor.cache.prediction." + targetId;
+                    localStorage.removeItem(key);
+                    isPredictionValid = false;
+                }
 
-            if (isPredictionValid) {
-                prediction.fromCache = true;
-                callback(targetId, prediction);
-                LogInfo("Prediction for target" + targetId + " found in the cache");
-                return;
+                if (isPredictionValid) {
+                    prediction.fromCache = true;
+                    callback(targetId, prediction);
+                    LogInfo("Prediction for target" + targetId + " found in the cache");
+                    return;
+                }
             }
         }
 
         LogInfo("Prediction for target" + targetId + " not found in the cache, asking server..");
-        const json = await FetchScoreAndTBS(targetId);
+        const newPrediction = await FetchScoreAndTBS(targetId);
         LogInfo("Prediction for target" + targetId + " not found in the cache, value retrieved");
-        callback(targetId, json);
+        if (newPrediction != undefined) {
+            SetPredictionInCache(targetId, newPrediction); 
+
+            var subscriptionEnd = new Date(newPrediction.SubscriptionEnd);
+            LOCAL_DATE_SUBSCRIPTION_END = subscriptionEnd;
+            localStorage.setItem("tdup.battleStatsPredictor.dateSubscriptionEnd", LOCAL_DATE_SUBSCRIPTION_END);            
+        }        
+        callback(targetId, newPrediction);
     }
 
     function FetchServerVersion() {
