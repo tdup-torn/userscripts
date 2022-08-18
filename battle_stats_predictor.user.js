@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     4.7
+// @version     4.8
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -11,8 +11,7 @@
 // @match       https://www.torn.com/page.php*
 // @match       https://www.torn.com/joblist.php*
 // @run-at      document-end
-// @grant       GM_addStyle
-// @grant       GM_xmlhttpRequest
+// @grant       GM.xmlHttpRequest
 // @grant       GM_setValue
 // @grant       GM_getValue
 // @connect     api.torn.com
@@ -69,43 +68,49 @@ var dateSubscriptionEndUtc;
 var setBattleStats;
 var mainNode;
 
-// Css / option menu based on finally.torn.FactionWallBattlestats script (Thanks!)
-$("head").append(
-    '<link '
-    + 'href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" '
-    + 'rel="stylesheet" type="text/css">'
-);
 
-GM_addStyle(`
-.style-bs-api {
-	background: var(--main-bg);
-	text-align: center;
-	left: 0;
-	top: 0;
-	width: 100%;
-	height: 100%;
-    padding-bottom : 5px;
-    padding-top : 5px;
-}
+var link = document.createElement('link');
+link.type = 'text/css';
+link.rel = 'stylesheet';
+document.head.appendChild(link);
+link.href = 'https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css';
 
-.style-bs-api > * {
-	margin: 0 5px;
-	padding: 5px;
-}
+var styleToAdd = document.createElement('style');
+styleToAdd.innerHTML =
+    '.style-bs-api { ' +
+    'background: var(--main-bg);  ' +
+    'text-align: center;  ' +
+    'left: 0;  ' +
+    'top: 0;  ' +
+    'width: 100%;  ' +
+    'height: 100%;  ' +
+    'padding-bottom : 5px;  ' +
+    'padding-top : 5px; ' +
+    '} ' +
+    ' ' +
+    '.style-bs-api > * { ' +
+    '	margin: 0 5px; ' +
+    '	padding: 5px; ' +
+    '} ' +
+    ' ' +
+    '.style-bs-api > table, td, th, input { ' +
+    '  border: 1px; ' +
+    '} ' +
+    ' ' +
+    '.style-bs-api > table { ' +
+    '  width: 100%; ' +
+    '  border-collapse: collapse; ' +
+    '} ' +
+    ' ' +
+    '.finally-bs-col { ' +
+    '	text-overflow: clip !important; ' +
+    '}';
 
-.style-bs-api > table, td, th, input {
-  border: 1px;
-}
+// Get the first script tag
+var ref = document.querySelector('script');
 
-.style-bs-api > table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.finally-bs-col {
-	text-overflow: clip !important;
-}
-`);
+// Insert our new styles before the first script tag
+ref.parentNode.insertBefore(styleToAdd, ref);
 
 function LogInfo(value) {
     console.log(value);
@@ -152,7 +157,7 @@ async function GetPlayerFromTornAPI(key, retrieveStats, callback) {
         urlToUse += "selections=battlestats&";
 
     urlToUse += "comment=BSPredictor&key=" + key;
-    GM_xmlhttpRequest({
+    GM.xmlHttpRequest({
         method: "GET",
         url: urlToUse,
         onload: (r) => {
@@ -1019,7 +1024,7 @@ function InjectOptionMenu(node) {
 
     function FetchServerVersion() {
         return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
+            GM.xmlHttpRequest({
                 method: 'GET',
                 url: `http://www.lol-manager.com/api/battlestats/`,
                 headers: {
@@ -1044,7 +1049,7 @@ function InjectOptionMenu(node) {
 
     function FetchScoreAndTBS(targetId) {
         return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
+            GM.xmlHttpRequest({
                 method: 'GET',
                 url: `http://www.lol-manager.com/api/battlestats/${LOCAL_API_KEY}/${targetId}`,
                 headers: {
