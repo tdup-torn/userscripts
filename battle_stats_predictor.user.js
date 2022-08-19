@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     4.8
+// @version     4.9
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -52,7 +52,8 @@ const LOCAL_COLORS = [
 var FAIL = 0;
 var SUCCESS = 1;
 var TOO_WEAK = 2;
-var TOO_STRONG = 3
+var TOO_STRONG = 3;
+var MODEL_ERROR = 4;
 
 var errorAPIKeyInvalid;
 var errorImportBattleStats;
@@ -129,7 +130,7 @@ function GetPredictionFromCache(playerId) {
 }
 
 function SetPredictionInCache(playerId, prediction) {
-    if (prediction.Result == FAIL) {
+    if (prediction.Result == FAIL || prediction.Result == MODEL_ERROR) {
         return;
     }
     var key = "tdup.battleStatsPredictor.cache.prediction." + playerId;
@@ -802,6 +803,7 @@ function InjectOptionMenu(node) {
         let result = prediction.Result;
         switch (result) {
             case FAIL:
+            case MODEL_ERROR:
                 dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><img style="background-color:' + colorTBS + '; border-radius: 50%;" width="16" height="16" src="https://www.freeiconspng.com/uploads/sign-red-error-icon-1.png" /></div>' + dictDivPerPlayer[targetId].innerHTML;
                 return;
             case SUCCESS:
@@ -885,6 +887,7 @@ function InjectOptionMenu(node) {
         }
 
         switch (prediction.Result) {
+            case MODEL_ERROR:
             case FAIL:
                 divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + prediction.Reason + '</div>';
                 return;
@@ -894,7 +897,6 @@ function InjectOptionMenu(node) {
                 {
                     let TBSBalanced = prediction.TBS_Balanced.toLocaleString('en-US');
                     let TBS = prediction.TBS.toLocaleString('en-US');
-                    let TargetScore = prediction.Score.toLocaleString('en-US');
                     var intTBS = parseInt(TBS.replaceAll(',', ''));
                     var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
                     var tbs1Ratio = 100 * intTBS / localTBS;
@@ -1033,8 +1035,13 @@ function InjectOptionMenu(node) {
                 onload: (response) => {
                     try {
                         if (parseInt(response.responseText)) {
-                            LOCAL_PREDICTION_VERSION_ON_SERVER = parseInt(response.responseText);
-                            localStorage.setItem("tdup.battleStatsPredictor.PredictionVersionOnServer", LOCAL_PREDICTION_VERSION_ON_SERVER);
+                            var serverVersion = parseInt(response.responseText);
+                            var localVersion = parseInt(LOCAL_PREDICTION_VERSION_ON_SERVER);
+                            if (serverVersion != localVersion) {
+                                LogInfo("Server changed prediction model version, from " + localVersion + " to " + serverVersion);
+                                LOCAL_PREDICTION_VERSION_ON_SERVER = serverVersion;
+                                localStorage.setItem("tdup.battleStatsPredictor.PredictionVersionOnServer", LOCAL_PREDICTION_VERSION_ON_SERVER);
+                            }
                         }
                     } catch (err) {
                         reject(err);
