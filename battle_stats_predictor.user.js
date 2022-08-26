@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     4.9
+// @version     5.0
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -993,9 +993,10 @@ function InjectOptionMenu(node) {
         if (LOCAL_DATE_SUBSCRIPTION_END != undefined) {
             var prediction = GetPredictionFromCache(targetId);
             if (prediction != undefined) {
-                var isPredictionValid = true;
-                let expirationDate = Date.now() - 864E5 * 1000;
-                let predictionDate = new Date(prediction.PredictionDate).getTime();
+                var isPredictionValid = true;   
+                var expirationDate = new Date();
+                expirationDate.setDate(expirationDate.getDate() - 1);                
+                var predictionDate = new Date(prediction.PredictionDate);
                 if ((predictionDate < expirationDate) || (prediction.Version != parseInt(LOCAL_PREDICTION_VERSION_ON_SERVER))) {
                     var key = "tdup.battleStatsPredictor.cache.prediction." + targetId;
                     localStorage.removeItem(key);
