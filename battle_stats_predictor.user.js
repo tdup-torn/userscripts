@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     5.0
+// @version     5.1
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -806,6 +806,8 @@ function InjectOptionMenu(node) {
             case MODEL_ERROR:
                 dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><img style="background-color:' + colorTBS + '; border-radius: 50%;" width="16" height="16" src="https://www.freeiconspng.com/uploads/sign-red-error-icon-1.png" /></div>' + dictDivPerPlayer[targetId].innerHTML;
                 return;
+            case TOO_WEAK:
+            case TOO_STRONG:
             case SUCCESS:
                 {
                     if (LOCAL_USE_COMPARE_MODE) {
@@ -818,8 +820,13 @@ function InjectOptionMenu(node) {
                         var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
                         var ratioComparedToUs = 50 * (intTBS + intTBSBalanced) / localTBS;
                         var colorTBS = getColorDifference(ratioComparedToUs);
+                        if (prediction.Result == TOO_STRONG) {
+                            var ratioTBS = 100 * intTBS / localTBS;
+                            colorTBS = getColorDifference(ratioTBS);
+                        }
                         var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
 
+                        //<div style="display: inline-block; margin-right:5px;
                         dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '"><img style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>' + dictDivPerPlayer[targetId].innerHTML;
                     }
                     return;
@@ -870,7 +877,7 @@ function InjectOptionMenu(node) {
             var time_difference = dateSubscriptionEnd - dateNow;
             if (time_difference < 0) {
                 CleanPredictionsCache();
-                subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for 2xan/month (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a>)</div>';
+                subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg `bsp`)</div>';
             }
             else {
                 var days_difference = parseInt(time_difference / (1000 * 60 * 60 * 24));
@@ -882,7 +889,7 @@ function InjectOptionMenu(node) {
                 subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Your subscription ends in '
                     + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
                     + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                    + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br />You can extend it for 2xan/month (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a>)</div>';
+                    + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br />You can extend it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg `bsp`)</div>';
             }
         }
 
@@ -929,7 +936,7 @@ function InjectOptionMenu(node) {
                             divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:2px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label></div>';
                             divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:2px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
                             if (prediction.fromCache) {
-                                divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: center;"><img src="https://cdn1.iconfinder.com/data/icons/database-1-1/100/database-20-128.png"  width="12" height="12"/></div>';
+                                divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: center;"><img src="https://cdn1.iconfinder.com/data/icons/database-1-1/100/database-20-128.png" title="' + prediction.PredictionDate +'"  width="12" height="12"/></div>';
                             }
                         }
                     }
