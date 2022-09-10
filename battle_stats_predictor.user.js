@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     5.1
+// @version     5.2
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -10,6 +10,7 @@
 // @match       https://www.torn.com/factions.php*
 // @match       https://www.torn.com/page.php*
 // @match       https://www.torn.com/joblist.php*
+// @match       https://www.torn.com/competition.php*
 // @run-at      document-end
 // @grant       GM.xmlHttpRequest
 // @grant       GM_setValue
@@ -677,7 +678,11 @@ function InjectOptionMenu(node) {
 
     var dictDivPerPlayer = {};
 
-    var shouldStop = false;
+    if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=recent")) {
+        return;
+    }
+
+    var shouldStop = false;  
     if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
         shouldStop = true;
         if (window.location.href.startsWith("https://www.torn.com/factions.php?step=profile")) {
