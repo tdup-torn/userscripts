@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     5.2
+// @version     5.3
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -682,7 +682,7 @@ function InjectOptionMenu(node) {
         return;
     }
 
-    var shouldStop = false;  
+    var shouldStop = false;
     if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
         shouldStop = true;
         if (window.location.href.startsWith("https://www.torn.com/factions.php?step=profile")) {
@@ -776,7 +776,7 @@ function InjectOptionMenu(node) {
                             }
                             else {
                                 // for pages with several players
-                                el = document.querySelectorAll('.user.name')
+                                el = node.querySelectorAll('.user.name')
                                 for (i = 0; i < el.length; ++i) {
                                     {
                                         var iter = el[i];
@@ -791,9 +791,11 @@ function InjectOptionMenu(node) {
 
                                         var playerId = parseInt(myArray[0]);
                                         if (!(playerId in dictDivPerPlayer)) {
-                                            dictDivPerPlayer[playerId] = el[i];
-                                            GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
+                                            dictDivPerPlayer[playerId] = new Array();
                                         }
+
+                                        dictDivPerPlayer[playerId].push(el[i]);
+                                        GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
                                     }
                                 }
                             }
@@ -809,7 +811,16 @@ function InjectOptionMenu(node) {
         switch (result) {
             case FAIL:
             case MODEL_ERROR:
-                dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><img style="background-color:' + colorTBS + '; border-radius: 50%;" width="16" height="16" src="https://www.freeiconspng.com/uploads/sign-red-error-icon-1.png" /></div>' + dictDivPerPlayer[targetId].innerHTML;
+                var toInject = '<div style="position: absolute;z-index: 100;"><img style="border-radius: 50%;" width="16" height="16" src="https://www.freeiconspng.com/uploads/sign-red-error-icon-1.png" /></div>';
+                var htmlElems = dictDivPerPlayer[targetId];
+                if (Array.isArray(htmlElems)) {
+                    for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
+                        dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+                    }
+                }
+                else {
+                    dictDivPerPlayer[targetId].innerHTML = toInject + dictDivPerPlayer[targetId].innerHTML;
+                }
                 return;
             case TOO_WEAK:
             case TOO_STRONG:
@@ -831,8 +842,18 @@ function InjectOptionMenu(node) {
                         }
                         var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
 
-                        //<div style="display: inline-block; margin-right:5px;
-                        dictDivPerPlayer[targetId].innerHTML = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '"><img style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>' + dictDivPerPlayer[targetId].innerHTML;
+                        var toInject = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '"><img style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>';
+                        var htmlElems = dictDivPerPlayer[targetId];
+                        if (Array.isArray(htmlElems)) {
+                            for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
+                                dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+                            }
+                        }
+                        else {
+                            dictDivPerPlayer[targetId].innerHTML = toInject + dictDivPerPlayer[targetId].innerHTML;
+                        }
+
+
                     }
                     return;
                 }
@@ -842,9 +863,9 @@ function InjectOptionMenu(node) {
 
     var canonical = document.querySelector("link[rel='canonical']");
     if (canonical != undefined) {
-        var hrefCanon = canonical.href; 
+        var hrefCanon = canonical.href;
         const urlParams = new URLSearchParams(hrefCanon);
-        TargetId = urlParams.get('https://www.torn.com/profiles.php?XID');   
+        TargetId = urlParams.get('https://www.torn.com/profiles.php?XID');
     }
 
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
@@ -941,7 +962,7 @@ function InjectOptionMenu(node) {
                             divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:2px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label></div>';
                             divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:2px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
                             if (prediction.fromCache) {
-                                divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: center;"><img src="https://cdn1.iconfinder.com/data/icons/database-1-1/100/database-20-128.png" title="' + prediction.PredictionDate +'"  width="12" height="12"/></div>';
+                                divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: center;"><img src="https://cdn1.iconfinder.com/data/icons/database-1-1/100/database-20-128.png" title="' + prediction.PredictionDate + '"  width="12" height="12"/></div>';
                             }
                         }
                     }
@@ -1005,9 +1026,9 @@ function InjectOptionMenu(node) {
         if (LOCAL_DATE_SUBSCRIPTION_END != undefined) {
             var prediction = GetPredictionFromCache(targetId);
             if (prediction != undefined) {
-                var isPredictionValid = true;   
+                var isPredictionValid = true;
                 var expirationDate = new Date();
-                expirationDate.setDate(expirationDate.getDate() - 1);                
+                expirationDate.setDate(expirationDate.getDate() - 1);
                 var predictionDate = new Date(prediction.PredictionDate);
                 if ((predictionDate < expirationDate) || (prediction.Version != parseInt(LOCAL_PREDICTION_VERSION_ON_SERVER))) {
                     var key = "tdup.battleStatsPredictor.cache.prediction." + targetId;
