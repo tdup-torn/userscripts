@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     5.3
+// @version     5.4
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -69,7 +69,14 @@ var subscriptionEndText;
 var dateSubscriptionEndUtc;
 var setBattleStats;
 var mainNode;
+var isUsingHonorBar = false;
 
+var isInjected = false;
+var ProfileTargetId = -1;
+var divWhereToInject;
+var svgAttackDivFound = false;
+var divSvgAttackToColor;
+var dictDivPerPlayer = {};
 
 var link = document.createElement('link');
 link.type = 'text/css';
@@ -265,7 +272,282 @@ function UpdateLocalScore(value) {
     }
 }
 
+function getColorDifference(ratio) {
+    for (var i = 0; i < LOCAL_COLORS.length; ++i) {
+        if (ratio < LOCAL_COLORS[i].maxValue) {
+            return LOCAL_COLORS[i].color;
+        }
+    }
+    return "#ffc0cb"; //pink
+}
 
+function OnProfilePlayerStatsRetrieved(playerId, prediction) {
+    if (prediction == undefined) {
+        return;
+    }
+
+    if (subscriptionEndText != undefined) {
+        var dateNow = new Date();
+        var offsetInMinute = dateNow.getTimezoneOffset();
+        var dateSubscriptionEnd = new Date(LOCAL_DATE_SUBSCRIPTION_END);
+        dateSubscriptionEnd.setMinutes(dateSubscriptionEnd.getMinutes() - offsetInMinute);
+        var time_difference = dateSubscriptionEnd - dateNow;
+        if (time_difference < 0) {
+            CleanPredictionsCache();
+            subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg `bsp`)</div>';
+        }
+        else {
+            var days_difference = parseInt(time_difference / (1000 * 60 * 60 * 24));
+            var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
+            hours_difference %= 24;
+            var minutes_difference = parseInt(time_difference / (1000 * 60));
+            minutes_difference %= 60;
+
+            subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Your subscription ends in '
+                + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
+                + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
+                + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br />You can extend it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg `bsp`)</div>';
+        }
+    }
+
+    switch (prediction.Result) {
+        case MODEL_ERROR:
+        case FAIL:
+            divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + prediction.Reason + '</div>';
+            return;
+        case TOO_WEAK:
+        case TOO_STRONG:
+        case SUCCESS:
+            {
+                let TBSBalanced = prediction.TBS_Balanced.toLocaleString('en-US');
+                let TBS = prediction.TBS.toLocaleString('en-US');
+                var intTBS = parseInt(TBS.replaceAll(',', ''));
+                var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
+                var tbs1Ratio = 100 * intTBS / localTBS;
+
+                var intTbsBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
+                var tbsBalancedRatio = 100 * intTbsBalanced / ((parseInt(LOCAL_SCORE) * parseInt(LOCAL_SCORE)) / 4);
+
+                var colorTBS = getColorDifference(tbs1Ratio);
+                var colorBalancedTBS = getColorDifference(tbsBalancedRatio);
+
+                var averageModelTBS = parseInt((intTBS + intTbsBalanced) / 2);
+                var ratioComparedToUs = 100 * averageModelTBS / localTBS;
+                var colorComparedToUs = getColorDifference(ratioComparedToUs);
+
+                if (LOCAL_USE_COMPARE_MODE) {
+                    if (divSvgAttackToColor) {
+                        divSvgAttackToColor.style.fill = colorComparedToUs;
+                    }
+
+                    if (prediction.Result == TOO_STRONG) {
+                        divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too strong to give a proper estimation</div >';
+                    } else if (prediction.Result == TOO_WEAK) {
+                        divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too weak to give a proper estimation</div >';
+                    }
+                    else {
+                        divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px"><img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' + FormatBattleStats(averageModelTBS) + ' <label style = "color:' + colorComparedToUs + '"; "> (' + ratioComparedToUs.toFixed(0) + '%) </label></div >';
+                    }
+
+                    if (LOCAL_SHOW_PREDICTION_DETAILS) {
+                        divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:2px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label></div>';
+                        divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:2px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
+                        if (prediction.fromCache) {
+                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: center;"><img src="https://cdn1.iconfinder.com/data/icons/database-1-1/100/database-20-128.png" title="' + prediction.PredictionDate + '"  width="12" height="12"/></div>';
+                        }
+                    }
+                }
+                else {
+
+                    if (prediction.Result == TOO_STRONG) {
+                        divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too strong to give a proper estimation</div >';
+                    } else if (prediction.Result == TOO_WEAK) {
+                        divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too weak to give a proper estimation</div >';
+                    }
+                    else {
+                        divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px"><img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' + FormatBattleStats(averageModelTBS) + '</div >';
+                    }
+
+                    if (LOCAL_SHOW_PREDICTION_DETAILS) {
+                        divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:2px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '</div>';
+                        divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:2px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '</div>';
+                    }
+                }
+            }
+            break;
+    }
+}
+
+function FormatBattleStats(number) {
+    var localized = number.toLocaleString('en-US');
+    var myArray = localized.split(",");
+    if (myArray.length < 1) {
+        return 'ERROR';
+    }
+
+    var toReturn = myArray[0];
+    if (toReturn < 100) {
+        if (parseInt(myArray[1][0]) != 0) {
+            toReturn += ',' + myArray[1][0];
+        }
+    }
+    switch (myArray.length) {
+        case 2:
+            toReturn += "k";
+            break;
+        case 3:
+            toReturn += "m";
+            break;
+        case 4:
+            toReturn += "b";
+            break;
+        case 5:
+            toReturn += "t";
+            break;
+    }
+
+    return toReturn;
+}
+
+async function GetPredictionForPlayer(targetId, callback) {
+    if (targetId == undefined || targetId < 1) {
+        return;
+    }
+
+    if (LOCAL_DATE_SUBSCRIPTION_END != undefined) {
+        var prediction = GetPredictionFromCache(targetId);
+        if (prediction != undefined) {
+            var isPredictionValid = true;
+            var expirationDate = new Date();
+            expirationDate.setDate(expirationDate.getDate() - 1);
+            var predictionDate = new Date(prediction.PredictionDate);
+            if ((predictionDate < expirationDate) || (prediction.Version != parseInt(LOCAL_PREDICTION_VERSION_ON_SERVER))) {
+                var key = "tdup.battleStatsPredictor.cache.prediction." + targetId;
+                localStorage.removeItem(key);
+                isPredictionValid = false;
+            }
+
+            if (isPredictionValid) {
+                prediction.fromCache = true;
+                callback(targetId, prediction);
+                LogInfo("Prediction for target" + targetId + " found in the cache");
+                return;
+            }
+        }
+    }
+
+    LogInfo("Prediction for target" + targetId + " not found in the cache, asking server..");
+    const newPrediction = await FetchScoreAndTBS(targetId);
+    LogInfo("Prediction for target" + targetId + " not found in the cache, value retrieved");
+    if (newPrediction != undefined) {
+        SetPredictionInCache(targetId, newPrediction);
+
+        var subscriptionEnd = new Date(newPrediction.SubscriptionEnd);
+        LOCAL_DATE_SUBSCRIPTION_END = subscriptionEnd;
+        localStorage.setItem("tdup.battleStatsPredictor.dateSubscriptionEnd", LOCAL_DATE_SUBSCRIPTION_END);
+    }
+    callback(targetId, newPrediction);
+}
+
+function FetchServerVersion() {
+    return new Promise((resolve, reject) => {
+        GM.xmlHttpRequest({
+            method: 'GET',
+            url: `http://www.lol-manager.com/api/battlestats/`,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            onload: (response) => {
+                try {
+                    if (parseInt(response.responseText)) {
+                        var serverVersion = parseInt(response.responseText);
+                        var localVersion = parseInt(LOCAL_PREDICTION_VERSION_ON_SERVER);
+                        if (serverVersion != localVersion) {
+                            LogInfo("Server changed prediction model version, from " + localVersion + " to " + serverVersion);
+                            LOCAL_PREDICTION_VERSION_ON_SERVER = serverVersion;
+                            localStorage.setItem("tdup.battleStatsPredictor.PredictionVersionOnServer", LOCAL_PREDICTION_VERSION_ON_SERVER);
+                        }
+                    }
+                } catch (err) {
+                    reject(err);
+                }
+            },
+            onerror: (err) => {
+                reject(err);
+            }
+        });
+    });
+}
+
+function FetchScoreAndTBS(targetId) {
+    return new Promise((resolve, reject) => {
+        GM.xmlHttpRequest({
+            method: 'GET',
+            url: `http://www.lol-manager.com/api/battlestats/${LOCAL_API_KEY}/${targetId}`,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            onload: (response) => {
+                try {
+                    resolve(JSON.parse(response.responseText));
+                } catch (err) {
+                    reject(err);
+                }
+            },
+            onerror: (err) => {
+                reject(err);
+            }
+        });
+    });
+}
+
+function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
+    let result = prediction.Result;
+    switch (result) {
+        case FAIL:
+        case MODEL_ERROR:
+            var toInject = '<div style="position: absolute;z-index: 100;"><img style="border-radius: 50%;" width="16" height="16" src="https://www.freeiconspng.com/uploads/sign-red-error-icon-1.png" /></div>';
+            for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
+                dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+            }
+            return;
+        case TOO_WEAK:
+        case TOO_STRONG:
+        case SUCCESS:
+            {
+                if (LOCAL_USE_COMPARE_MODE) {
+                    let TBS = prediction.TBS.toLocaleString('en-US');
+                    let TBSBalanced = prediction.TBS_Balanced.toLocaleString('en-US');
+
+                    var intTBS = parseInt(TBS.replaceAll(',', ''));
+                    var intTBSBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
+
+                    var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
+                    var ratioComparedToUs = 50 * (intTBS + intTBSBalanced) / localTBS;
+                    var colorTBS = getColorDifference(ratioComparedToUs);
+                    if (prediction.Result == TOO_STRONG) {
+                        var ratioTBS = 100 * intTBS / localTBS;
+                        colorTBS = getColorDifference(ratioTBS);
+                    }
+                    var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
+
+                    var toInject = "";
+                    if (isUsingHonorBar == true)
+                        toInject = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '" target="_blank"><img style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>';
+                    else
+                        toInject = '<div style="display: inline-block; margin-right:5px;"><a href="' + urlAttack + '" target="_blank"><img style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>';
+
+                    for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
+                        if (dictDivPerPlayer[targetId][i].innerHTML.includes("police-gun-pistol-weapon-512.png")) {
+                            continue;
+                        }
+                        dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+                    }
+                }
+                return;
+            }
+    }
+}
 
 function InjectOptionMenu(node) {
     if (!node) return;
@@ -666,21 +948,142 @@ function InjectOptionMenu(node) {
     node.appendChild(buttonsNode);
 }
 
+function InjectInProfilePage(node) {
+    if (!node) return;
+
+    var el = node.querySelectorAll('.empty-block')
+    for (var i = 0; i < el.length; ++i) {
+        if (isInjected) {
+            break;
+        }
+        divWhereToInject = el[i];
+        isInjected = true;
+        if (LOCAL_API_KEY_IS_VALID) {
+            GetPredictionForPlayer(ProfileTargetId, OnProfilePlayerStatsRetrieved);
+        }
+    }
+
+    if (!svgAttackDivFound && LOCAL_USE_COMPARE_MODE) {
+        var el2 = node.querySelectorAll('.profile-button-attack')
+        for (i = 0; i < el2.length; ++i) {
+            divSvgAttackToColor = el2[i].children[0];
+            svgAttackDivFound = true;
+        }
+    }
+}
+
+function InjectInFactionPage(node) {
+    if (!node) return;
+
+    isUsingHonorBar = true;
+    el = node.querySelectorAll('a');
+    for (i = 0; i < el.length; ++i) {
+        var isDone = false;
+        var iter = el[i];
+        if (iter.href != null) {
+            //"https://www.torn.com/profiles.php?XID=2139172"
+            var myArray = iter.href.split("?XID=");
+            if (myArray.length == 2) {
+                for (var j = 0; j < iter.children.length; ++j) {
+                    if (isDone) {
+                        break;
+                    }
+                    var children = iter.children[j];
+                    for (var k = 0; k < children.children.length; ++k) {
+
+                        if (children != undefined && children.tagName != undefined && children.tagName == "IMG") {
+                            var playerId = parseInt(myArray[1]);
+
+                            if (!(playerId in dictDivPerPlayer)) {
+                                dictDivPerPlayer[playerId] = new Array();
+                            }
+                            dictDivPerPlayer[playerId].push(children);
+                            GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
+                            isDone = true;
+                            break;
+                        }
+                        else {
+                            var subChildren = children.children[k];
+                            if (subChildren != undefined && subChildren.tagName != undefined && subChildren.tagName == "IMG") {
+
+                                var playerId = parseInt(myArray[1]);
+                                if (!(playerId in dictDivPerPlayer)) {
+                                    dictDivPerPlayer[playerId] = new Array();
+                                }
+
+                                dictDivPerPlayer[playerId].push(children);
+                                GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
+                                isDone = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+function InjectInGenericGridPage(isInit, node) {
+    // For pages with several players, grid format
+    var el;
+    if (isInit == true) {
+        el = document.querySelectorAll('.user.name')
+    }
+    else {
+        el = node.querySelectorAll('.user.name')
+    }
+    for (i = 0; i < el.length; ++i) {
+        {
+            var iter = el[i];
+            var toSplit = iter.innerHTML;
+            var myArray = toSplit.split("[");
+            if (myArray.length < 2)
+                continue;
+
+            myArray = myArray[1].split("]");
+            if (myArray.length < 1)
+                continue;
+
+            var children = iter.children;
+            for (var k = 0; k < children.length; ++k) {
+                if (children[k] != undefined && children[k].className == "honor-text-wrap") {
+                    isUsingHonorBar = true;
+                }
+            }
+
+            var parentNode = iter.parentNode;
+            var style = window.getComputedStyle(parentNode);
+            if (style.display == "none") {
+                continue;
+            }
+
+            var playerId = parseInt(myArray[0]);
+            if (!(playerId in dictDivPerPlayer)) {
+                dictDivPerPlayer[playerId] = new Array();
+            }
+
+            dictDivPerPlayer[playerId].push(iter);
+            GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
+        }
+    }
+}
+
+function InitColors() {
+    for (var i = 0; i < LOCAL_COLORS.length; ++i) {
+        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_" + i];
+        if (color != undefined) {
+            LOCAL_COLORS[i].color = color;
+        }
+        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_" + i];
+        if (maxvalue != undefined) {
+            LOCAL_COLORS[i].maxValue = parseInt(maxvalue);
+        }
+    }
+}
+
 (function () {
     'use strict';
-
-    var isInjected = false;
-    var TargetId = -1;
-    var divWhereToInject;
-
-    var svgAttackDivFound = false;
-    var divSvgAttackToColor;
-
-    var dictDivPerPlayer = {};
-
-    if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=recent")) {
-        return;
-    }
 
     var shouldStop = false;
     if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
@@ -697,108 +1100,29 @@ function InjectOptionMenu(node) {
         return;
     }
 
-    if (window.location.href.includes("https://www.torn.com/profiles.php")) {
+    if (window.location.href.startsWith("https://www.torn.com/profiles.php")) {
         InjectOptionMenu(document.querySelector(".content-title"));
     }
-    FetchServerVersion();
 
+    FetchServerVersion();
+    InitColors();
+
+    // Inject in already loaded page:
+    InjectInGenericGridPage(true, undefined);
+
+    // Start observer, to inject within dynamically loaded content
     var observer = new MutationObserver(function (mutations, observer) {
         mutations.forEach(function (mutation) {
             for (const node of mutation.addedNodes) {
                 if (node.querySelector) {
-                    if (window.location.href.includes("https://www.torn.com/profiles.php")) {
-                        var el = node.querySelectorAll('.empty-block')
-                        for (var i = 0; i < el.length; ++i) {
-                            if (isInjected) {
-                                break;
-                            }
-                            divWhereToInject = el[i];
-                            isInjected = true;
-                            if (LOCAL_API_KEY_IS_VALID) {
-                                GetPredictionForPlayer(TargetId, OnProfilePlayerStatsRetrieved);
-                            }
+                    if (window.location.href.startsWith("https://www.torn.com/profiles.php")) {
+                        InjectInProfilePage(node);
+                    } else if (LOCAL_USE_COMPARE_MODE) {
+                        if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
+                            InjectInFactionPage(node);
                         }
-
-                        if (!svgAttackDivFound && LOCAL_USE_COMPARE_MODE) {
-                            var el2 = node.querySelectorAll('.profile-button-attack')
-                            for (i = 0; i < el2.length; ++i) {
-                                divSvgAttackToColor = el2[i].children[0];
-                                svgAttackDivFound = true;
-                            }
-                        }
-                    } else {
-                        if (LOCAL_USE_COMPARE_MODE) {
-
-                            if (window.location.href.includes("https://www.torn.com/factions.php") || window.location.href.includes("https://www.torn.com/page.php?sid=russianRoulette")) {
-                                // for faction page
-                                el = node.querySelectorAll('a');
-                                for (i = 0; i < el.length; ++i) {
-                                    var isDone = false;
-                                    var iter = el[i];
-                                    if (iter.href != null) {
-                                        //"https://www.torn.com/profiles.php?XID=2139172"
-                                        var myArray = iter.href.split("?XID=");
-                                        if (myArray.length == 2) {
-                                            for (var j = 0; j < iter.children.length; ++j) {
-                                                if (isDone) {
-                                                    break;
-                                                }
-                                                var children = iter.children[j];
-                                                for (var k = 0; k < children.children.length; ++k) {
-
-                                                    if (children != undefined && children.tagName != undefined && children.tagName == "IMG") {
-                                                        var playerId = parseInt(myArray[1]);
-                                                        if (!(playerId in dictDivPerPlayer)) {
-                                                            dictDivPerPlayer[playerId] = children;
-                                                            GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
-                                                            isDone = true;
-                                                            break;
-                                                        }
-                                                    }
-                                                    else {
-                                                        var subChildren = children.children[k];
-                                                        if (subChildren != undefined && subChildren.tagName != undefined && subChildren.tagName == "IMG") {
-
-                                                            var playerId = parseInt(myArray[1]);
-                                                            if (!(playerId in dictDivPerPlayer)) {
-                                                                dictDivPerPlayer[playerId] = children;
-                                                                GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
-                                                                isDone = true;
-                                                                break;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            else {
-                                // for pages with several players
-                                el = node.querySelectorAll('.user.name')
-                                for (i = 0; i < el.length; ++i) {
-                                    {
-                                        var iter = el[i];
-                                        var toSplit = iter.innerHTML;
-                                        var myArray = toSplit.split("[");
-                                        if (myArray.length < 2)
-                                            continue;
-
-                                        myArray = myArray[1].split("]");
-                                        if (myArray.length < 1)
-                                            continue;
-
-                                        var playerId = parseInt(myArray[0]);
-                                        if (!(playerId in dictDivPerPlayer)) {
-                                            dictDivPerPlayer[playerId] = new Array();
-                                        }
-
-                                        dictDivPerPlayer[playerId].push(el[i]);
-                                        GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
-                                    }
-                                }
-                            }
+                        else {
+                            InjectInGenericGridPage(false, node);
                         }
                     }
                 }
@@ -806,308 +1130,13 @@ function InjectOptionMenu(node) {
         });
     });
 
-    function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
-        let result = prediction.Result;
-        switch (result) {
-            case FAIL:
-            case MODEL_ERROR:
-                var toInject = '<div style="position: absolute;z-index: 100;"><img style="border-radius: 50%;" width="16" height="16" src="https://www.freeiconspng.com/uploads/sign-red-error-icon-1.png" /></div>';
-                var htmlElems = dictDivPerPlayer[targetId];
-                if (Array.isArray(htmlElems)) {
-                    for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
-                        dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
-                    }
-                }
-                else {
-                    dictDivPerPlayer[targetId].innerHTML = toInject + dictDivPerPlayer[targetId].innerHTML;
-                }
-                return;
-            case TOO_WEAK:
-            case TOO_STRONG:
-            case SUCCESS:
-                {
-                    if (LOCAL_USE_COMPARE_MODE) {
-                        let TBS = prediction.TBS.toLocaleString('en-US');
-                        let TBSBalanced = prediction.TBS_Balanced.toLocaleString('en-US');
-
-                        var intTBS = parseInt(TBS.replaceAll(',', ''));
-                        var intTBSBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
-
-                        var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
-                        var ratioComparedToUs = 50 * (intTBS + intTBSBalanced) / localTBS;
-                        var colorTBS = getColorDifference(ratioComparedToUs);
-                        if (prediction.Result == TOO_STRONG) {
-                            var ratioTBS = 100 * intTBS / localTBS;
-                            colorTBS = getColorDifference(ratioTBS);
-                        }
-                        var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
-
-                        var toInject = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '"><img style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>';
-                        var htmlElems = dictDivPerPlayer[targetId];
-                        if (Array.isArray(htmlElems)) {
-                            for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
-                                dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
-                            }
-                        }
-                        else {
-                            dictDivPerPlayer[targetId].innerHTML = toInject + dictDivPerPlayer[targetId].innerHTML;
-                        }
-
-
-                    }
-                    return;
-                }
-        }
-    }
-
-
     var canonical = document.querySelector("link[rel='canonical']");
     if (canonical != undefined) {
         var hrefCanon = canonical.href;
         const urlParams = new URLSearchParams(hrefCanon);
-        TargetId = urlParams.get('https://www.torn.com/profiles.php?XID');
-    }
-
-    for (var i = 0; i < LOCAL_COLORS.length; ++i) {
-        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_" + i];
-        if (color != undefined) {
-            LOCAL_COLORS[i].color = color;
-        }
-        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_" + i];
-        if (maxvalue != undefined) {
-            LOCAL_COLORS[i].maxValue = parseInt(maxvalue);
-        }
+        ProfileTargetId = urlParams.get('https://www.torn.com/profiles.php?XID');
     }
 
     observer.observe(document, { attributes: false, childList: true, characterData: false, subtree: true });
-
-    function getColorDifference(ratio) {
-        for (var i = 0; i < LOCAL_COLORS.length; ++i) {
-            if (ratio < LOCAL_COLORS[i].maxValue) {
-                return LOCAL_COLORS[i].color;
-            }
-        }
-        return "#ffc0cb"; //pink
-    }
-
-    function OnProfilePlayerStatsRetrieved(playerId, prediction) {
-        if (prediction == undefined) {
-            return;
-        }
-
-        if (subscriptionEndText != undefined) {
-            var dateNow = new Date();
-            var offsetInMinute = dateNow.getTimezoneOffset();
-            var dateSubscriptionEnd = new Date(LOCAL_DATE_SUBSCRIPTION_END);
-            dateSubscriptionEnd.setMinutes(dateSubscriptionEnd.getMinutes() - offsetInMinute);
-            var time_difference = dateSubscriptionEnd - dateNow;
-            if (time_difference < 0) {
-                CleanPredictionsCache();
-                subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg `bsp`)</div>';
-            }
-            else {
-                var days_difference = parseInt(time_difference / (1000 * 60 * 60 * 24));
-                var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
-                hours_difference %= 24;
-                var minutes_difference = parseInt(time_difference / (1000 * 60));
-                minutes_difference %= 60;
-
-                subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Your subscription ends in '
-                    + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
-                    + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                    + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br />You can extend it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg `bsp`)</div>';
-            }
-        }
-
-        switch (prediction.Result) {
-            case MODEL_ERROR:
-            case FAIL:
-                divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + prediction.Reason + '</div>';
-                return;
-            case TOO_WEAK:
-            case TOO_STRONG:
-            case SUCCESS:
-                {
-                    let TBSBalanced = prediction.TBS_Balanced.toLocaleString('en-US');
-                    let TBS = prediction.TBS.toLocaleString('en-US');
-                    var intTBS = parseInt(TBS.replaceAll(',', ''));
-                    var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
-                    var tbs1Ratio = 100 * intTBS / localTBS;
-
-                    var intTbsBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
-                    var tbsBalancedRatio = 100 * intTbsBalanced / ((parseInt(LOCAL_SCORE) * parseInt(LOCAL_SCORE)) / 4);
-
-                    var colorTBS = getColorDifference(tbs1Ratio);
-                    var colorBalancedTBS = getColorDifference(tbsBalancedRatio);
-
-                    var averageModelTBS = parseInt((intTBS + intTbsBalanced) / 2);
-                    var ratioComparedToUs = 100 * averageModelTBS / localTBS;
-                    var colorComparedToUs = getColorDifference(ratioComparedToUs);
-
-                    if (LOCAL_USE_COMPARE_MODE) {
-                        if (divSvgAttackToColor) {
-                            divSvgAttackToColor.style.fill = colorComparedToUs;
-                        }
-
-                        if (prediction.Result == TOO_STRONG) {
-                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too strong to give a proper estimation</div >';
-                        } else if (prediction.Result == TOO_WEAK) {
-                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too weak to give a proper estimation</div >';
-                        }
-                        else {
-                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px"><img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' + FormatBattleStats(averageModelTBS) + ' <label style = "color:' + colorComparedToUs + '"; "> (' + ratioComparedToUs.toFixed(0) + '%) </label></div >';
-                        }
-
-                        if (LOCAL_SHOW_PREDICTION_DETAILS) {
-                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:2px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label></div>';
-                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:2px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
-                            if (prediction.fromCache) {
-                                divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: center;"><img src="https://cdn1.iconfinder.com/data/icons/database-1-1/100/database-20-128.png" title="' + prediction.PredictionDate + '"  width="12" height="12"/></div>';
-                            }
-                        }
-                    }
-                    else {
-
-                        if (prediction.Result == TOO_STRONG) {
-                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too strong to give a proper estimation</div >';
-                        } else if (prediction.Result == TOO_WEAK) {
-                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too weak to give a proper estimation</div >';
-                        }
-                        else {
-                            divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px"><img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' + FormatBattleStats(averageModelTBS) + '</div >';
-                        }
-
-                        if (LOCAL_SHOW_PREDICTION_DETAILS) {
-                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:2px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '</div>';
-                            divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:2px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '</div>';
-                        }
-                    }
-                }
-                break;
-        }
-    }
-
-    function FormatBattleStats(number) {
-        var localized = number.toLocaleString('en-US');
-        var myArray = localized.split(",");
-        if (myArray.length < 1) {
-            return 'ERROR';
-        }
-
-        var toReturn = myArray[0];
-        if (toReturn < 100) {
-            if (parseInt(myArray[1][0]) != 0) {
-                toReturn += ',' + myArray[1][0];
-            }
-        }
-        switch (myArray.length) {
-            case 2:
-                toReturn += "k";
-                break;
-            case 3:
-                toReturn += "m";
-                break;
-            case 4:
-                toReturn += "b";
-                break;
-            case 5:
-                toReturn += "t";
-                break;
-        }
-
-        return toReturn;
-    }
-
-    async function GetPredictionForPlayer(targetId, callback) {
-        if (targetId == undefined || targetId < 1) {
-            return;
-        }
-
-        if (LOCAL_DATE_SUBSCRIPTION_END != undefined) {
-            var prediction = GetPredictionFromCache(targetId);
-            if (prediction != undefined) {
-                var isPredictionValid = true;
-                var expirationDate = new Date();
-                expirationDate.setDate(expirationDate.getDate() - 1);
-                var predictionDate = new Date(prediction.PredictionDate);
-                if ((predictionDate < expirationDate) || (prediction.Version != parseInt(LOCAL_PREDICTION_VERSION_ON_SERVER))) {
-                    var key = "tdup.battleStatsPredictor.cache.prediction." + targetId;
-                    localStorage.removeItem(key);
-                    isPredictionValid = false;
-                }
-
-                if (isPredictionValid) {
-                    prediction.fromCache = true;
-                    callback(targetId, prediction);
-                    LogInfo("Prediction for target" + targetId + " found in the cache");
-                    return;
-                }
-            }
-        }
-
-        LogInfo("Prediction for target" + targetId + " not found in the cache, asking server..");
-        const newPrediction = await FetchScoreAndTBS(targetId);
-        LogInfo("Prediction for target" + targetId + " not found in the cache, value retrieved");
-        if (newPrediction != undefined) {
-            SetPredictionInCache(targetId, newPrediction);
-
-            var subscriptionEnd = new Date(newPrediction.SubscriptionEnd);
-            LOCAL_DATE_SUBSCRIPTION_END = subscriptionEnd;
-            localStorage.setItem("tdup.battleStatsPredictor.dateSubscriptionEnd", LOCAL_DATE_SUBSCRIPTION_END);
-        }
-        callback(targetId, newPrediction);
-    }
-
-    function FetchServerVersion() {
-        return new Promise((resolve, reject) => {
-            GM.xmlHttpRequest({
-                method: 'GET',
-                url: `http://www.lol-manager.com/api/battlestats/`,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                onload: (response) => {
-                    try {
-                        if (parseInt(response.responseText)) {
-                            var serverVersion = parseInt(response.responseText);
-                            var localVersion = parseInt(LOCAL_PREDICTION_VERSION_ON_SERVER);
-                            if (serverVersion != localVersion) {
-                                LogInfo("Server changed prediction model version, from " + localVersion + " to " + serverVersion);
-                                LOCAL_PREDICTION_VERSION_ON_SERVER = serverVersion;
-                                localStorage.setItem("tdup.battleStatsPredictor.PredictionVersionOnServer", LOCAL_PREDICTION_VERSION_ON_SERVER);
-                            }
-                        }
-                    } catch (err) {
-                        reject(err);
-                    }
-                },
-                onerror: (err) => {
-                    reject(err);
-                }
-            });
-        });
-    }
-
-    function FetchScoreAndTBS(targetId) {
-        return new Promise((resolve, reject) => {
-            GM.xmlHttpRequest({
-                method: 'GET',
-                url: `http://www.lol-manager.com/api/battlestats/${LOCAL_API_KEY}/${targetId}`,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                onload: (response) => {
-                    try {
-                        resolve(JSON.parse(response.responseText));
-                    } catch (err) {
-                        reject(err);
-                    }
-                },
-                onerror: (err) => {
-                    reject(err);
-                }
-            });
-        });
-    }
 
 })();
