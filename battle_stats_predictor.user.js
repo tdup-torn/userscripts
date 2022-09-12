@@ -1085,21 +1085,6 @@ function InitColors() {
 (function () {
     'use strict';
 
-    var shouldStop = false;
-    if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
-        shouldStop = true;
-        if (window.location.href.startsWith("https://www.torn.com/factions.php?step=profile")) {
-            shouldStop = false;
-        }
-        if (window.location.href == "https://www.torn.com/factions.php?step=your#/tab=info") {
-            shouldStop = false;
-        }
-    }
-
-    if (shouldStop) {
-        return;
-    }
-
     if (window.location.href.startsWith("https://www.torn.com/profiles.php")) {
         InjectOptionMenu(document.querySelector(".content-title"));
     }
