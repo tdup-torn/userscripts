@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     5.5
+// @version     5.6
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -523,19 +523,21 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
                     var intTBSBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
 
                     var localTBS = parseInt(LOCAL_STATS_STR) + parseInt(LOCAL_STATS_DEF) + parseInt(LOCAL_STATS_DEX) + parseInt(LOCAL_STATS_SPD);
-                    var ratioComparedToUs = 50 * (intTBS + intTBSBalanced) / localTBS;
-                    var colorTBS = getColorDifference(ratioComparedToUs);
+
+                    var predictedStats = (intTBS + intTBSBalanced) / 2;
                     if (prediction.Result == TOO_STRONG) {
-                        var ratioTBS = 100 * intTBS / localTBS;
-                        colorTBS = getColorDifference(ratioTBS);
+                        predictedStats = intTBS;
                     }
+
+                    var ratioComparedToUs = 100 * predictedStats / localTBS;
+                    var colorTBS = getColorDifference(ratioComparedToUs);
                     var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
 
                     var toInject = "";
                     if (isUsingHonorBar == true)
-                        toInject = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '" target="_blank"><img style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>';
+                        toInject = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '" target="_blank"><img title=' + FormatBattleStats(predictedStats) + ' style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>';
                     else
-                        toInject = '<div style="display: inline-block; margin-right:5px;"><a href="' + urlAttack + '" target="_blank"><img style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>';
+                        toInject = '<div style="display: inline-block; margin-right:5px;"><a href="' + urlAttack + '" target="_blank"><img title=' + FormatBattleStats(predictedStats) + ' style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>';
 
                     for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
                         if (dictDivPerPlayer[targetId][i].innerHTML.includes("police-gun-pistol-weapon-512.png")) {
