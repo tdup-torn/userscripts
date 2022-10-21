@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     5.6
+// @version     5.7
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -11,6 +11,7 @@
 // @match       https://www.torn.com/page.php*
 // @match       https://www.torn.com/joblist.php*
 // @match       https://www.torn.com/competition.php*
+// @match       https://www.torn.com/bounties.php*
 // @run-at      document-end
 // @grant       GM.xmlHttpRequest
 // @grant       GM_setValue
@@ -158,6 +159,16 @@ function JSONparse(str) {
         return JSON.parse(str);
     } catch (e) { }
     return null;
+}
+
+const PageType = {
+    Profile: 'https://www.torn.com/profiles.php',
+    Faction: 'https://www.torn.com/factions.php',
+    Bounty: 'https://www.torn.com/bounties.php'
+};
+
+function IsPage(pageType) {
+    return window.location.href.startsWith(pageType);
 }
 
 async function GetPlayerFromTornAPI(key, retrieveStats, callback) {
@@ -388,7 +399,7 @@ function FormatBattleStats(number) {
     var toReturn = myArray[0];
     if (toReturn < 100) {
         if (parseInt(myArray[1][0]) != 0) {
-            toReturn += ',' + myArray[1][0];
+            toReturn += '.' + myArray[1][0];
         }
     }
     switch (myArray.length) {
@@ -1026,6 +1037,34 @@ function InjectInFactionPage(node) {
     }
 }
 
+function InjectInBountyPagePage(isInit, node) {
+    var el;
+    if (isInit == true) {
+        el = document.querySelectorAll('.target.left')
+    }
+    else if (node == undefined) {
+        return;
+    }
+    else {
+        el = node.querySelectorAll('.target.left')
+    }    
+
+    for (i = 0; i < el.length; ++i) {
+        var iter = el[i];
+        var children = iter.children;
+        var myArray = children[0].href.split("?XID=");
+        if (myArray.length == 2) {
+            var playerId = parseInt(myArray[1]);
+            if (!(playerId in dictDivPerPlayer)) {
+                dictDivPerPlayer[playerId] = new Array();
+            }
+
+            dictDivPerPlayer[playerId].push(iter);
+            GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
+        }
+    }
+}
+
 function InjectInGenericGridPage(isInit, node) {
     // For pages with several players, grid format
     var el;
@@ -1036,38 +1075,36 @@ function InjectInGenericGridPage(isInit, node) {
         el = node.querySelectorAll('.user.name')
     }
     for (i = 0; i < el.length; ++i) {
-        {
-            var iter = el[i];
-            var toSplit = iter.innerHTML;
-            var myArray = toSplit.split("[");
-            if (myArray.length < 2)
-                continue;
+        var iter = el[i];
+        var toSplit = iter.innerHTML;
+        var myArray = toSplit.split("[");
+        if (myArray.length < 2)
+            continue;
 
-            myArray = myArray[1].split("]");
-            if (myArray.length < 1)
-                continue;
+        myArray = myArray[1].split("]");
+        if (myArray.length < 1)
+            continue;
 
-            var children = iter.children;
-            for (var k = 0; k < children.length; ++k) {
-                if (children[k] != undefined && children[k].className == "honor-text-wrap") {
-                    isUsingHonorBar = true;
-                }
+        var children = iter.children;
+        for (var k = 0; k < children.length; ++k) {
+            if (children[k] != undefined && children[k].className == "honor-text-wrap") {
+                isUsingHonorBar = true;
             }
-
-            var parentNode = iter.parentNode;
-            var style = window.getComputedStyle(parentNode);
-            if (style.display == "none") {
-                continue;
-            }
-
-            var playerId = parseInt(myArray[0]);
-            if (!(playerId in dictDivPerPlayer)) {
-                dictDivPerPlayer[playerId] = new Array();
-            }
-
-            dictDivPerPlayer[playerId].push(iter);
-            GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
         }
+
+        var parentNode = iter.parentNode;
+        var style = window.getComputedStyle(parentNode);
+        if (style.display == "none") {
+            continue;
+        }
+
+        var playerId = parseInt(myArray[0]);
+        if (!(playerId in dictDivPerPlayer)) {
+            dictDivPerPlayer[playerId] = new Array();
+        }
+
+        dictDivPerPlayer[playerId].push(iter);
+        GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
     }
 }
 
@@ -1095,18 +1132,35 @@ function InitColors() {
     InitColors();
 
     // Inject in already loaded page:
-    InjectInGenericGridPage(true, undefined);
+    if (IsPage(PageType.Profile)) {
+        //InjectInProfilePage(node);
+    }
+    else if (LOCAL_USE_COMPARE_MODE) {
+        if (IsPage(PageType.Faction)) {
+            //InjectInFactionPage(node);
+        }
+        else if (IsPage(PageType.Bounty)) {
+            InjectInBountyPagePage(true, undefined);
+        }
+        else {
+            InjectInGenericGridPage(true, undefined);
+        }
+    } 
 
     // Start observer, to inject within dynamically loaded content
     var observer = new MutationObserver(function (mutations, observer) {
         mutations.forEach(function (mutation) {
             for (const node of mutation.addedNodes) {
                 if (node.querySelector) {
-                    if (window.location.href.startsWith("https://www.torn.com/profiles.php")) {
+                    if (IsPage(PageType.Profile)) {
                         InjectInProfilePage(node);
-                    } else if (LOCAL_USE_COMPARE_MODE) {
-                        if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
+                    }
+                    else if (LOCAL_USE_COMPARE_MODE) {
+                        if (IsPage(PageType.Faction)) {
                             InjectInFactionPage(node);
+                        }
+                        else if (IsPage(PageType.Bounty)) {
+                            InjectInBountyPagePage(false, node);
                         }
                         else {
                             InjectInGenericGridPage(false, node);
