@@ -879,11 +879,16 @@ function InjectOptionMenu(node) {
     });
 
     configPanelSave.addEventListener("click", () => {
+        console.error("Click0");
         if (errorAPIKeyInvalid)
             errorAPIKeyInvalid.style.display = "none";
 
+        console.error("Click1");
         errorImportBattleStats.style.display = "none";
+        console.error("Click2");
+
         apiKeyText.innerHTML = "Checking key and saving data";
+        console.error("Click3");
 
         LOCAL_API_KEY = apiKeyInput.value;
         localStorage.setItem("tdup.battleStatsPredictor.TornApiKey", LOCAL_API_KEY);
