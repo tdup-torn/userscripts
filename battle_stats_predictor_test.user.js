@@ -212,6 +212,10 @@ async function GetPlayerFromTornAPI(key, retrieveStats, callback) {
                     case TORN_API_ERROR_DISABLED:
                         msgToDisplay = "Torn API is disabled, check official forum for update & try later";
                         isTornApiDown = true;
+
+                        //Small lie below (it will be fixed next time Torn API works)
+                        LOCAL_API_KEY_IS_VALID = true;
+                        localStorage.setItem("tdup.battleStatsPredictor.TornApiKeyValid", LOCAL_API_KEY_IS_VALID);
                         break;
                     default:
                         break;
@@ -863,7 +867,7 @@ function InjectOptionMenu(node) {
     function OnAPIKeyValidationCallback(r, isTornAPIDown) {
         if (isTornAPIDown === true) {
             errorAPIKeyInvalid.style.display = "block";
-            errorAPIKeyInvalid.innerHTML = `Can't validate your key. ` + r + '<br />';                      
+            errorAPIKeyInvalid.innerHTML = `Can't validate your key. ` + r + '<br />';
             return;
         }
 
@@ -1063,7 +1067,7 @@ function InjectInBountyPagePage(isInit, node) {
     }
     else {
         el = node.querySelectorAll('.target.left')
-    }    
+    }
 
     for (i = 0; i < el.length; ++i) {
         var iter = el[i];
@@ -1161,7 +1165,7 @@ function InitColors() {
         else {
             InjectInGenericGridPage(true, undefined);
         }
-    } 
+    }
 
     // Start observer, to inject within dynamically loaded content
     var observer = new MutationObserver(function (mutations, observer) {
