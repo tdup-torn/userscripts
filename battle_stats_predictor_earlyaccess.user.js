@@ -29,7 +29,9 @@ let LOCAL_API_KEY = localStorage["tdup.battleStatsPredictor.TornApiKey"];
 let LOCAL_API_KEY_IS_VALID = localStorage["tdup.battleStatsPredictor.TornApiKeyValid"] == "true";
 let LOCAL_API_KEY_CAN_FETCH_BATTLE_STATS = localStorage["tdup.battleStatsPredictor.TornApiKeyCanFetchBattleStats"] == "true";
 
-var LOCAL_USE_TORN_STATS_SPIES = localStorage["tdup.battleStatsPredictor.useTornStatsSpies"] == "true";
+// Used to retrieve spies from TornStats.
+// Important : THIS IS NOT SENT to the backend, it's loading your TornStats spies into your local cache, and this script will display those spies values instead of predictions.
+let LOCAL_USE_TORN_STATS_SPIES = localStorage["tdup.battleStatsPredictor.useTornStatsSpies"] == "true";
 let LOCAL_TORN_STATS_API_KEY = localStorage["tdup.battleStatsPredictor.TornStatsApiKey"];
 
 // Used to compare players stats and show if you are weaker/stronger.
@@ -48,11 +50,12 @@ let LOCAL_SHOW_PREDICTION_DETAILS = localStorage["tdup.battleStatsPredictor.show
 let LOCAL_DATE_SUBSCRIPTION_END = localStorage["tdup.battleStatsPredictor.dateSubscriptionEnd"];
 
 const LOCAL_COLORS = [
-    { maxValue: 50, color: '#9EBDBA', canModify: true },
-    { maxValue: 70, color: '#008000', canModify: true },
-    { maxValue: 150, color: '#FFA500', canModify: true },
-    { maxValue: 500, color: '#FF0000', canModify: true },
-    { maxValue: 100000000, color: '#000000', canModify: false },
+    { maxValue: 5, color: '#949494', canModify: true },
+    { maxValue: 40, color: '#73DF5D', canModify: true },
+    { maxValue: 75, color: '#47A6FF', canModify: true },
+    { maxValue: 125, color: '#FFB30F', canModify: true },
+    { maxValue: 400, color: '#FF0000', canModify: true },
+    { maxValue: 10000000000, color: '#FF00DD', canModify: false },
 ];
 
 var FAIL = 0;
@@ -112,7 +115,7 @@ styleToAdd.innerHTML ='.style-bs-api { background: var(--main-bg); text-align: c
     '.style-bs-api > * {margin: 0 5px; padding: 5px; } .style-bs-api > table, td, th, input { border: 1px; } .style-bs-api > table {width: 100%; border-collapse: collapse; }' +
     '.finally-bs-col { text-overflow: clip !important; }';
 
-styleToAdd.innerHTML += '.iconStats {height: 20px; width: 32px; position: relative; text-align: center; font-size: 12px; font-weight:bold; color: black; box-sizing: border-box; border: 1px solid black;line-height: 18px}';
+styleToAdd.innerHTML += '.iconStats {height: 20px; width: 32px; position: relative; text-align: center; font-size: 12px; font-weight:bold; color: black; box-sizing: border-box; border: 1px solid black;line-height: 18px;font-family: initial;}';
 
 // Get the first script tag
 var ref = document.querySelector('script');
@@ -417,7 +420,7 @@ function FormatBattleStats(number) {
     }
 
     var toReturn = myArray[0];
-    if (toReturn < 100) {
+    if (toReturn < 10) {
         if (parseInt(myArray[1][0]) != 0) {
             toReturn += '.' + myArray[1][0];
         }
@@ -1086,11 +1089,11 @@ function InjectOptionMenu(node) {
     }
 
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
-        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_" + i];
+        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_v3_" + i];
         if (color != undefined) {
             LOCAL_COLORS[i].color = color;
         }
-        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_" + i];
+        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_v3_" + i];
         if (maxvalue != undefined) {
             LOCAL_COLORS[i].maxValue = parseInt(maxvalue);
         }
@@ -1175,10 +1178,10 @@ function InjectOptionMenu(node) {
 
         for (var i = 0; i < LOCAL_COLORS.length; ++i) {
             LOCAL_COLORS[i].color = LOCAL_COLORS[i].inputColor.value;
-            localStorage.setItem("tdup.battleStatsPredictor.colorSettings_color_" + i, LOCAL_COLORS[i].color);
+            localStorage.setItem("tdup.battleStatsPredictor.colorSettings_color_v3_" + i, LOCAL_COLORS[i].color);
 
             LOCAL_COLORS[i].maxValue = LOCAL_COLORS[i].inputNumber.value;
-            localStorage.setItem("tdup.battleStatsPredictor.colorSettings_maxValue_" + i, LOCAL_COLORS[i].maxValue);
+            localStorage.setItem("tdup.battleStatsPredictor.colorSettings_maxValue_v3_" + i, LOCAL_COLORS[i].maxValue);
         }
 
         //location.reload();
@@ -1379,11 +1382,11 @@ function InjectInGenericGridPage(isInit, node) {
 
 function InitColors() {
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
-        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_" + i];
+        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_v3_" + i];
         if (color != undefined) {
             LOCAL_COLORS[i].color = color;
         }
-        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_" + i];
+        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_v3_" + i];
         if (maxvalue != undefined) {
             LOCAL_COLORS[i].maxValue = parseInt(maxvalue);
         }
