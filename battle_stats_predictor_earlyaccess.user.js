@@ -51,11 +51,11 @@ let LOCAL_DATE_SUBSCRIPTION_END = localStorage["tdup.battleStatsPredictor.dateSu
 
 const LOCAL_COLORS = [
     { maxValue: 5, color: '#949494', canModify: true },
-    { maxValue: 40, color: '#73DF5D', canModify: true },
-    { maxValue: 75, color: '#47A6FF', canModify: true },
-    { maxValue: 125, color: '#FFB30F', canModify: true },
-    { maxValue: 400, color: '#FF0000', canModify: true },
-    { maxValue: 10000000000, color: '#FF00DD', canModify: false },
+    { maxValue: 35, color: '#FFFFFF', canModify: true },
+    { maxValue: 75, color: '#73DF5D', canModify: true },
+    { maxValue: 125, color: '#47A6FF', canModify: true },
+    { maxValue: 400, color: '#FFB30F', canModify: true },
+    { maxValue: 10000000000, color: '#FF0000', canModify: false },
 ];
 
 var FAIL = 0;
@@ -149,11 +149,18 @@ function SetPredictionInCache(playerId, prediction) {
 
 function SetSpyInCache(playerId, spy) {
     if (spy == undefined) {
-        return;
+        return false;
     }
+
+    let existingSpy = GetSpyFromCache(playerId);
+    if (existingSpy != undefined && existingSpy.timestamp >= spy.timestamp) {
+        return false;
+    }
+
     var key = "tdup.battleStatsPredictor.cache.spy." + playerId;
     spy.IsSpy = true;
     localStorage[key] = JSON.stringify(spy);
+    return true;
 }
 
 function GetSpyFromCache(playerId) {
@@ -189,7 +196,7 @@ async function GetPlayerFromTornAPI(key, retrieveStats, callback) {
     if (retrieveStats)
         urlToUse += "selections=battlestats&";
 
-    urlToUse += "comment=BSPredictor&key=" + key;
+    urlToUse += "comment=BSPAuth&key=" + key;
     GM.xmlHttpRequest({
         method: "GET",
         url: urlToUse,
@@ -450,8 +457,13 @@ async function GetPredictionForPlayer(targetId, callback) {
 
     let targetSpy = GetSpyFromCache(targetId);
     if (targetSpy != undefined) {
-        callback(targetId, targetSpy);
-        return;
+        let spyDateConsideredTooOld = new Date();
+        spyDateConsideredTooOld.setDate(spyDateConsideredTooOld.getDate() - 30); // 30 days old spies are not displayed anymore, and we switch back to predictions
+        let spyDate = new Date(targetSpy.timestamp * 1000);
+        if (spyDate > spyDateConsideredTooOld) {
+            callback(targetId, targetSpy);
+            return;
+        }
     }
 
     if (LOCAL_DATE_SUBSCRIPTION_END != undefined) {
@@ -609,25 +621,29 @@ function FetchFactionSpiesFromTornStats(factionId, successElem, failedElem) {
                     if (results.status === false) {
                         failedElem.style.visibility = "visible";
                         failedElem.style.display = "block";
-                        failedElem.innerHTML = result.message;
+                        failedElem.innerHTML = results.message;
                         successElem.style.visibility = "hidden";
                         return;
                     }
 
                     let membersCount = 0;
+                    let newSpiesAdded = 0;
                     for (var key in results.faction.members) {
                         let factionMember = results.faction.members[key];
                         if (factionMember.spy == undefined) {
                             continue;
                         }
-                        SetSpyInCache(factionMember.id, factionMember.spy);
                         membersCount++;
+                        let success = SetSpyInCache(factionMember.id, factionMember.spy);
+                        if (success) {
+                            newSpiesAdded++;                            
+                        }
                     }                 
 
                     failedElem.style.visibility = "hidden";
                     successElem.style.visibility = "visible";
                     successElem.style.display = "block";
-                    successElem.innerHTML = "Success! " + membersCount + " spies retrieved.";
+                    successElem.innerHTML = "Success! " + membersCount + " spies fetched from TornStats. " + newSpiesAdded + " new spies added";
                 } catch (err) {
                     reject(err);
                 }
@@ -647,7 +663,11 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         var tbsRatio = 100 * prediction.total / localTBS;
         var colorComparedToUs = getColorDifference(tbsRatio);
 
-        toInject = '<a href="' + urlAttack + '" target="_blank"><div style="position: absolute;z-index: 100;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + FormatBattleStats(prediction.total) +'</div></div></a>';
+        if (isUsingHonorBar == true)
+            toInject = '<a href="' + urlAttack + '" target="_blank"><div style="position: absolute;z-index: 100;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + FormatBattleStats(prediction.total) + '</div></div></a>';
+        else
+            toInject = '<a href="' + urlAttack + '" target="_blank"><div style="display: inline-block; margin-right:5px;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + FormatBattleStats(prediction.total) + '</div></div></a>';
+          //  toInject = '<div style="display: inline-block; margin-right:5px;"><a href="' + urlAttack + '" target="_blank"><img title=' + FormatBattleStats(prediction.total) + ' style="background-color:' + colorComparedToUs + ';" width="20" height="20" src="https://game-icons.net/icons/000000/transparent/1x1/lorc/magnifying-glass.png" /></a></div>';
 
         //if (isUsingHonorBar == true)
         //    toInject = '<div style="position: absolute;z-index: 100;background-color:' + colorComparedToUs +'; width:20px; height:20px;"><a href="' + urlAttack + '" target="_blank">' + FormatBattleStats(prediction.total) +'</a></div>';
@@ -661,7 +681,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         //    toInject = '<div style="display: inline-block; margin-right:5px;"><a href="' + urlAttack + '" target="_blank"><img title=' + FormatBattleStats(prediction.total) + ' style="background-color:' + colorComparedToUs + ';" width="20" height="20" src="https://game-icons.net/icons/000000/transparent/1x1/lorc/magnifying-glass.png" /></a></div>';
 
         for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
-            if (dictDivPerPlayer[targetId][i].innerHTML.includes("police-gun-pistol-weapon-512.png")) {
+            if (dictDivPerPlayer[targetId][i].innerHTML.startsWith('<a href="https://www.torn.com/loader2.php?sid=getInAttack')) {
                 continue;
             }
             dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
@@ -912,7 +932,7 @@ function InjectOptionMenu(node) {
     successImportTornStatsSpies.style.visibility = "hidden";
 
     errorImportTornStatsSpies = document.createElement("label");
-    errorImportTornStatsSpies.innerHTML = 'Error while fetching battle stats';
+    errorImportTornStatsSpies.innerHTML = 'Error while fetching spies from TornStats';
     errorImportTornStatsSpies.style.backgroundColor = 'red';
     errorImportTornStatsSpies.style.display = "none";
 
@@ -1089,11 +1109,11 @@ function InjectOptionMenu(node) {
     }
 
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
-        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_v3_" + i];
+        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_v5_" + i];
         if (color != undefined) {
             LOCAL_COLORS[i].color = color;
         }
-        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_v3_" + i];
+        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_v5_" + i];
         if (maxvalue != undefined) {
             LOCAL_COLORS[i].maxValue = parseInt(maxvalue);
         }
@@ -1178,10 +1198,10 @@ function InjectOptionMenu(node) {
 
         for (var i = 0; i < LOCAL_COLORS.length; ++i) {
             LOCAL_COLORS[i].color = LOCAL_COLORS[i].inputColor.value;
-            localStorage.setItem("tdup.battleStatsPredictor.colorSettings_color_v3_" + i, LOCAL_COLORS[i].color);
+            localStorage.setItem("tdup.battleStatsPredictor.colorSettings_color_v5_" + i, LOCAL_COLORS[i].color);
 
             LOCAL_COLORS[i].maxValue = LOCAL_COLORS[i].inputNumber.value;
-            localStorage.setItem("tdup.battleStatsPredictor.colorSettings_maxValue_v3_" + i, LOCAL_COLORS[i].maxValue);
+            localStorage.setItem("tdup.battleStatsPredictor.colorSettings_maxValue_v5_" + i, LOCAL_COLORS[i].maxValue);
         }
 
         //location.reload();
@@ -1382,11 +1402,11 @@ function InjectInGenericGridPage(isInit, node) {
 
 function InitColors() {
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
-        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_v3_" + i];
+        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_v5_" + i];
         if (color != undefined) {
             LOCAL_COLORS[i].color = color;
         }
-        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_v3_" + i];
+        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_v5_" + i];
         if (maxvalue != undefined) {
             LOCAL_COLORS[i].maxValue = parseInt(maxvalue);
         }
