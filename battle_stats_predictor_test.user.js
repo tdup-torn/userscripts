@@ -156,7 +156,7 @@ styleToAdd.innerHTML += '.iconStats {height: 20px; width: 32px; position: relati
 styleToAdd.innerHTML += '.TDup_optionsMenu {border: 1px solid #ccc;background-color: #f1f1f1;}';
 
 /* Style the buttons inside the tab */
-styleToAdd.innerHTML += '.TDup_optionsMenu button {display: block; background-color: inherit; color: black; padding: 22px 16px; width: 100%; border: none; outline: none; text-align: left; cursor: pointer; transition: 0.3s;font-size: 14px;}';
+styleToAdd.innerHTML += '.TDup_optionsMenu button {display: block; text-align:center !important; height:45px; background-color: inherit; color: black; padding: 22px 16px; width: 100%; border: none; outline: none; text-align: left; cursor: pointer; transition: 0.3s;font-size: 14px;}';
 
 /* Change background color of buttons on hover */
 styleToAdd.innerHTML += '.TDup_optionsMenu button:hover button:focus { background-color: #99ccff !important; color: black !important}';
@@ -164,10 +164,10 @@ styleToAdd.innerHTML += '.TDup_optionsMenu button:hover button:focus { backgroun
 /* Create an active/current "tab button" class */
 styleToAdd.innerHTML += '.TDup_optionsMenu button.active { background-color: #6699ff !important;}';
 
-styleToAdd.innerHTML += '.TDup_optionsCellMenu {width:100px; background:white; height:300px; vertical-align: top !important;}';
+styleToAdd.innerHTML += '.TDup_optionsCellMenu {width:100px; background:white; height:320px; vertical-align: top !important;}';
 
 /* Style the tab content */
-styleToAdd.innerHTML += '.TDup_optionsTabContent { float: left;  padding: 0px 12px;  border: 1px solid #ccc;  width: 70%;  border-left: none;  /*height: 400px;*/  }'; // max-width:100px;
+styleToAdd.innerHTML += '.TDup_optionsTabContent { padding: 10px 10px;  border: 1px solid #ccc;  }'; // max-width:100px;
 
 styleToAdd.innerHTML += '.TDup_button {  background-color: dodgerblue; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
 styleToAdd.innerHTML += 'font-size: 12px;font-weight: 100; line-height: 1;  margin: 0; max-width: none; min-width: 10px;  outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;';
@@ -1036,6 +1036,7 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
 function BuildSettingsMenu(node) {
 
     TDup_PredictorOptionsDiv = document.createElement("div");
+    TDup_PredictorOptionsDiv.style.background = "khaki";
 
     TDup_PredictorOptionsMenuArea = document.createElement("div");
     TDup_PredictorOptionsMenuArea.className = "TDup_optionsMenu";
