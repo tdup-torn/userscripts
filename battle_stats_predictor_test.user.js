@@ -19,7 +19,6 @@
 // @grant       GM_info
 // @connect     api.torn.com
 // @connect     www.lol-manager.com
-// @connect     localhost
 // @connect     www.tornstats.com
 // @author      TDup
 // ==/UserScript==
@@ -131,8 +130,9 @@ var errorImportTornStatsSpies;
 var mainNode;
 var isUsingHonorBar = false;
 
-var TDup_PredictorOptionsMenu;
-var TDup_PredictorOptionsTabs;
+var TDup_PredictorOptionsDiv;
+var TDup_PredictorOptionsMenuArea;
+var TDup_PredictorOptionsContentArea;
 
 var isInjected = false;
 var ProfileTargetId = -1;
@@ -153,19 +153,21 @@ styleToAdd.innerHTML += '.iconStats {height: 20px; width: 32px; position: relati
 //styleToAdd.innerHTML += '.TDup_optionsTabContent * { all: unset;}';
 
 /* Style the tab */
-styleToAdd.innerHTML += '.TDup_optionsTab {float: left;border: 1px solid #ccc;background-color: #f1f1f1; width: 100px; height: 400px;}';
+styleToAdd.innerHTML += '.TDup_optionsMenu {border: 1px solid #ccc;background-color: #f1f1f1;}';
 
 /* Style the buttons inside the tab */
-styleToAdd.innerHTML += '.TDup_optionsTab button {display: block; background-color: inherit; color: black; padding: 22px 16px; width: 100%; border: none; outline: none; text-align: left; cursor: pointer; transition: 0.3s;font-size: 14px;}';
+styleToAdd.innerHTML += '.TDup_optionsMenu button {display: block; background-color: inherit; color: black; padding: 22px 16px; width: 100%; border: none; outline: none; text-align: left; cursor: pointer; transition: 0.3s;font-size: 14px;}';
 
 /* Change background color of buttons on hover */
-styleToAdd.innerHTML += '.TDup_optionsTab button:hover button:focus { background-color: #99ccff !important; color: black !important}';
+styleToAdd.innerHTML += '.TDup_optionsMenu button:hover button:focus { background-color: #99ccff !important; color: black !important}';
 
 /* Create an active/current "tab button" class */
-styleToAdd.innerHTML += '.TDup_optionsTab button.active { background-color: #6699ff !important;}';
+styleToAdd.innerHTML += '.TDup_optionsMenu button.active { background-color: #6699ff !important;}';
+
+styleToAdd.innerHTML += '.TDup_optionsCellMenu {width:100px; background:white; height:300px; vertical-align: top !important;}';
 
 /* Style the tab content */
-styleToAdd.innerHTML += '.TDup_optionsTabContent { float: left;  padding: 0px 12px;  border: 1px solid #ccc;  width: 70%;  border-left: none;  height: 400px;  }'; // max-width:100px;
+styleToAdd.innerHTML += '.TDup_optionsTabContent { float: left;  padding: 0px 12px;  border: 1px solid #ccc;  width: 70%;  border-left: none;  /*height: 400px;*/  }'; // max-width:100px;
 
 styleToAdd.innerHTML += '.TDup_button {  background-color: dodgerblue; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
 styleToAdd.innerHTML += 'font-size: 12px;font-weight: 100; line-height: 1;  margin: 0; max-width: none; min-width: 10px;  outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;';
@@ -403,36 +405,11 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     let localBattleStats = GetLocalBattleStats();
     let localTBS = localBattleStats.TBS;
 
-    if (subscriptionEndText != undefined) {
-        var dateNow = new Date();
-        var offsetInMinute = dateNow.getTimezoneOffset();
-        var dateSubscriptionEnd = new Date(GetStorage(StorageKey.DateSubscriptionEnd));
-        dateSubscriptionEnd.setMinutes(dateSubscriptionEnd.getMinutes() - offsetInMinute);
-        var time_difference = dateSubscriptionEnd - dateNow;
-        if (time_difference < 0) {
-            CleanPredictionsCache();
-            subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg bsp)</div>';
-        }
-        else {
-            var days_difference = parseInt(time_difference / (1000 * 60 * 60 * 24));
-            var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
-            hours_difference %= 24;
-            var minutes_difference = parseInt(time_difference / (1000 * 60));
-            minutes_difference %= 60;
-
-            subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Your subscription ends in '
-                + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
-                + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br />You can extend it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg "bsp")</div>';
-        }
-    }
-
-
     if (prediction.IsSpy === true) {
         var tbsRatio = 100 * prediction.total / localTBS;
         var colorComparedToUs = getColorDifference(tbsRatio);
 
-        divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px"><img title="Spy" src="https://game-icons.net/icons/000000/transparent/1x1/lorc/magnifying-glass.png" width="18" height="18" style="margin-right:5px;"/>' + FormatBattleStats(prediction.total) + ' <label style = "color:' + colorComparedToUs + '"; "> (' + tbsRatio.toFixed(0) + '%) </label></div >';
+        divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px"><img title="Spy" width="13" height="13" style="position:absolute; margin: 5px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/><img title="Spy" src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' + FormatBattleStats(prediction.total) + ' <label style = "color:' + colorComparedToUs + '"; "> (' + tbsRatio.toFixed(0) + '%) </label></div >';
         return;
     }
 
@@ -496,7 +473,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         var colorComparedToUs = getColorDifference(tbsRatio);
 
         if (isUsingHonorBar == true)
-            toInject = '<a href="' + urlAttack + '" target="_blank"><div style="position: absolute;z-index: 100;"><div class="iconStats" style="background:' + colorComparedToUs + '"><img width="10" height="10" style="position:absolute; margin: -5px -10px;" src="https://i.postimg.cc/SKty9vy2/Verified-TDup.png"/>' + FormatBattleStats(prediction.total) + '</div></div></a>';
+            toInject = '<a href="' + urlAttack + '" target="_blank"><img width="13" height="13" style="position:absolute; margin: -6px 23px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/><div style="position: absolute;z-index: 100;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + FormatBattleStats(prediction.total) + '</div></div></a>';
         else
             toInject = '<a href="' + urlAttack + '" target="_blank"><div style="display: inline-block; margin-right:5px;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + FormatBattleStats(prediction.total) + '</div></div></a>';
 
@@ -570,7 +547,7 @@ function OpenOptionsTab(evt, optionsTabName) {
     evt.currentTarget.className += " active";
 }
 
-function BuildOptionMenu(tabs, menu, name, isOpenAtStart = false) {
+function BuildOptionMenu(menuArea, contentArea, name, isOpenAtStart = false) {
     // Adding the button in the tabs
     let TabEntryBtn = document.createElement("button");
     TabEntryBtn.className = "TDup_tablinks";
@@ -580,13 +557,13 @@ function BuildOptionMenu(tabs, menu, name, isOpenAtStart = false) {
         OpenOptionsTab(evt, "TDup_optionsTabContent_" + name);
     });
 
-    tabs.appendChild(TabEntryBtn);
+    menuArea.appendChild(TabEntryBtn);
 
     // Adding the corresponding div
     let TabContent = document.createElement("div");
     TabContent.className = "TDup_optionsTabContent";
     TabContent.id = "TDup_optionsTabContent_" + name;
-    menu.appendChild(TabContent);
+    contentArea.appendChild(TabContent);
 
     return TabContent;
 }
@@ -1043,8 +1020,8 @@ function BuildOptionMenu_Debug(tabs, menu) {
     contentDiv.appendChild(buttonClearLocalCache);
 }
 
-function BuildOptionMenu_Infos(tabs, menu) {
-    let contentDiv = BuildOptionMenu(tabs, menu, "Infos");
+function BuildOptionMenu_Infos(menuArea, contentArea) {
+    let contentDiv = BuildOptionMenu(menuArea, contentArea, "Infos");
 
     // TornStats option menu content:
     let TabContent_Content = document.createElement("p");
@@ -1058,32 +1035,34 @@ function BuildOptionMenu_Infos(tabs, menu) {
 
 function BuildSettingsMenu(node) {
 
-    TDup_PredictorOptionsMenu = document.createElement("div");
-    TDup_PredictorOptionsTabs = document.createElement("div");
-    TDup_PredictorOptionsTabs.className = "TDup_optionsTab";
+    TDup_PredictorOptionsDiv = document.createElement("div");
 
-    //var cell, raw, table;
-    //table = document.createElement('table');
+    TDup_PredictorOptionsMenuArea = document.createElement("div");
+    TDup_PredictorOptionsMenuArea.className = "TDup_optionsMenu";
 
-    //let comparisonDex = document.createElement("label");
-    //comparisonDex.innerHTML = '<div style="text-align: right; margin-right:10px;">Dex&nbsp</div>';
-    //raw = table.insertRow(0);
-    //cell = raw.insertCell(0);
-    //cell.width = '50%';
-    //cell.appendChild(comparisonDex);
+    TDup_PredictorOptionsContentArea = document.createElement("div");   
 
-    TDup_PredictorOptionsMenu.appendChild(TDup_PredictorOptionsTabs);
+    var cell, raw, table;
+    table = document.createElement('table');
 
-    BuildOptionMenu_Global(TDup_PredictorOptionsTabs, TDup_PredictorOptionsMenu, true);
-    BuildOptionMenu_StatsDisplay(TDup_PredictorOptionsTabs, TDup_PredictorOptionsMenu);
-    BuildOptionMenu_Pages(TDup_PredictorOptionsTabs, TDup_PredictorOptionsMenu);
-    BuildOptionMenu_TornStats(TDup_PredictorOptionsTabs, TDup_PredictorOptionsMenu);
-    BuildOptionMenu_Debug(TDup_PredictorOptionsTabs, TDup_PredictorOptionsMenu);
-    BuildOptionMenu_Infos(TDup_PredictorOptionsTabs, TDup_PredictorOptionsMenu);
+    raw = table.insertRow(0);
+    cell = raw.insertCell(0);
+    cell.className = "TDup_optionsCellMenu";
+    cell.appendChild(TDup_PredictorOptionsMenuArea);
 
-    node.appendChild(TDup_PredictorOptionsMenu);
+    cell = raw.insertCell(1);
+    cell.appendChild(TDup_PredictorOptionsContentArea);
+    TDup_PredictorOptionsDiv.appendChild(table);
+    node.appendChild(TDup_PredictorOptionsDiv);
 
-    TDup_PredictorOptionsMenu.style.display = "none";
+    BuildOptionMenu_Global(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea, true);
+    BuildOptionMenu_StatsDisplay(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
+    BuildOptionMenu_Pages(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
+    BuildOptionMenu_TornStats(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
+    BuildOptionMenu_Debug(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
+    BuildOptionMenu_Infos(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
+
+    TDup_PredictorOptionsDiv.style.display = "none";
 
     // Get the element with id="defaultOpen" and click on it
     document.getElementById("TDup_tablinks_defaultOpen").click();
@@ -1105,15 +1084,15 @@ function InjectOptionMenu(node) {
     BuildSettingsMenu(node);
 
     let btnOpenSettings = document.createElement("a");
-    btnOpenSettings.className = "t-clear h c-pointer  line-h24 right ";
-    btnOpenSettings.innerHTML = '<span class="TDup_button">BSP Settings</span>';
+    btnOpenSettings.className = "t-clear h c-pointer  line-h24 right";
+    btnOpenSettings.innerHTML = '<div class="TDup_button">BSP Settings</div>';
 
     btnOpenSettings.addEventListener("click", () => {
-        if (TDup_PredictorOptionsMenu.style.display == "block") {
-            TDup_PredictorOptionsMenu.style.display = "none";
+        if (TDup_PredictorOptionsDiv.style.display == "block") {
+            TDup_PredictorOptionsDiv.style.display = "none";
         }
         else {
-            TDup_PredictorOptionsMenu.style.display = "block";
+            TDup_PredictorOptionsDiv.style.display = "block";
             FetchUserDataFromBSPServer();
         }
     });
@@ -1146,7 +1125,26 @@ function InjectImportSpiesButton(node) {
     errorImportTornStatsSpiesForFaction.style.display = "none";
 
     const URLPage = new URL(window.location.href);
-    let factionId = parseInt(URLPage.searchParams.get('ID'));
+    let factionIdStr = URLPage.searchParams.get('ID');
+
+    if (factionIdStr == undefined) {
+        var el = document.querySelector('.faction-info');
+        if (el != undefined) {
+            factionIdStr = el.getAttribute("data-faction");
+        }
+        else {
+            el = document.querySelector('.forum-thread');
+            if (el != undefined && el.href != undefined) {
+                let hrefArray = el.href.split('a=');
+                if (hrefArray.length == 2) {
+                    factionIdStr = hrefArray[1];
+                }
+            }
+        }
+
+    }
+
+    let factionId = parseInt(factionIdStr);
 
     if (factionId > 0) {
         btnImportTornStatsSpies.addEventListener("click", () => {
@@ -1405,8 +1403,7 @@ function FetchUserDataFromBSPServer() {
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
-            //url: `http://www.lol-manager.com/api/battlestats/user/${GetBasicAPIKey()}/${GM_info.script.version}`,
-            url: `https://localhost:7198/api/battlestats/user/${GetStorage(StorageKey.BasicAPIKey)}/${GM_info.script.version}`,
+            url: `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.BasicAPIKey)}/${GM_info.script.version}`,
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -1449,8 +1446,7 @@ function FetchScoreAndTBS(targetId) {
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
-            //url: `http://www.lol-manager.com/api/battlestats/${GetBasicAPIKey()}/${targetId}/${GM_info.script.version}`, //var version = GM_info.script.version;
-            url: `https://localhost:7198/api/battlestats/${GetStorage(StorageKey.BasicAPIKey)}/${targetId}/${GM_info.script.version}`, //var version = GM_info.script.version;
+            url: `http://www.lol-manager.com/api/battlestats/${GetStorage(StorageKey.BasicAPIKey)}/${targetId}/${GM_info.script.version}`,
             headers: {
                 'Content-Type': 'application/json'
             },
