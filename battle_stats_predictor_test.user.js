@@ -12,6 +12,7 @@
 // @match       https://www.torn.com/joblist.php*
 // @match       https://www.torn.com/competition.php*
 // @match       https://www.torn.com/bounties.php*
+// @match       https://www.torn.com/hospitalview.php*
 // @run-at      document-end
 // @grant       GM.xmlHttpRequest
 // @grant       GM_setValue
@@ -145,6 +146,8 @@ var dictDivPerPlayer = {};
 
 // #region Styles
 
+var mainColor = "cadetblue";
+
 var styleToAdd = document.createElement('style');
 
 styleToAdd.innerHTML += '.iconStats {height: 20px; width: 32px; position: relative; text-align: center; font-size: 12px; font-weight:bold; color: black; box-sizing: border-box; border: 1px solid black;line-height: 18px;font-family: initial;}';
@@ -156,20 +159,30 @@ styleToAdd.innerHTML += '.iconStats {height: 20px; width: 32px; position: relati
 styleToAdd.innerHTML += '.TDup_optionsMenu {border: 1px solid #ccc;background-color: #f1f1f1;}';
 
 /* Style the buttons inside the tab */
-styleToAdd.innerHTML += '.TDup_optionsMenu button {display: block; text-align:center !important; height:45px; background-color: inherit; color: black; padding: 22px 16px; width: 100%; border: none; outline: none; text-align: left; cursor: pointer; transition: 0.3s;font-size: 14px;}';
+styleToAdd.innerHTML += '.TDup_optionsMenu button {display: block; text-align:center !important; height:45px; background-color: inherit; color: black; padding: 22px 16px; width: 100%; border: none; outline: none; text-align: left; cursor: pointer; transition: 0.3s;font-size: 14px; border: 1px solid white !important}';
 
 /* Change background color of buttons on hover */
 styleToAdd.innerHTML += '.TDup_optionsMenu button:hover button:focus { background-color: #99ccff !important; color: black !important}';
 
 /* Create an active/current "tab button" class */
-styleToAdd.innerHTML += '.TDup_optionsMenu button.active { background-color: #6699ff !important;}';
+styleToAdd.innerHTML += '.TDup_optionsMenu button.active { background-color: ' + mainColor +' !important; color:white}';
 
 styleToAdd.innerHTML += '.TDup_optionsCellMenu {width:100px; background:white; height:320px; vertical-align: top !important;}';
 
+styleToAdd.innerHTML += '.TDup_optionsCellHeader {text-align: center; font-size: 18px !important; background:' + mainColor +'; color: white;}';
+
+styleToAdd.innerHTML += '.TDup_divBtnBsp {width: initial !important;}';
+
+/* Buttons in Option menu content */
+styleToAdd.innerHTML += '.TDup_buttonInOptionMenu {  background-color: ' + mainColor + '; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
+styleToAdd.innerHTML += 'font-size: 12px; margin: 0; max-width: none; outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;}';
+
+
 /* Style the tab content */
 styleToAdd.innerHTML += '.TDup_optionsTabContent { padding: 10px 10px;  border: 1px solid #ccc;  }'; // max-width:100px;
+styleToAdd.innerHTML += '.TDup_optionsTabContent label { margin:10px 0px; }'; 
 
-styleToAdd.innerHTML += '.TDup_button {  background-color: dodgerblue; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
+styleToAdd.innerHTML += '.TDup_button {  background-color: ' + mainColor +'; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
 styleToAdd.innerHTML += 'font-size: 12px;font-weight: 100; line-height: 1;  margin: 0; max-width: none; min-width: 10px;  outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;';
 styleToAdd.innerHTML += 'text-transform: none;  user-select: none; -webkit-user-select: none;  touch-action: manipulation; width: 100%;}';
 styleToAdd.innerHTML += '.TDup_button: hover, .TDup_button:focus { opacity: .75;}'
@@ -195,7 +208,9 @@ const PageType = {
     Faction: 'Faction',
     Company: 'Company',
     Competition: 'Competition',
-    Bounty: 'Bounty'
+    Bounty: 'Bounty',
+    Search: 'Search',
+    Hospital : 'Hospital',
 };
 
 //https://www.torn.com/index.php => profile
@@ -207,7 +222,9 @@ var mapPageTypeAddress = {
     [PageType.Faction]: 'https://www.torn.com/factions.php',
     [PageType.Company]: 'https://www.torn.com/joblist.php',
     [PageType.Competition]: 'https://www.torn.com/competition.php',
-    [PageType.Bounty]: 'https://www.torn.com/bounties.php'
+    [PageType.Bounty]: 'https://www.torn.com/bounties.php',
+    [PageType.Search]: 'https://www.torn.com/page.php',    
+    [PageType.Hospital]: 'https://www.torn.com/hospitalview.php',
 }
 
 function LogInfo(value) {
@@ -468,6 +485,12 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     let localBattleStats = GetLocalBattleStats();
     let localTBS = localBattleStats.TBS;
 
+
+    let topMargin = -6;
+    if (IsPage(PageType.Search)) {
+
+    }  
+
     if (prediction.IsSpy === true) {
         var tbsRatio = 100 * prediction.total / localTBS;
         var colorComparedToUs = getColorDifference(tbsRatio);
@@ -579,10 +602,9 @@ function BuildOptionMenu_Global(tabs, menu) {
     mainAPIKeyInput.value = GetStorageEmptyIfUndefined(StorageKey.BasicAPIKey);
 
     btnValidatemainAPIKey = document.createElement("input");
-    btnValidatemainAPIKey.style.marginTop = '5px';
-    btnValidatemainAPIKey.style.marginBottom = '5px';
     btnValidatemainAPIKey.type = "button";
     btnValidatemainAPIKey.value = "Validate";
+    btnValidatemainAPIKey.className = "TDup_buttonInOptionMenu";
 
     function OnTornAPIKeyVerified(success, reason) {
         btnValidatemainAPIKey.disabled = false;
@@ -646,10 +668,9 @@ function BuildOptionMenu_StatsDisplay(tabs, menu) {
     }
 
     btnValidategymStatsAPIKey = document.createElement("input");
-    btnValidategymStatsAPIKey.style.marginTop = '5px';
-    btnValidategymStatsAPIKey.style.marginBottom = '5px';
     btnValidategymStatsAPIKey.type = "button";
     btnValidategymStatsAPIKey.value = "Import stats";
+    btnValidategymStatsAPIKey.className = "TDup_buttonInOptionMenu";
 
     successValidategymStatsAPIKey = document.createElement("label");
     successValidategymStatsAPIKey.innerHTML = 'Stats imported!';
@@ -843,7 +864,7 @@ function BuildOptionMenu_Pages(tabs, menu) {
     let contentDiv = BuildOptionMenu(tabs, menu, "Pages");
 
     let textExplanation = document.createElement("p");
-    textExplanation.innerHTML = "Pages where BSP is enabled:";
+    textExplanation.innerHTML = "Select where BSP should be enabled";
     contentDiv.appendChild(textExplanation);
 
     // Pages where it's enabled
@@ -854,6 +875,8 @@ function BuildOptionMenu_Pages(tabs, menu) {
     BuildOptionsCheckboxPageWhereItsEnabled(contentDiv, PageType.Company);
     BuildOptionsCheckboxPageWhereItsEnabled(contentDiv, PageType.Competition);
     BuildOptionsCheckboxPageWhereItsEnabled(contentDiv, PageType.Bounty);
+    BuildOptionsCheckboxPageWhereItsEnabled(contentDiv, PageType.Search);
+    BuildOptionsCheckboxPageWhereItsEnabled(contentDiv, PageType.Hospital);
 }
 
 function BuildOptionsCheckboxPageWhereItsEnabled(contentDiv, pageType) {
@@ -864,7 +887,7 @@ function BuildOptionsCheckboxPageWhereItsEnabled(contentDiv, pageType) {
     checkboxPage.type = "checkbox";
     checkboxPage.name = "name";
     checkboxPage.value = "value";
-    checkboxPage.id = "id";
+    checkboxPage.id = "id_" + pageType;
     checkboxPage.checked = GetStorageBoolWithDefaultValue(StorageKey.IsBSPEnabledOnPage + pageType, true);
 
     checkboxPage.addEventListener("change", () => {
@@ -873,7 +896,7 @@ function BuildOptionsCheckboxPageWhereItsEnabled(contentDiv, pageType) {
     });
 
     var tornStatsCheckboxLabel = document.createElement('label')
-    tornStatsCheckboxLabel.htmlFor = "id";
+    tornStatsCheckboxLabel.htmlFor = checkboxPage.id;
     tornStatsCheckboxLabel.appendChild(document.createTextNode(pageType));
     pageCheckBoxNode.appendChild(tornStatsCheckboxLabel);
 
@@ -920,10 +943,9 @@ function BuildOptionMenu_TornStats(tabs, menu) {
     }
 
     btnValidateTornStatsAPIKey = document.createElement("input");
-    btnValidateTornStatsAPIKey.style.marginTop = '5px';
-    btnValidateTornStatsAPIKey.style.marginBottom = '5px';
     btnValidateTornStatsAPIKey.type = "button";
     btnValidateTornStatsAPIKey.value = "Validate";
+    btnValidateTornStatsAPIKey.className = "TDup_buttonInOptionMenu";
 
     successValidateTornStatsAPIKey = document.createElement("label");
     successValidateTornStatsAPIKey.innerHTML = 'TornStats API Key verified';
@@ -1004,10 +1026,9 @@ function BuildOptionMenu_Debug(tabs, menu) {
     contentDiv.appendChild(PredictionDetailsBoxNode);
 
     var buttonClearLocalCache = document.createElement("input");
-    buttonClearLocalCache.style.marginTop = '5px';
-    buttonClearLocalCache.style.marginBottom = '5px';
     buttonClearLocalCache.type = "button";
     buttonClearLocalCache.value = "Clear predictor local storage";
+    buttonClearLocalCache.className = "TDup_buttonInOptionMenu";
 
     buttonClearLocalCache.addEventListener("click", () => {
         buttonClearLocalCache.disabled = true;
@@ -1028,30 +1049,51 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
     TabContent_Content.innerHTML = "Script version : " + GM_info.script.version;
     contentDiv.appendChild(TabContent_Content);
 
-    let DiscordLink = document.createElement("p");
-    DiscordLink.innerHTML = 'Give feedback, report bugs or just come to say hi on the <a href="https://discord.gg/zgrVX5j6MQ">Discord</a>';
+    let DiscordLink = document.createElement("div");
+    DiscordLink.style.position = "absolute";
+
+    let DiscordText = document.createElement("p");
+    DiscordText.innerHTML = 'Give feedback, report bugs or just come to say hi on the Discord';
+    DiscordLink.appendChild(DiscordText);
+
+    let DiscordLinkImg = document.createElement("div");
+    DiscordLinkImg.innerHTML = '<a href="https://discord.gg/zgrVX5j6MQ"><img width="48" height="48" title="Discord" src="https://wiki.soldat.pl/images/6/6f/DiscordLogo.png" /> </a>';
+    DiscordLinkImg.style.position = "absolute";
+
+    DiscordLink.appendChild(DiscordLinkImg);
+
     contentDiv.appendChild(DiscordLink);
 }
 
 function BuildSettingsMenu(node) {
 
     TDup_PredictorOptionsDiv = document.createElement("div");
-    TDup_PredictorOptionsDiv.style.background = "khaki";
+    TDup_PredictorOptionsDiv.style.background = "lightgray";
 
     TDup_PredictorOptionsMenuArea = document.createElement("div");
     TDup_PredictorOptionsMenuArea.className = "TDup_optionsMenu";
 
     TDup_PredictorOptionsContentArea = document.createElement("div");   
 
-    var cell, raw, table;
+    var cell,table;
     table = document.createElement('table');
+    table.style.width = "100%";
 
-    raw = table.insertRow(0);
-    cell = raw.insertCell(0);
+    let thead = table.createTHead();
+    let rowHeader = thead.insertRow();
+    let th = document.createElement("th");
+    th.className = "TDup_optionsCellHeader";
+    th.colSpan = 2;
+    let text = document.createTextNode("BSP Settings");
+    th.appendChild(text);
+    rowHeader.appendChild(th);
+
+    let raw = table.insertRow();
+    cell = raw.insertCell();
     cell.className = "TDup_optionsCellMenu";
     cell.appendChild(TDup_PredictorOptionsMenuArea);
 
-    cell = raw.insertCell(1);
+    cell = raw.insertCell();
     cell.appendChild(TDup_PredictorOptionsContentArea);
     TDup_PredictorOptionsDiv.appendChild(table);
     node.appendChild(TDup_PredictorOptionsDiv);
@@ -1085,7 +1127,7 @@ function InjectOptionMenu(node) {
     BuildSettingsMenu(node);
 
     let btnOpenSettings = document.createElement("a");
-    btnOpenSettings.className = "t-clear h c-pointer  line-h24 right";
+    btnOpenSettings.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
     btnOpenSettings.innerHTML = '<div class="TDup_button">BSP Settings</div>';
 
     btnOpenSettings.addEventListener("click", () => {
@@ -1112,8 +1154,8 @@ function InjectImportSpiesButton(node) {
     node.style.position = "relative";
 
     let btnImportTornStatsSpies = document.createElement("a");
-    btnImportTornStatsSpies.className = "t-clear h c-pointer  line-h24 right ";
-    btnImportTornStatsSpies.innerHTML = '<span class="TDup_button">BSP Import Spies</span>';
+    btnImportTornStatsSpies.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
+    btnImportTornStatsSpies.innerHTML = '<div class="TDup_button">BSP Import Spies</div>';
 
     let successImportTornStatsSpiesForFaction = document.createElement("label");
     successImportTornStatsSpiesForFaction.innerHTML = 'Spies imported updated!';
