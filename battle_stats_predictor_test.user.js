@@ -58,6 +58,7 @@ const StorageKey = {
 
     // Display choice
     IsShowingHonorBars: 'tdup.battleStatsPredictor.isShowingHonorBars',
+    BSPColorTheme: 'tdup.battleStatsPredictor.bspColorTheme',
 };
 
 function GetStorage(key) { return localStorage[key]; }
@@ -148,7 +149,7 @@ var dictDivPerPlayer = {};
 
 // #region Styles
 
-var mainColor = "cadetblue";
+//var mainColor = "cadetblue";
 
 var styleToAdd = document.createElement('style');
 
@@ -167,25 +168,30 @@ styleToAdd.innerHTML += '.TDup_optionsMenu button {display: block; text-align:ce
 styleToAdd.innerHTML += '.TDup_optionsMenu button:hover button:focus { background-color: #99ccff !important; color: black !important}';
 
 /* Create an active/current "tab button" class */
-styleToAdd.innerHTML += '.TDup_optionsMenu button.active { background-color: ' + mainColor +' !important; color:white}';
+styleToAdd.innerHTML += '.TDup_optionsMenu button.active { background-color: ' + GetColorTheme() +' !important; color:white}';
 
 styleToAdd.innerHTML += '.TDup_optionsCellMenu {width:100px; background:white; height:350px; vertical-align: top !important;}';
 
-styleToAdd.innerHTML += '.TDup_optionsCellHeader {text-align: center; font-size: 18px !important; background:' + mainColor +'; color: white;}';
+styleToAdd.innerHTML += '.TDup_optionsCellHeader {text-align: center; font-size: 18px !important; background:' + GetColorTheme() +'; color: white;}';
 
 styleToAdd.innerHTML += '.TDup_divBtnBsp {width: initial !important;}';
 
 /* Buttons in Option menu content */
-styleToAdd.innerHTML += '.TDup_buttonInOptionMenu { background-color: ' + mainColor + '; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
+styleToAdd.innerHTML += '.TDup_buttonInOptionMenu { background-color: ' + GetColorTheme() + '; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
 styleToAdd.innerHTML += 'font-size: 12px; margin: 5px; max-width: none; outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;}';
 
 
 /* Style the tab content */
-styleToAdd.innerHTML += '.TDup_optionsTabContent { padding: 10px 10px;  border: 1px solid #ccc;  }'; // max-width:100px;
+styleToAdd.innerHTML += '.TDup_optionsTabContent { padding: 10px 10px;  border: 1px solid #ccc;  }'; 
 styleToAdd.innerHTML += '.TDup_optionsTabContent label { margin:10px 0px; }'; 
 styleToAdd.innerHTML += '.TDup_optionsTabContent p { margin:10px 0px; }'; 
+styleToAdd.innerHTML += '.TDup_optionsTabContent a { color:black !important;}'; 
+styleToAdd.innerHTML += '.TDup_optionsTabContent input { margin:0px 10px !important; }';
+styleToAdd.innerHTML += '.TDup_optionsTabContent input[type = button] { margin:0px 0px !important; }';
 
-styleToAdd.innerHTML += '.TDup_button {  background-color: ' + mainColor +'; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
+/*styleToAdd.innerHTML += '.TDup_optionsTabContent div { margin:10px 0px !important; }';*/
+
+styleToAdd.innerHTML += '.TDup_button {  background-color: ' + GetColorTheme() +'; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
 styleToAdd.innerHTML += 'font-size: 12px;font-weight: 100; line-height: 1;  margin: 0; max-width: none; min-width: 10px;  outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;';
 styleToAdd.innerHTML += 'text-transform: none;  user-select: none; -webkit-user-select: none;  touch-action: manipulation; width: 100%;}';
 styleToAdd.innerHTML += '.TDup_button: hover, .TDup_button:focus { opacity: .75;}'
@@ -206,14 +212,15 @@ ref.parentNode.insertBefore(styleToAdd, ref);
 
 const PageType = {
     Profile: 'Profile',
-    RecruitCitizens: 'RecruitCitizens',
-    HallOfFame: 'HallOfFame',
+    RecruitCitizens: 'Recruit Citizens',
+    HallOfFame: 'Hall Of Fame',
     Faction: 'Faction',
     Company: 'Company',
     Competition: 'Competition',
     Bounty: 'Bounty',
     Search: 'Search',
-    Hospital : 'Hospital',
+    Hospital: 'Hospital',
+    Chain: 'Chain',
 };
 
 //https://www.torn.com/index.php => profile
@@ -228,6 +235,7 @@ var mapPageTypeAddress = {
     [PageType.Bounty]: 'https://www.torn.com/bounties.php',
     [PageType.Search]: 'https://www.torn.com/page.php',    
     [PageType.Hospital]: 'https://www.torn.com/hospitalview.php',
+    [PageType.Chain]: 'https://www.torn.com/factions.php?step=your#/war/chain',
 }
 
 function LogInfo(value) {
@@ -300,6 +308,12 @@ function IsSubscriptionValid() {
     return time_difference > 0;
 }
 
+function GetColorTheme() {
+    let color = GetStorage(StorageKey.BSPColorTheme);
+    if (color == undefined) {
+        return "cadetblue";
+    }
+}
 // #endregion
 
 // #region Cache 
@@ -389,7 +403,8 @@ async function GetPredictionForPlayer(targetId, callback) {
     let targetSpy = GetSpyFromCache(targetId);
     if (targetSpy != undefined) {
         let spyDateConsideredTooOld = new Date();
-        spyDateConsideredTooOld.setDate(spyDateConsideredTooOld.getDate() - 30); // 30 days old spies are not displayed anymore, and we switch back to predictions
+        let daysToUseTornStatsSpy = GetStorage(StorageKey.DaysToUseTornStatsSpy);
+        spyDateConsideredTooOld.setDate(spyDateConsideredTooOld.getDate() - daysToUseTornStatsSpy);
         let spyDate = new Date(targetSpy.timestamp * 1000);
         if (spyDate > spyDateConsideredTooOld) {
             callback(targetId, targetSpy);
@@ -411,6 +426,10 @@ async function GetPredictionForPlayer(targetId, callback) {
 
         if (isPredictionValid) {
             prediction.fromCache = true;
+
+            if (targetSpy != undefined) {
+                prediction.attachedSpy = targetSpy;
+            }
             callback(targetId, prediction);
             LogInfo("Prediction for target" + targetId + " found in the cache");
             return;
@@ -422,6 +441,10 @@ async function GetPredictionForPlayer(targetId, callback) {
     LogInfo("Prediction for target" + targetId + " not found in the cache, value retrieved");
     if (newPrediction != undefined) {
         SetPredictionInCache(targetId, newPrediction);
+    }
+
+    if (targetSpy != undefined) {
+        newPrediction.attachedSpy = targetSpy;
     }
     callback(targetId, newPrediction);
 }
@@ -501,6 +524,11 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     let localBattleStats = GetLocalBattleStats();
     let localTBS = localBattleStats.TBS;
 
+    let spyMargin = '-6px 23px';
+    if (IsPage(PageType.Chain)) {
+        spyMargin = '-1px 23px';
+    }
+   // https://www.torn.com/factions.php?step=your#/war/chain
         //let topMargin = -6;
     //if (IsPage(PageType.Search)) {
 
@@ -528,6 +556,12 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
                 if (prediction.Result == TOO_STRONG)
                     targetTBS = intTBS;
 
+                if (prediction.attachedSpy != undefined) {
+                    if (prediction.attachedSpy.total > 0 && prediction.attachedSpy.total > targetTBS) {
+                        targetTBS = prediction.attachedSpy.total;
+                    }
+                }
+
                 break;
         }
     }
@@ -541,7 +575,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         formattedBattleStats = "N/A";
     }
 
-    let spyIndicator = isUsingSpy ? '<img width="13" height="13" style="position:absolute; margin: -6px 23px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />' : '';
+    let spyIndicator = isUsingSpy ? '<img width="13" height="13" style="position:absolute; margin:' + spyMargin+';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />' : '';
 
     if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true))
         toInject = '<a href="' + urlAttack + '" target="_blank">' + spyIndicator + '<div style="position: absolute;z-index: 100;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
@@ -899,7 +933,7 @@ function BuildOptionMenu_Pages(tabs, menu) {
     let contentDiv = BuildOptionMenu(tabs, menu, "Pages");
 
     let textExplanation = document.createElement("p");
-    textExplanation.innerHTML = "Select where BSP should be enabled";
+    textExplanation.innerHTML = "Select where BSP is enabled";
     contentDiv.appendChild(textExplanation);
 
     // Pages where it's enabled
@@ -922,6 +956,7 @@ function BuildOptionsCheckboxPageWhereItsEnabled(contentDiv, pageType) {
     checkboxPage.type = "checkbox";
     checkboxPage.name = "name";
     checkboxPage.value = "value";
+    checkboxPage.style.margin = "5px 10px";
     checkboxPage.id = "id_" + pageType;
     checkboxPage.checked = GetStorageBoolWithDefaultValue(StorageKey.IsBSPEnabledOnPage + pageType, true);
 
@@ -930,12 +965,11 @@ function BuildOptionsCheckboxPageWhereItsEnabled(contentDiv, pageType) {
         SetStorage(StorageKey.IsBSPEnabledOnPage + pageType, isBSPEnabledForThisPage);
     });
 
-    var tornStatsCheckboxLabel = document.createElement('label')
-    tornStatsCheckboxLabel.htmlFor = checkboxPage.id;
-    tornStatsCheckboxLabel.appendChild(document.createTextNode(pageType));
-    pageCheckBoxNode.appendChild(tornStatsCheckboxLabel);
-
+    var checkboxLabel = document.createElement('label')
+    checkboxLabel.htmlFor = checkboxPage.id;
+    checkboxLabel.appendChild(document.createTextNode(pageType));
     pageCheckBoxNode.appendChild(checkboxPage);
+    pageCheckBoxNode.appendChild(checkboxLabel);
     contentDiv.appendChild(pageCheckBoxNode);
 }
 
@@ -1013,13 +1047,14 @@ function BuildOptionMenu_TornStats(tabs, menu) {
 
     let tornStatsNumberOfDaysInput = document.createElement("input");
     tornStatsNumberOfDaysInput.type = 'number';
+    tornStatsNumberOfDaysInput.style.width = '60px';
     if (GetStorage(StorageKey.DaysToUseTornStatsSpy) == undefined) {
         SetStorage(StorageKey.DaysToUseTornStatsSpy, 30);
     }
     tornStatsNumberOfDaysInput.value = parseInt(GetStorage(StorageKey.DaysToUseTornStatsSpy));
 
     tornStatsNumberOfDaysInput.addEventListener("change", () => {
-        let numberOfDaysNewValue = tornStatsNumberOfDaysInput.value;
+        let numberOfDaysNewValue = parseInt(tornStatsNumberOfDaysInput.value);
         SetStorage(StorageKey.DaysToUseTornStatsSpy, numberOfDaysNewValue);
     });
 
@@ -1079,17 +1114,17 @@ function BuildOptionMenu_Debug(tabs, menu) {
 function BuildOptionMenu_Infos(menuArea, contentArea) {
     let contentDiv = BuildOptionMenu(menuArea, contentArea, "Infos");
 
-    // TornStats option menu content:
     let TabContent_Content = document.createElement("p");
     TabContent_Content.innerHTML = "Script version : " + GM_info.script.version;
     contentDiv.appendChild(TabContent_Content);
 
     let ForumThread = document.createElement("div");
-    ForumThread.innerHTML = '<a href="https://www.torn.com/forums.php#/p=threads&f=67&t=16290324&b=0&a=0&to=22705010"> Forum thread</a>';
+    ForumThread.innerHTML = 'Read basic setup, Q&A and R+ the script if you like it on the <a href="https://www.torn.com/forums.php#/p=threads&f=67&t=16290324&b=0&a=0&to=22705010"> Forum thread</a>';
     contentDiv.appendChild(ForumThread);    
+    //ForumThread.style.position = "absolute";
 
     let DiscordLink = document.createElement("div");
-    DiscordLink.style.position = "absolute";
+    //DiscordLink.style.position = "absolute";
 
     let DiscordText = document.createElement("p");
     DiscordText.innerHTML = 'Give feedback, report bugs or just come to say hi on the Discord';
@@ -1116,7 +1151,7 @@ function BuildSettingsMenu(node) {
 
     var cell,table;
     table = document.createElement('table');
-    table.style = 'width:100%; border:2px solid ' + mainColor + ';';
+    table.style = 'width:100%; border:2px solid ' + GetColorTheme() + ';';
 
     let thead = table.createTHead();
     let rowHeader = thead.insertRow();
@@ -1734,5 +1769,3 @@ function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedEl
 }
 
 // #endregion
-
-
