@@ -55,6 +55,9 @@ const StorageKey = {
 
     // Pages enabled
     IsBSPEnabledOnPage: 'tdup.battleStatsPredictor.IsBSPEnabledOnPage_',
+
+    // Display choice
+    IsShowingHonorBars: 'tdup.battleStatsPredictor.isShowingHonorBars',
 };
 
 function GetStorage(key) { return localStorage[key]; }
@@ -129,7 +132,6 @@ var btnImportTornStatsSpies;
 var successImportTornStatsSpies;
 var errorImportTornStatsSpies;
 var mainNode;
-var isUsingHonorBar = false;
 
 var TDup_PredictorOptionsDiv;
 var TDup_PredictorOptionsMenuArea;
@@ -167,20 +169,21 @@ styleToAdd.innerHTML += '.TDup_optionsMenu button:hover button:focus { backgroun
 /* Create an active/current "tab button" class */
 styleToAdd.innerHTML += '.TDup_optionsMenu button.active { background-color: ' + mainColor +' !important; color:white}';
 
-styleToAdd.innerHTML += '.TDup_optionsCellMenu {width:100px; background:white; height:320px; vertical-align: top !important;}';
+styleToAdd.innerHTML += '.TDup_optionsCellMenu {width:100px; background:white; height:350px; vertical-align: top !important;}';
 
 styleToAdd.innerHTML += '.TDup_optionsCellHeader {text-align: center; font-size: 18px !important; background:' + mainColor +'; color: white;}';
 
 styleToAdd.innerHTML += '.TDup_divBtnBsp {width: initial !important;}';
 
 /* Buttons in Option menu content */
-styleToAdd.innerHTML += '.TDup_buttonInOptionMenu {  background-color: ' + mainColor + '; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
-styleToAdd.innerHTML += 'font-size: 12px; margin: 0; max-width: none; outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;}';
+styleToAdd.innerHTML += '.TDup_buttonInOptionMenu { background-color: ' + mainColor + '; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
+styleToAdd.innerHTML += 'font-size: 12px; margin: 5px; max-width: none; outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;}';
 
 
 /* Style the tab content */
 styleToAdd.innerHTML += '.TDup_optionsTabContent { padding: 10px 10px;  border: 1px solid #ccc;  }'; // max-width:100px;
 styleToAdd.innerHTML += '.TDup_optionsTabContent label { margin:10px 0px; }'; 
+styleToAdd.innerHTML += '.TDup_optionsTabContent p { margin:10px 0px; }'; 
 
 styleToAdd.innerHTML += '.TDup_button {  background-color: ' + mainColor +'; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
 styleToAdd.innerHTML += 'font-size: 12px;font-weight: 100; line-height: 1;  margin: 0; max-width: none; min-width: 10px;  outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;';
@@ -246,7 +249,8 @@ function FormatBattleStats(number) {
     }
 
     var toReturn = myArray[0];
-    if (toReturn < 10) {
+    if (number < 1000) return number;
+    if (parseInt(toReturn) < 10) {
         if (parseInt(myArray[1][0]) != 0) {
             toReturn += '.' + myArray[1][0];
         }
@@ -273,13 +277,27 @@ function IsPage(pageType) {
     return window.location.href.startsWith(mapPageTypeAddress[pageType]);
 }
 
-function getColorDifference(ratio) {
+function GetColorDifference(ratio) {
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
         if (ratio < LOCAL_COLORS[i].maxValue) {
             return LOCAL_COLORS[i].color;
         }
     }
     return "#ffc0cb"; //pink
+}
+
+function IsSubscriptionValid() {
+
+    let subscriptionEnd = GetStorage(StorageKey.DateSubscriptionEnd);
+    if (subscriptionEnd == undefined)
+        return true;
+
+    var dateNow = new Date();
+    var offsetInMinute = dateNow.getTimezoneOffset();
+    var dateSubscriptionEnd = new Date(subscriptionEnd);
+    dateSubscriptionEnd.setMinutes(dateSubscriptionEnd.getMinutes() - offsetInMinute);
+    var time_difference = dateSubscriptionEnd - dateNow;
+    return time_difference > 0;
 }
 
 // #endregion
@@ -397,15 +415,13 @@ async function GetPredictionForPlayer(targetId, callback) {
             LogInfo("Prediction for target" + targetId + " found in the cache");
             return;
         }
-    }
-    
+    }    
 
     LogInfo("Prediction for target" + targetId + " not found in the cache, asking server..");
     const newPrediction = await FetchScoreAndTBS(targetId);
     LogInfo("Prediction for target" + targetId + " not found in the cache, value retrieved");
     if (newPrediction != undefined) {
         SetPredictionInCache(targetId, newPrediction);
-        //TDTODO : subscription date is not updated on client side.
     }
     callback(targetId, newPrediction);
 }
@@ -422,9 +438,9 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     let localBattleStats = GetLocalBattleStats();
     let localTBS = localBattleStats.TBS;
 
-    if (prediction.IsSpy === true) {
+    if (prediction.IsSpy === true && prediction.total > 0) {
         var tbsRatio = 100 * prediction.total / localTBS;
-        var colorComparedToUs = getColorDifference(tbsRatio);
+        var colorComparedToUs = GetColorDifference(tbsRatio);
 
         divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px"><img title="Spy" width="13" height="13" style="position:absolute; margin: 5px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/><img title="Spy" src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' + FormatBattleStats(prediction.total) + ' <label style = "color:' + colorComparedToUs + '"; "> (' + tbsRatio.toFixed(0) + '%) </label></div >';
         return;
@@ -447,12 +463,12 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
                 var intTbsBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
                 var tbsBalancedRatio = 100 * intTbsBalanced / ((localBattleStats.Score * localBattleStats.Score) / 4);
 
-                var colorTBS = getColorDifference(tbs1Ratio);
-                var colorBalancedTBS = getColorDifference(tbsBalancedRatio);
+                var colorTBS = GetColorDifference(tbs1Ratio);
+                var colorBalancedTBS = GetColorDifference(tbsBalancedRatio);
 
                 var averageModelTBS = parseInt((intTBS + intTbsBalanced) / 2);
                 var ratioComparedToUs = 100 * averageModelTBS / localTBS;
-                var colorComparedToUs = getColorDifference(ratioComparedToUs);
+                var colorComparedToUs = GetColorDifference(ratioComparedToUs);
 
                 if (divSvgAttackToColor) {
                     divSvgAttackToColor.style.fill = colorComparedToUs;
@@ -485,70 +501,58 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     let localBattleStats = GetLocalBattleStats();
     let localTBS = localBattleStats.TBS;
 
+        //let topMargin = -6;
+    //if (IsPage(PageType.Search)) {
 
-    let topMargin = -6;
-    if (IsPage(PageType.Search)) {
+    //}  
 
-    }  
+    let isError = false;
+    let isUsingSpy = prediction.IsSpy === true;
+    let targetTBS = 0;
+    if (isUsingSpy) {
+        targetTBS = prediction.total;
+    }
+    else {
+        switch (prediction.Result) {
+            case FAIL:
+            case MODEL_ERROR:
+                isError = true;
+                break;
+            case TOO_WEAK:
+            case TOO_STRONG:
+            case SUCCESS:
+                let intTBS = parseInt(prediction.TBS.toLocaleString('en-US').replaceAll(',', ''));
+                let intTBSBalanced = parseInt(prediction.TBS_Balanced.toLocaleString('en-US').replaceAll(',', ''));
 
-    if (prediction.IsSpy === true) {
-        var tbsRatio = 100 * prediction.total / localTBS;
-        var colorComparedToUs = getColorDifference(tbsRatio);
+                targetTBS = (intTBS + intTBSBalanced) / 2;
+                if (prediction.Result == TOO_STRONG)
+                    targetTBS = intTBS;
 
-        if (isUsingHonorBar == true)
-            toInject = '<a href="' + urlAttack + '" target="_blank"><img width="13" height="13" style="position:absolute; margin: -6px 23px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/><div style="position: absolute;z-index: 100;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + FormatBattleStats(prediction.total) + '</div></div></a>';
-        else
-            toInject = '<a href="' + urlAttack + '" target="_blank"><div style="display: inline-block; margin-right:5px;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + FormatBattleStats(prediction.total) + '</div></div></a>';
-
-        for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
-            if (dictDivPerPlayer[targetId][i].innerHTML.startsWith('<a href="https://www.torn.com/loader2.php?sid=getInAttack')) {
-                continue;
-            }
-            dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+                break;
         }
-
-        return;
     }
 
-    let result = prediction.Result;
-    switch (result) {
-        case FAIL:
-        case MODEL_ERROR:
-            var toInject = '<div style="position: absolute;z-index: 100;"><img style="border-radius: 50%;" width="16" height="16" src="https://www.freeiconspng.com/uploads/sign-red-error-icon-1.png" /></div>';
-            for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
-                dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
-            }
-            return;
-        case TOO_WEAK:
-        case TOO_STRONG:
-        case SUCCESS:
-            {
-                let TBS = prediction.TBS.toLocaleString('en-US');
-                let TBSBalanced = prediction.TBS_Balanced.toLocaleString('en-US');
+    let tbsRatio = 100 * targetTBS / localTBS;
+    let colorComparedToUs = GetColorDifference(tbsRatio);
 
-                var intTBS = parseInt(TBS.replaceAll(',', ''));
-                var intTBSBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
+    let formattedBattleStats = FormatBattleStats(targetTBS);
+    if (isError == true) {
+        colorComparedToUs = "pink";
+        formattedBattleStats = "N/A";
+    }
 
-                var predictedStats = (intTBS + intTBSBalanced) / 2;
-                if (prediction.Result == TOO_STRONG) predictedStats = intTBS;
+    let spyIndicator = isUsingSpy ? '<img width="13" height="13" style="position:absolute; margin: -6px 23px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />' : '';
 
-                var ratioComparedToUs = 100 * predictedStats / localTBS;
-                var colorTBS = getColorDifference(ratioComparedToUs);
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true))
+        toInject = '<a href="' + urlAttack + '" target="_blank">' + spyIndicator + '<div style="position: absolute;z-index: 100;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+    else
+        toInject = '<a href="' + urlAttack + '" target="_blank">' + spyIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
 
-                var toInject = "";
-                if (isUsingHonorBar == true)
-                    toInject = '<a href="' + urlAttack + '" target="_blank"><div style="position: absolute;z-index: 100;"><div class="iconStats" style="background:' + colorTBS + '">' + FormatBattleStats(predictedStats) + '</div></div></a>';
-                //toInject = '<div style="position: absolute;z-index: 100;"><a href="' + urlAttack + '" target="_blank"><img title=' + FormatBattleStats(predictedStats) + ' style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>';
-                else
-                    toInject = '<div style="display: inline-block; margin-right:5px;"><a href="' + urlAttack + '" target="_blank"><img title=' + FormatBattleStats(predictedStats) + ' style="background-color:' + colorTBS + ';" width="20" height="20" src="https://cdn1.iconfinder.com/data/icons/guns-3/512/police-gun-pistol-weapon-512.png" /></a></div>';
-
-                for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
-                    if (dictDivPerPlayer[targetId][i].innerHTML.includes("iconStats")) {
-                        continue;
-                    }
-                    dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
-                }
-            }
+    for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
+        if (dictDivPerPlayer[targetId][i].innerHTML.startsWith('<a href="https://www.torn.com/loader2.php?sid=getInAttack')) {
+            continue;
+        }
+        dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
     }
 }
 
@@ -611,6 +615,7 @@ function BuildOptionMenu_Global(tabs, menu) {
         SetStorage(StorageKey.IsBasicAPIKeyValid, success);
         if (success === true) {
             successValidatemainAPIKey.style.visibility = "visible";
+            FetchUserDataFromBSPServer();
         }
         else {
             errorValidatemainAPIKey.style.visibility = "visible";
@@ -628,7 +633,7 @@ function BuildOptionMenu_Global(tabs, menu) {
 
     successValidatemainAPIKey = document.createElement("label");
     successValidatemainAPIKey.innerHTML = 'API Key verified and saved!';
-    successValidatemainAPIKey.style.color = '#1E88E5';
+    successValidatemainAPIKey.style.color = 'green';
     successValidatemainAPIKey.style.visibility = "hidden";
 
     errorValidatemainAPIKey = document.createElement("label");
@@ -644,13 +649,43 @@ function BuildOptionMenu_Global(tabs, menu) {
     mainAPIKeyDiv.appendChild(errorValidatemainAPIKey);
     contentDiv.appendChild(mainAPIKeyDiv);
 
-    let apiRegister = document.createElement("span");
-    apiRegister.innerHTML = '<a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BSP_Main&user=basic,personalstats,profile" target="_blank">Generate a basic key</a>';
+
+    let apiRegister = document.createElement("div");
+    apiRegister.innerHTML = '<a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BSP_Main&user=basic,personalstats,profile" target="_blank"><input type"button" class="TDup_buttonInOptionMenu" value="Generate a basic key"/></a>';
     contentDiv.appendChild(apiRegister);
 
     // Subscription info
     subscriptionEndText = document.createElement("div");
+    subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Please fill a valid API Key, and press on validate to get your subscription details</div>';
     contentDiv.appendChild(subscriptionEndText);
+
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsBasicAPIKeyValid, false) == true) {
+        apiRegister.style.display = "none";
+        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Fetching subscription infos, please </div>';
+    }
+
+    let isShowingHonorBarsNode = document.createElement("div");
+    let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
+
+    let checkboxIsShowingHonorBars = document.createElement('input');
+    checkboxIsShowingHonorBars.type = "checkbox";
+    checkboxIsShowingHonorBars.name = "name";
+    checkboxIsShowingHonorBars.value = "value";
+    checkboxIsShowingHonorBars.id = "idIsShowingHonorBars";
+    checkboxIsShowingHonorBars.checked = isShowingHonorBars;
+
+    checkboxIsShowingHonorBars.addEventListener("change", () => {
+        let isShowingHonorBarsNew = checkboxIsShowingHonorBars.checked;
+        SetStorage(StorageKey.IsShowingHonorBars, isShowingHonorBarsNew);
+    });
+
+    var isShowingHonorBarsLabel = document.createElement('label')
+    isShowingHonorBarsLabel.htmlFor = "idIsShowingHonorBars";
+    isShowingHonorBarsLabel.appendChild(document.createTextNode('Are you displaying honor bars?'));
+    isShowingHonorBarsNode.appendChild(isShowingHonorBarsLabel);
+
+    isShowingHonorBarsNode.appendChild(checkboxIsShowingHonorBars);
+    contentDiv.appendChild(isShowingHonorBarsNode);
 }
 
 function BuildOptionMenu_StatsDisplay(tabs, menu) {
@@ -674,7 +709,7 @@ function BuildOptionMenu_StatsDisplay(tabs, menu) {
 
     successValidategymStatsAPIKey = document.createElement("label");
     successValidategymStatsAPIKey.innerHTML = 'Stats imported!';
-    successValidategymStatsAPIKey.style.color = '#1E88E5';
+    successValidategymStatsAPIKey.style.color = 'green';
     successValidategymStatsAPIKey.style.visibility = "hidden";
 
     errorValidategymStatsAPIKey = document.createElement("label");
@@ -914,7 +949,7 @@ function BuildOptionMenu_TornStats(tabs, menu) {
     checkboxTornStats.type = "checkbox";
     checkboxTornStats.name = "name";
     checkboxTornStats.value = "value";
-    checkboxTornStats.id = "id";
+    checkboxTornStats.id = "idUseTornStatsSpies";
     checkboxTornStats.checked = tornStatsEnabled;
 
     checkboxTornStats.addEventListener("change", () => {
@@ -924,7 +959,7 @@ function BuildOptionMenu_TornStats(tabs, menu) {
     });
 
     var tornStatsCheckboxLabel = document.createElement('label')
-    tornStatsCheckboxLabel.htmlFor = "id";
+    tornStatsCheckboxLabel.htmlFor = "idUseTornStatsSpies";
     tornStatsCheckboxLabel.appendChild(document.createTextNode('Use TornStats spies'));
     tornStatsCheckBoxNode.appendChild(tornStatsCheckboxLabel);
 
@@ -949,7 +984,7 @@ function BuildOptionMenu_TornStats(tabs, menu) {
 
     successValidateTornStatsAPIKey = document.createElement("label");
     successValidateTornStatsAPIKey.innerHTML = 'TornStats API Key verified';
-    successValidateTornStatsAPIKey.style.color = '#1E88E5';
+    successValidateTornStatsAPIKey.style.color = 'green';
     successValidateTornStatsAPIKey.style.visibility = "hidden";
 
     errorValidateTornStatsAPIKey = document.createElement("label");
@@ -1049,6 +1084,10 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
     TabContent_Content.innerHTML = "Script version : " + GM_info.script.version;
     contentDiv.appendChild(TabContent_Content);
 
+    let ForumThread = document.createElement("div");
+    ForumThread.innerHTML = '<a href="https://www.torn.com/forums.php#/p=threads&f=67&t=16290324&b=0&a=0&to=22705010"> Forum thread</a>';
+    contentDiv.appendChild(ForumThread);    
+
     let DiscordLink = document.createElement("div");
     DiscordLink.style.position = "absolute";
 
@@ -1057,7 +1096,7 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
     DiscordLink.appendChild(DiscordText);
 
     let DiscordLinkImg = document.createElement("div");
-    DiscordLinkImg.innerHTML = '<a href="https://discord.gg/zgrVX5j6MQ"><img width="48" height="48" title="Discord" src="https://wiki.soldat.pl/images/6/6f/DiscordLogo.png" /> </a>';
+    DiscordLinkImg.innerHTML = '<a href="https://discord.gg/zgrVX5j6MQ"><img width="64" height="64" title="Discord" src="https://wiki.soldat.pl/images/6/6f/DiscordLogo.png" /> </a>';
     DiscordLinkImg.style.position = "absolute";
 
     DiscordLink.appendChild(DiscordLinkImg);
@@ -1077,7 +1116,7 @@ function BuildSettingsMenu(node) {
 
     var cell,table;
     table = document.createElement('table');
-    table.style.width = "100%";
+    table.style = 'width:100%; border:2px solid ' + mainColor + ';';
 
     let thead = table.createTHead();
     let rowHeader = thead.insertRow();
@@ -1136,7 +1175,9 @@ function InjectOptionMenu(node) {
         }
         else {
             TDup_PredictorOptionsDiv.style.display = "block";
-            FetchUserDataFromBSPServer();
+            if (GetStorageBool(StorageKey.IsBasicAPIKeyValid)) {
+                FetchUserDataFromBSPServer();
+            }
         }
     });
 
@@ -1158,8 +1199,8 @@ function InjectImportSpiesButton(node) {
     btnImportTornStatsSpies.innerHTML = '<div class="TDup_button">BSP Import Spies</div>';
 
     let successImportTornStatsSpiesForFaction = document.createElement("label");
-    successImportTornStatsSpiesForFaction.innerHTML = 'Spies imported updated!';
-    successImportTornStatsSpiesForFaction.style.color = '#1E88E5';
+    successImportTornStatsSpiesForFaction.innerHTML = 'Spies imported!';
+    successImportTornStatsSpiesForFaction.style.color = 'green';
     successImportTornStatsSpiesForFaction.style.visibility = "hidden";
 
     let errorImportTornStatsSpiesForFaction = document.createElement("label");
@@ -1228,7 +1269,6 @@ function InjectInProfilePage(node) {
 function InjectInFactionPage(node) {
     if (!node) return;
 
-    isUsingHonorBar = true;
     el = node.querySelectorAll('a');
     for (i = 0; i < el.length; ++i) {
         var isDone = false;
@@ -1237,6 +1277,16 @@ function InjectInFactionPage(node) {
             //"https://www.torn.com/profiles.php?XID=2139172"
             var myArray = iter.href.split("?XID=");
             if (myArray.length == 2) {
+                let playerId = parseInt(myArray[1]);
+                if (iter.rel == "noopener noreferrer") {
+                    if (!(playerId in dictDivPerPlayer)) {
+                        dictDivPerPlayer[playerId] = new Array();
+                    }
+                    dictDivPerPlayer[playerId].push(iter);
+                    GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
+                    isDone = true;
+                }
+
                 for (var j = 0; j < iter.children.length; ++j) {
                     if (isDone) {
                         break;
@@ -1245,8 +1295,6 @@ function InjectInFactionPage(node) {
                     for (var k = 0; k < children.children.length; ++k) {
 
                         if (children != undefined && children.tagName != undefined && children.tagName == "IMG") {
-                            var playerId = parseInt(myArray[1]);
-
                             if (!(playerId in dictDivPerPlayer)) {
                                 dictDivPerPlayer[playerId] = new Array();
                             }
@@ -1258,8 +1306,6 @@ function InjectInFactionPage(node) {
                         else {
                             var subChildren = children.children[k];
                             if (subChildren != undefined && subChildren.tagName != undefined && subChildren.tagName == "IMG") {
-
-                                var playerId = parseInt(myArray[1]);
                                 if (!(playerId in dictDivPerPlayer)) {
                                     dictDivPerPlayer[playerId] = new Array();
                                 }
@@ -1325,13 +1371,6 @@ function InjectInGenericGridPage(isInit, node) {
         if (myArray.length < 1)
             continue;
 
-        var children = iter.children;
-        for (var k = 0; k < children.length; ++k) {
-            if (children[k] != undefined && children[k].className == "honor-text-wrap") {
-                isUsingHonorBar = true;
-            }
-        }
-
         var parentNode = iter.parentNode;
         var style = window.getComputedStyle(parentNode);
         if (style.display == "none") {
@@ -1383,6 +1422,10 @@ function IsBSPEnabledOnCurrentPage() {
 
     if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
         InjectImportSpiesButton(document.querySelector(".content-title"));
+    }
+
+    if (!IsSubscriptionValid()) {
+        return;
     }
 
     InitColors();
@@ -1453,6 +1496,13 @@ function FetchUserDataFromBSPServer() {
             onload: (response) => {
                 try {
                     let result = JSON.parse(response.responseText);
+                    if (result == undefined) {
+                        subscriptionEndText.innerHTML = '<div style="color:red">WARNING - An error occured while fetching the subscription end date.</div>';
+                        return;
+                    }
+
+                    SetStorage(StorageKey.DateSubscriptionEnd, result.SubscriptionEnd);
+
                     if (result.SubscriptionActive) {
                         var dateNow = new Date();
                         var offsetInMinute = dateNow.getTimezoneOffset();
@@ -1473,7 +1523,7 @@ function FetchUserDataFromBSPServer() {
                     else {
                         CleanPredictionsCache();
                         subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg bsp)</div>';
-                    }
+                    }                   
                 } catch (err) {
                     reject(err);
                 }
@@ -1684,3 +1734,5 @@ function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedEl
 }
 
 // #endregion
+
+
