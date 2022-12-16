@@ -197,6 +197,7 @@ styleToAdd.innerHTML += '.TDup_optionsTabContent a { color:black !important;}';
 
 styleToAdd.innerHTML += '.TDup_optionsTabContent input { margin:0px 10px !important; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent input[type = button] { margin:0px 10px 0px 0px !important; }';
+styleToAdd.innerHTML += '.TDup_optionsTabContent input[type = number] { text-align: right; }';
 
 /*styleToAdd.innerHTML += '.TDup_optionsTabContent div { margin:10px 0px !important; }';*/
 
@@ -481,114 +482,40 @@ async function GetPredictionForPlayer(targetId, callback) {
 
 // #region Callback
 
-function OnProfilePlayerStatsRetrieved(playerId, prediction) {
-    if (prediction == undefined) {
-        return;
-    }
+function GetConsolidatedDataForPlayerStats(prediction) {
+    let objectToReturn = new Object();
+    objectToReturn.IsUsingSpy = prediction.IsSpy === true;
+    objectToReturn.TargetTBS = 0;
+    objectToReturn.Success = SUCCESS;
+    objectToReturn.OldSpyStrongerThanPrediction = false;
+    objectToReturn.Spy = undefined;
 
-    let localBattleStats = GetLocalBattleStats();
-    let localTBS = localBattleStats.TBS;
-
-    if (prediction.IsSpy === true && prediction.total > 0) {
-        var tbsRatio = 100 * prediction.total / localTBS;
-        var colorComparedToUs = GetColorDifference(tbsRatio);
-
-        divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px"><img title="Spy" width="13" height="13" style="position:absolute; margin: 5px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/><img title="Spy" src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' + FormatBattleStats(prediction.total) + ' <label style = "color:' + colorComparedToUs + '"; "> (' + tbsRatio.toFixed(0) + '%) </label></div >';
-        return;
-    }
-
-    switch (prediction.Result) {
-        case MODEL_ERROR:
-        case FAIL:
-            divWhereToInject.innerHTML += '<div style="font-size: 14px; text-align: left; margin-left: 20px;  margin-top:5px;">Error : ' + prediction.Reason + '</div>';
-            return;
-        case TOO_WEAK:
-        case TOO_STRONG:
-        case SUCCESS:
-            {
-                let TBSBalanced = prediction.TBS_Balanced.toLocaleString('en-US');
-                let TBS = prediction.TBS.toLocaleString('en-US');
-                var intTBS = parseInt(TBS.replaceAll(',', ''));
-                var tbs1Ratio = 100 * intTBS / localTBS;
-
-                var intTbsBalanced = parseInt(TBSBalanced.replaceAll(',', ''));
-                var tbsBalancedRatio = 100 * intTbsBalanced / ((localBattleStats.Score * localBattleStats.Score) / 4);
-
-                var colorTBS = GetColorDifference(tbs1Ratio);
-                var colorBalancedTBS = GetColorDifference(tbsBalancedRatio);
-
-                var averageModelTBS = parseInt((intTBS + intTbsBalanced) / 2);
-                var ratioComparedToUs = 100 * averageModelTBS / localTBS;
-                var colorComparedToUs = GetColorDifference(ratioComparedToUs);
-
-                if (divSvgAttackToColor) {
-                    divSvgAttackToColor.style.fill = colorComparedToUs;
-                }
-
-                if (prediction.Result == TOO_STRONG) {
-                    divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too strong to give a proper estimation</div >';
-                } else if (prediction.Result == TOO_WEAK) {
-                    divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">Too weak to give a proper estimation</div >';
-                }
-                else {
-                    divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px"><img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' + FormatBattleStats(averageModelTBS) + ' <label style = "color:' + colorComparedToUs + '"; "> (' + ratioComparedToUs.toFixed(0) + '%) </label></div >';
-                }
-
-                if (GetStorageBool(StorageKey.ShowPredictionDetails) == true) {
-                    divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: left; margin-top:2px; float:left;">TBS(TBS) = ' + intTBS.toLocaleString('en-US') + '<label style="color:' + colorTBS + '";"> (' + tbs1Ratio.toFixed(0) + '%) </label></div>';
-                    divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: right; margin-top:2px;float:right;">TBS(Score) = ' + intTbsBalanced.toLocaleString('en-US') + '<label style="color:' + colorBalancedTBS + '";"> (' + tbsBalancedRatio.toFixed(0) + '%) </label></div>';
-                    if (prediction.fromCache) {
-                        divWhereToInject.innerHTML += '<div style="font-size: 10px; text-align: center;"><img src="https://cdn1.iconfinder.com/data/icons/database-1-1/100/database-20-128.png" title="' + prediction.PredictionDate + '"  width="12" height="12"/></div>';
-                    }
-                }
-            }
-            break;
-    }
-}
-
-function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
-    var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
-
-    let localBattleStats = GetLocalBattleStats();
-    let localTBS = localBattleStats.TBS;
-
-    let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
-
-    let spyMargin = '-6px 23px';
-    if (IsPage(PageType.Chain) && !isShowingHonorBars) {
-        spyMargin = '-1px 23px';
-    }
-    // https://www.torn.com/factions.php?step=your#/war/chain
-    //let topMargin = -6;
-    //if (IsPage(PageType.Search)) {
-
-    //}
-
-    let isError = false;
     let isUsingSpy = prediction.IsSpy === true;
-    let targetTBS = 0;
     if (isUsingSpy) {
-        targetTBS = prediction.total;
+        objectToReturn.TargetTBS = prediction.total;
+        objectToReturn.Spy = prediction;
     }
     else {
+        objectToReturn.Success = prediction.Result;
+
         switch (prediction.Result) {
             case FAIL:
             case MODEL_ERROR:
-                isError = true;
-                break;
+                return objectToReturn;
             case TOO_WEAK:
             case TOO_STRONG:
             case SUCCESS:
                 let intTBS = parseInt(prediction.TBS.toLocaleString('en-US').replaceAll(',', ''));
                 let intTBSBalanced = parseInt(prediction.TBS_Balanced.toLocaleString('en-US').replaceAll(',', ''));
 
-                targetTBS = (intTBS + intTBSBalanced) / 2;
+                objectToReturn.TargetTBS = (intTBS + intTBSBalanced) / 2;
                 if (prediction.Result == TOO_STRONG)
-                    targetTBS = intTBS;
+                    objectToReturn.TargetTBS = intTBS;
 
                 if (prediction.attachedSpy != undefined) {
-                    if (prediction.attachedSpy.total > 0 && prediction.attachedSpy.total > targetTBS) {
-                        targetTBS = prediction.attachedSpy.total;
+                    if (prediction.attachedSpy.total > 0 && prediction.attachedSpy.total > objectToReturn.TargetTBS) {
+                        objectToReturn.TargetTBS = prediction.attachedSpy.total;
+                        objectToReturn.OldSpyStrongerThanPrediction = true;
                     }
                 }
 
@@ -596,21 +523,101 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         }
     }
 
-    let tbsRatio = 100 * targetTBS / localTBS;
-    let colorComparedToUs = GetColorDifference(tbsRatio);
+    return objectToReturn;
+}
 
-    let formattedBattleStats = FormatBattleStats(targetTBS);
-    if (isError == true) {
-        colorComparedToUs = "pink";
-        formattedBattleStats = "N/A";
+function OnProfilePlayerStatsRetrieved(playerId, prediction) {
+    if (prediction == undefined) {
+        return;
     }
 
-    let spyIndicator = isUsingSpy ? '<img width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />' : '';
+    let localBattleStats = GetLocalBattleStats();
+    let localTBS = localBattleStats.TBS;
+    let consolidatedData = GetConsolidatedDataForPlayerStats(prediction);
+
+    let tbsRatio = 100 * consolidatedData.TargetTBS / localTBS;
+    let colorComparedToUs = GetColorDifference(tbsRatio);
+
+    let formattedBattleStats = FormatBattleStats(consolidatedData.TargetTBS);
+    if (consolidatedData.Success == FAIL) {
+        colorComparedToUs = "pink";
+        formattedBattleStats = "Wait";
+    } else if (consolidatedData.Success == MODEL_ERROR) {
+        colorComparedToUs = "pink";
+        formattedBattleStats = "Error";
+    }
+
+    let extraIndicator = '';
+    if (consolidatedData.IsUsingSpy) {
+        extraIndicator = '<img title="Data coming from spy" width="13" height="13" style="position:absolute; margin: 5px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/>';
+    }
+    else if (consolidatedData.OldSpyStrongerThanPrediction) {
+        extraIndicator = '<img title="Old spy having greater TBS than prediction, showing old spy data" width="18" height="18" style="position:absolute; margin: 0px -20px; z-index: 102;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png"/>';
+    }
+
+    divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">' + extraIndicator + '<img title="Spy" src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>'+
+        formattedBattleStats + ' <label style = "color:' + colorComparedToUs + '"; "> (' + tbsRatio.toFixed(0) + '%) </label></div >';
+}
+
+function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
+    var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
+    let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
+    let spyMargin = '-6px 23px';
+    let mainMarginWhenDisplayingHonorBars = "-10px -9px";
+
+    if (IsPage(PageType.Chain) && !isShowingHonorBars) {
+        spyMargin = '-1px 23px';
+    }
+    else if (IsPage(PageType.Faction) && isShowingHonorBars) {
+        spyMargin = '-16px 15px';
+    }
+    else if (IsPage(PageType.Search) && isShowingHonorBars) {
+        mainMarginWhenDisplayingHonorBars = '6px -8px';
+    }
+    else if (IsPage(PageType.Company) && isShowingHonorBars) {
+        mainMarginWhenDisplayingHonorBars = '0px';
+    }
+    else if (IsPage(PageType.RecruitCitizens) && isShowingHonorBars) {
+        mainMarginWhenDisplayingHonorBars = '0px';
+    }
+    else if (IsPage(PageType.HallOfFame) && isShowingHonorBars) {
+        mainMarginWhenDisplayingHonorBars = '0px';
+    }
+    else if (IsPage(PageType.Hospital) && isShowingHonorBars) {
+        mainMarginWhenDisplayingHonorBars = '0px 6px';
+    }
+    else if (IsPage(PageType.Bounty)) {
+        isShowingHonorBars = false; // No honor bars in bounty page, ever.
+    }
+
+    let localBattleStats = GetLocalBattleStats();
+    let localTBS = localBattleStats.TBS;
+    let consolidatedData = GetConsolidatedDataForPlayerStats(prediction);
+
+    let tbsRatio = 100 * consolidatedData.TargetTBS / localTBS;
+    let colorComparedToUs = GetColorDifference(tbsRatio);
+
+    let formattedBattleStats = FormatBattleStats(consolidatedData.TargetTBS);
+    if (consolidatedData.Success == FAIL) {
+        colorComparedToUs = "pink";
+        formattedBattleStats = "Wait";
+    } else if (consolidatedData.Success == MODEL_ERROR) {
+        colorComparedToUs = "pink";
+        formattedBattleStats = "Error";
+    }
+
+    let extraIndicator = '';
+    if (consolidatedData.IsUsingSpy) {
+        extraIndicator = '<img title="Data coming from spy" width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />';
+    }
+    else if (consolidatedData.OldSpyStrongerThanPrediction) {
+        extraIndicator = '<img title="Old spy having greater TBS than prediction -> showing old spy data instead" width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png" />';
+    }
 
     if (isShowingHonorBars)
-        toInject = '<a href="' + urlAttack + '" target="_blank">' + spyIndicator + '<div style="position: absolute;z-index: 100;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+        toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars+'"><div class="iconStats" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
     else
-        toInject = '<a href="' + urlAttack + '" target="_blank">' + spyIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+        toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
 
     for (var i = 0; i < dictDivPerPlayer[targetId].length; i++) {
         if (dictDivPerPlayer[targetId][i].innerHTML.startsWith('<a href="https://www.torn.com/loader2.php?sid=getInAttack')) {
@@ -944,7 +951,7 @@ function BuildOptionMenu_Colors(tabs, menu) {
         let divColor = document.createElement("div");
 
         let text = document.createElement("label");
-        text.innerHTML = 'Until %';
+        text.innerHTML = 'Up to';
         divColor.appendChild(text);
 
         let colorThresholdInput = document.createElement("input");
@@ -961,6 +968,10 @@ function BuildOptionMenu_Colors(tabs, menu) {
 
         divColor.appendChild(colorThresholdInput);
         colorItem.inputNumber = colorThresholdInput;
+
+        let textPercent = document.createElement("label");
+        textPercent.innerHTML = '%';
+        divColor.appendChild(textPercent);
 
         let colorPickerInput = document.createElement("input");
         colorPickerInput.type = "color";
