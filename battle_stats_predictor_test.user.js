@@ -13,6 +13,9 @@
 // @match       https://www.torn.com/competition.php*
 // @match       https://www.torn.com/bounties.php*
 // @match       https://www.torn.com/hospitalview.php*
+// @match       https://www.torn.com/imarket.php*
+// @match       https://www.torn.com/forums.php*
+// @match       https://www.torn.com/loader.php*
 // @run-at      document-end
 // @grant       GM.xmlHttpRequest
 // @grant       GM_setValue
@@ -58,7 +61,7 @@ const StorageKey = {
 
     // Display choice
     IsShowingHonorBars: 'tdup.battleStatsPredictor.isShowingHonorBars',
-    BSPColorTheme: 'tdup.battleStatsPredictor.BspColorTheme', //TD TODO
+    BSPColorTheme: 'tdup.battleStatsPredictor.BspColorTheme', //TDTODO
     ColorStatsThreshold: 'tdup.battleStatsPredictor.ColorStatsThreshold_',
 };
 
@@ -91,7 +94,6 @@ function GetLocalBattleStats() {
     }
     return JSON.parse(data);
 }
-
 function SetLocalBattleStats(value) {
     localStorage[StorageKey.PlayerBattleStats] = JSON.stringify(value);
 }
@@ -115,18 +117,13 @@ var TOO_WEAK = 2;
 var TOO_STRONG = 3;
 var MODEL_ERROR = 4;
 
-var errorAPIKeyInvalid;
-var errorImportBattleStats;
-var successImportBattleStats;
 var comparisonBattleStatsText;
 var scoreStrInput;
 var scoreDefInput;
 var scoreSpdInput;
 var scoreDexInput;
-var apiKeyText;
 var subscriptionEndText;
-var dateSubscriptionEndUtc;
-var setBattleStats;
+
 var btnValidateTornStatsAPIKey;
 var successValidateTornStatsAPIKey;
 var errorValidateTornStatsAPIKey;
@@ -231,6 +228,10 @@ const PageType = {
     Search: 'Search',
     Hospital: 'Hospital',
     Chain: 'Chain',
+    Market: 'Market',
+    Forum: 'Forum',
+    ForumThread: 'ForumThread',
+    Attack: 'Attack',
 };
 
 //https://www.torn.com/index.php => profile
@@ -246,6 +247,10 @@ var mapPageTypeAddress = {
     [PageType.Search]: 'https://www.torn.com/page.php',
     [PageType.Hospital]: 'https://www.torn.com/hospitalview.php',
     [PageType.Chain]: 'https://www.torn.com/factions.php?step=your#/war/chain',
+    [PageType.Market]: 'https://www.torn.com/imarket.php',    
+    [PageType.Forum]: 'https://www.torn.com/forums.php',  
+    [PageType.ForumThread]: 'https://www.torn.com/forums.php#/p=threads',    
+    [PageType.Attack]: ' https://www.torn.com/loader.php',
 }
 
 function LogInfo(value) {
@@ -429,7 +434,11 @@ async function GetPredictionForPlayer(targetId, callback) {
     if (targetId == undefined || targetId < 1)  return;
     if (IsNPC(targetId) == true) return;
 
-    let targetSpy = GetSpyFromCache(targetId);
+    let targetSpy = undefined;
+    if (GetStorageBool(StorageKey.IsTornStatsEnabled)) {
+        targetSpy = GetSpyFromCache(targetId);
+    }
+
     if (targetSpy != undefined) {
         let spyDateConsideredTooOld = new Date();
         let daysToUseTornStatsSpy = GetStorage(StorageKey.DaysToUseTornStatsSpy);
@@ -585,6 +594,16 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     }
     else if (IsPage(PageType.Hospital) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px 6px';
+    }
+    else if (IsPage(PageType.Forum)) {
+        spyMargin = '0px 23px';
+        if (isShowingHonorBars) {
+            mainMarginWhenDisplayingHonorBars = '7px 0px';            
+            if (IsPage(PageType.ForumThread)) {
+                spyMargin = '-5px 15px';
+                mainMarginWhenDisplayingHonorBars = '-26px 28px';
+            }
+        }
     }
     else if (IsPage(PageType.Bounty)) {
         isShowingHonorBars = false; // No honor bars in bounty page, ever.
@@ -794,6 +813,19 @@ function BuildOptionMenu_Colors(tabs, menu) {
     errorValidategymStatsAPIKey.style.backgroundColor = 'red';
     errorValidategymStatsAPIKey.style.visibility = "hidden";
 
+    function ReComputeStats() {
+        let localBattleStats = new Object();
+        localBattleStats.Str = parseInt(scoreStrInput.value);
+        localBattleStats.Def = parseInt(scoreDefInput.value);
+        localBattleStats.Spd = parseInt(scoreSpdInput.value);
+        localBattleStats.Dex = parseInt(scoreDexInput.value);
+        localBattleStats.TBS = localBattleStats.Str + localBattleStats.Def + localBattleStats.Spd + localBattleStats.Dex;
+        localBattleStats.Score = parseInt(Math.sqrt(localBattleStats.Str) + Math.sqrt(localBattleStats.Def) + Math.sqrt(localBattleStats.Spd) + Math.sqrt(localBattleStats.Dex));
+
+        SetLocalBattleStats(localBattleStats);
+        comparisonBattleStatsText.innerHTML = "TBS = " + localBattleStats.TBS.toLocaleString('en-US') + " | Battle Score = " + localBattleStats.Score.toLocaleString('en-US');
+    }
+
     function OnPlayerStatsFromTornAPI(success, stats, reason) {
         btnValidategymStatsAPIKey.disabled = false;
         SetStorage(StorageKey.IsBattleStatsAPIKeyValid, success);
@@ -801,22 +833,12 @@ function BuildOptionMenu_Colors(tabs, menu) {
             successValidategymStatsAPIKey.style.visibility = "visible";
             apiRegister.style.display = "none";
 
-            let localBattleStats = new Object();
-            localBattleStats.Str = parseInt(stats.strength);
-            localBattleStats.Def = parseInt(stats.defense);
-            localBattleStats.Spd = parseInt(stats.speed);
-            localBattleStats.Dex = parseInt(stats.dexterity);
-            localBattleStats.TBS = localBattleStats.Str + localBattleStats.Def + localBattleStats.Spd + localBattleStats.Dex;
-            localBattleStats.Score = parseInt(Math.sqrt((localBattleStats.Str) + Math.sqrt(localBattleStats.Def) + Math.sqrt(localBattleStats.Spd) + Math.sqrt(localBattleStats.Dex)));
+            scoreStrInput.value =  parseInt(stats.strength);
+            scoreDefInput.value =  parseInt(stats.defense);
+            scoreSpdInput.value =  parseInt(stats.speed);
+            scoreDexInput.value = parseInt(stats.dexterity);
 
-            SetLocalBattleStats(localBattleStats);
-
-            scoreStrInput.value = localBattleStats.Str;
-            scoreDefInput.value = localBattleStats.Def;
-            scoreSpdInput.value = localBattleStats.Spd;
-            scoreDexInput.value = localBattleStats.Dex;
-
-            comparisonBattleStatsText.innerHTML = "TBS = " + localBattleStats.TBS.toLocaleString('en-US') + " | Battle Score = " + localBattleStats.Score.toLocaleString('en-US');
+            ReComputeStats();
         }
         else {
             apiRegister.style.display = "block";
@@ -844,7 +866,7 @@ function BuildOptionMenu_Colors(tabs, menu) {
 
     let apiRegister = document.createElement("div");
     apiRegister.className = "TDup_optionsTabContentDiv";
-    apiRegister.innerHTML = '<a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BSP_Main&user=basic,personalstats,profile,battlestats" target="_blank"><input type"button" class="TDup_buttonInOptionMenu" value="Generate a key with access to your battlestats"/></a>';
+    apiRegister.innerHTML = '<a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BSP_Main&user=basic,personalstats,profile,battlestats" target="_blank"><input type"button" class="TDup_buttonInOptionMenu" style="width:280px;" value="Generate a key with access to your battlestats"/></a>';
     contentDiv.appendChild(apiRegister);
 
     if (GetStorageBoolWithDefaultValue(StorageKey.IsBattleStatsAPIKeyValid, false) == true) {
@@ -876,6 +898,8 @@ function BuildOptionMenu_Colors(tabs, menu) {
     scoreDexInput.addEventListener('change', () => {
         if (scoreDexInput.value) scoreDexInput.value = parseInt(scoreDexInput.value);
         else scoreDexInput.value = 0;
+
+        ReComputeStats();
     });
     cell = raw.insertCell(1);
     cell.style.textAlign = 'left';
@@ -895,6 +919,8 @@ function BuildOptionMenu_Colors(tabs, menu) {
     scoreSpdInput.addEventListener('change', () => {
         if (scoreSpdInput.value) scoreSpdInput.value = parseInt(scoreSpdInput.value);
         else scoreSpdInput.value = 0;
+
+        ReComputeStats();
     });
     cell = raw.insertCell(1);
     cell.style.textAlign = 'left';
@@ -914,6 +940,8 @@ function BuildOptionMenu_Colors(tabs, menu) {
     scoreDefInput.addEventListener('change', () => {
         if (scoreDefInput.value) scoreDefInput.value = parseInt(scoreDefInput.value);
         else scoreDefInput.value = 0;
+
+        ReComputeStats();
     });
     cell = raw.insertCell(1);
     cell.style.textAlign = 'left';
@@ -933,6 +961,8 @@ function BuildOptionMenu_Colors(tabs, menu) {
     scoreStrInput.addEventListener('change', () => {
         if (scoreStrInput.value) scoreStrInput.value = parseInt(scoreStrInput.value);
         else scoreStrInput.value = 0;
+
+        ReComputeStats();
     });
     cell = raw.insertCell(1);
     cell.style.textAlign = 'left';
@@ -1010,19 +1040,22 @@ function BuildOptionMenu_Pages(tabs, menu) {
 
     // Pages where it's enabled
     let divForCheckbox = document.createElement("div");
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Profile);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Faction);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Bounty);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Search);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Competition);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Company);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.RecruitCitizens);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.HallOfFame);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Hospital);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Profile, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Faction, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Attack, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Bounty, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Search, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Competition, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.HallOfFame, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.RecruitCitizens, false);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Company, false);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Hospital, false);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Market, false);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Forum, false);
     contentDiv.appendChild(divForCheckbox);
 }
 
-function BuildOptionsCheckboxPageWhereItsEnabled(parentDiv, pageType) {
+function BuildOptionsCheckboxPageWhereItsEnabled(parentDiv, pageType, defaultValue) {
 
     let pageCheckBoxNode = document.createElement("div");
     pageCheckBoxNode.className = "TDup_optionsTabContentDivSmall";
@@ -1033,7 +1066,7 @@ function BuildOptionsCheckboxPageWhereItsEnabled(parentDiv, pageType) {
     checkboxPage.value = "value";
     checkboxPage.style.margin = "5px 10px";
     checkboxPage.id = "id_" + pageType;
-    checkboxPage.checked = GetStorageBoolWithDefaultValue(StorageKey.IsBSPEnabledOnPage + pageType, true);
+    checkboxPage.checked = GetStorageBoolWithDefaultValue(StorageKey.IsBSPEnabledOnPage + pageType, defaultValue);
 
     checkboxPage.addEventListener("change", () => {
         let isBSPEnabledForThisPage = checkboxPage.checked;
@@ -1189,7 +1222,7 @@ function BuildOptionMenu_Debug(tabs, menu) {
     checkboxPredictionDetailsLabel.appendChild(document.createTextNode('Show prediction details'));
     PredictionDetailsBoxNode.appendChild(checkboxPredictionDetailsLabel);
     PredictionDetailsBoxNode.appendChild(checkboxPredictionDetails);
-    contentDiv.appendChild(PredictionDetailsBoxNode);
+    //contentDiv.appendChild(PredictionDetailsBoxNode); TDTODO
 
     var divbuttonClearLocalCache = document.createElement("div");
     divbuttonClearLocalCache.className = "TDup_optionsTabContentDiv";
@@ -1322,7 +1355,7 @@ function InjectOptionMenu(node) {
 function InjectImportSpiesButton(node) {
     if (!node) return;
 
-    if (!GetStorageBool(StorageKey.IsTornStatsEnabled)) return;
+    if (!GetStorageBool(StorageKey.IsTornStatsEnabled) || !GetStorageBool(StorageKey.IsTornStatsAPIKeyValid)) return;
 
     mainNode = node;
     var topPageLinksList = node.querySelector("#top-page-links-list");
@@ -1538,13 +1571,12 @@ function InitColors() {
 }
 
 function IsBSPEnabledOnCurrentPage() {
-
     for ([key, val] of Object.entries(PageType)) {
-        if (IsPage(key)) {
-            return GetStorageBoolWithDefaultValue(StorageKey.IsBSPEnabledOnPage + key, true);
+        if (IsPage(val)) {
+            return GetStorageBool(StorageKey.IsBSPEnabledOnPage + val);
         }
     }
-    return true;
+    return false;
 }
 
 (function () {
@@ -1652,11 +1684,11 @@ function FetchUserDataFromBSPServer() {
                         subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Your subscription expires in '
                             + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
                             + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br />You can extend it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg "bsp")</div>';
+                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg "bsp". Process is automated and treated within a minute)</div>';
                     }
                     else {
                         CleanPredictionsCache();
-                        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg bsp)</div>';
+                        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg bsp. Process is automated and treated within a minute)</div>';
                     }
                 } catch (err) {
                     reject(err);
