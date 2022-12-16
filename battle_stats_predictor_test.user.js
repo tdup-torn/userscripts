@@ -32,8 +32,8 @@
 const StorageKey = {
     // Used for identification to the third party (lolmanager, website handling the predictions) + doing Torn API calls on the backend, when target stats are not cached yet. Doesn't require any kind of abilitation.
     // This is the only key sent to the BSP backend.
-    BasicAPIKey: 'tdup.battleStatsPredictor.TornApiKey',
-    IsBasicAPIKeyValid: 'tdup.battleStatsPredictor.IsTornApiKeyValid',
+    PrimaryAPIKey: 'tdup.battleStatsPredictor.PrimaryAPIKey',
+    IsPrimaryAPIKeyValid: 'tdup.battleStatsPredictor.IsPrimaryAPIKeyValid',
 
     // Used only on the client side, to import user battlestats. This is not required but useful to have your stats up to date locally, for accurate color code.
     // You can fill manually your stats, or not fill your stat at all, and don't use the color code system.
@@ -178,8 +178,6 @@ styleToAdd.innerHTML += '.TDup_divBtnBsp {width: initial !important;}';
 styleToAdd.innerHTML += '.TDup_buttonInOptionMenu { background-color: ' + GetColorTheme() + '; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
 styleToAdd.innerHTML += 'font-size: 12px; margin: 5px; max-width: none; outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;}';
 
-
-
 /* Style the tab content */
 
 styleToAdd.innerHTML += '.TDup_optionsTabContentDiv { padding: 10px 10px;}';
@@ -231,7 +229,6 @@ const PageType = {
     Market: 'Market',
     Forum: 'Forum',
     ForumThread: 'ForumThread',
-    Attack: 'Attack',
 };
 
 //https://www.torn.com/index.php => profile
@@ -250,7 +247,6 @@ var mapPageTypeAddress = {
     [PageType.Market]: 'https://www.torn.com/imarket.php',    
     [PageType.Forum]: 'https://www.torn.com/forums.php',  
     [PageType.ForumThread]: 'https://www.torn.com/forums.php#/p=threads',    
-    [PageType.Attack]: ' https://www.torn.com/loader.php',
 }
 
 function LogInfo(value) {
@@ -664,11 +660,16 @@ function OpenOptionsTab(evt, optionsTabName) {
     evt.currentTarget.className += " active";
 }
 
-function BuildOptionMenu(menuArea, contentArea, name, isOpenAtStart = false) {
+function BuildOptionMenu(menuArea, contentArea, name, shouldBeHiddenWhenInactive, isOpenAtStart = false) {
     // Adding the button in the tabs
     let TabEntryBtn = document.createElement("button");
     TabEntryBtn.className = "TDup_tablinks";
-    if (isOpenAtStart) TabEntryBtn.id = "TDup_tablinks_defaultOpen";
+    if (shouldBeHiddenWhenInactive == true)
+        TabEntryBtn.className += " TDup_tablinksShouldBeHiddenWhenInactive";
+
+    if (isOpenAtStart)
+        TabEntryBtn.id = "TDup_tablinks_defaultOpen";
+
     TabEntryBtn.innerHTML = name;
     TabEntryBtn.addEventListener("click", function (evt) {
         OpenOptionsTab(evt, "TDup_optionsTabContent_" + name);
@@ -686,14 +687,14 @@ function BuildOptionMenu(menuArea, contentArea, name, isOpenAtStart = false) {
 }
 
 function BuildOptionMenu_Global(tabs, menu) {
-    let contentDiv = BuildOptionMenu(tabs, menu, "Global", true);
+    let contentDiv = BuildOptionMenu(tabs, menu, "Global", false, true);
 
     // API Key
     let mainAPIKeyLabel = document.createElement("label");
     mainAPIKeyLabel.innerHTML = 'API Key';
 
     let mainAPIKeyInput = document.createElement("input");
-    mainAPIKeyInput.value = GetStorageEmptyIfUndefined(StorageKey.BasicAPIKey);
+    mainAPIKeyInput.value = GetStorageEmptyIfUndefined(StorageKey.PrimaryAPIKey);
 
     btnValidatemainAPIKey = document.createElement("input");
     btnValidatemainAPIKey.type = "button";
@@ -702,13 +703,14 @@ function BuildOptionMenu_Global(tabs, menu) {
 
     function OnTornAPIKeyVerified(success, reason) {
         btnValidatemainAPIKey.disabled = false;
-        SetStorage(StorageKey.IsBasicAPIKeyValid, success);
+        SetStorage(StorageKey.IsPrimaryAPIKeyValid, success);
         if (success === true) {
             successValidatemainAPIKey.style.visibility = "visible";
             apiRegister.style.display = "none";
             FetchUserDataFromBSPServer();
         }
         else {
+            RefreshOptionMenuWithSubscription();
             errorValidatemainAPIKey.style.visibility = "visible";
             apiRegister.style.display = "block";
             errorValidatemainAPIKey.innerHTML = reason;
@@ -720,7 +722,7 @@ function BuildOptionMenu_Global(tabs, menu) {
         errorValidatemainAPIKey.style.visibility = "hidden";
         successValidatemainAPIKey.style.visibility = "hidden";
         btnValidatemainAPIKey.disabled = true;
-        SetStorage(StorageKey.BasicAPIKey, mainAPIKeyInput.value);
+        SetStorage(StorageKey.PrimaryAPIKey, mainAPIKeyInput.value);
         VerifyTornAPIKey(OnTornAPIKeyVerified);
     });
 
@@ -748,36 +750,12 @@ function BuildOptionMenu_Global(tabs, menu) {
     apiRegister.innerHTML = '<a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BSP_Main&user=basic,personalstats,profile" target="_blank"><input type"button" class="TDup_buttonInOptionMenu" value="Generate a basic key"/></a>';
     contentDiv.appendChild(apiRegister);
 
-    // Displaying Honor bars
-    let isShowingHonorBarsNode = document.createElement("div");
-    isShowingHonorBarsNode.className = "TDup_optionsTabContentDiv";
-    let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
-
-    let checkboxIsShowingHonorBars = document.createElement('input');
-    checkboxIsShowingHonorBars.type = "checkbox";
-    checkboxIsShowingHonorBars.name = "name";
-    checkboxIsShowingHonorBars.value = "value";
-    checkboxIsShowingHonorBars.id = "idIsShowingHonorBars";
-    checkboxIsShowingHonorBars.checked = isShowingHonorBars;
-
-    checkboxIsShowingHonorBars.addEventListener("change", () => {
-        let isShowingHonorBarsNew = checkboxIsShowingHonorBars.checked;
-        SetStorage(StorageKey.IsShowingHonorBars, isShowingHonorBarsNew);
-    });
-
-    var isShowingHonorBarsLabel = document.createElement('label')
-    isShowingHonorBarsLabel.htmlFor = "idIsShowingHonorBars";
-    isShowingHonorBarsLabel.appendChild(document.createTextNode('Are you displaying honor bars?'));
-    isShowingHonorBarsNode.appendChild(isShowingHonorBarsLabel);
-    isShowingHonorBarsNode.appendChild(checkboxIsShowingHonorBars);
-    contentDiv.appendChild(isShowingHonorBarsNode);
-
     // Subscription info
     subscriptionEndText = document.createElement("div");
     subscriptionEndText.className = "TDup_optionsTabContentDiv";
     subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Please fill a valid API Key, and press on validate to get your subscription details</div>';
 
-    if (GetStorageBoolWithDefaultValue(StorageKey.IsBasicAPIKeyValid, false) == true) {
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsPrimaryAPIKeyValid, false) == true) {
         apiRegister.style.display = "none";
         subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Fetching subscription infos, please </div>';
     }
@@ -785,7 +763,7 @@ function BuildOptionMenu_Global(tabs, menu) {
 }
 
 function BuildOptionMenu_Colors(tabs, menu) {
-    let contentDiv = BuildOptionMenu(tabs, menu, "Colors");
+    let contentDiv = BuildOptionMenu(tabs, menu, "Colors", true);
 
     let localBattleStats = GetLocalBattleStats();
 
@@ -1000,7 +978,7 @@ function BuildOptionMenu_Colors(tabs, menu) {
         colorItem.inputNumber = colorThresholdInput;
 
         let textPercent = document.createElement("label");
-        textPercent.innerHTML = '%';
+        textPercent.innerHTML = '% of TBS';
         divColor.appendChild(textPercent);
 
         let colorPickerInput = document.createElement("input");
@@ -1018,6 +996,10 @@ function BuildOptionMenu_Colors(tabs, menu) {
         colorSettingsNode.appendChild(divColor);
     }
 
+    let colorExplanations = document.createElement("label");
+    colorExplanations.innerHTML = "Color code used when displaying a Torn player, relative to the TBS you defined above";
+    colorSettingsNode.appendChild(colorExplanations);
+
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
         let colorThresholdstr = GetStorage(StorageKey.ColorStatsThreshold + i);
         if (colorThresholdstr != undefined && colorThresholdstr != "[object Object]") {
@@ -1031,7 +1013,32 @@ function BuildOptionMenu_Colors(tabs, menu) {
 }
 
 function BuildOptionMenu_Pages(tabs, menu) {
-    let contentDiv = BuildOptionMenu(tabs, menu, "Pages");
+    let contentDiv = BuildOptionMenu(tabs, menu, "Pages", true);
+
+    // Displaying Honor bars
+    let isShowingHonorBarsNode = document.createElement("div");
+    isShowingHonorBarsNode.className = "TDup_optionsTabContentDiv";
+    let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
+
+    let checkboxIsShowingHonorBars = document.createElement('input');
+    checkboxIsShowingHonorBars.type = "checkbox";
+    checkboxIsShowingHonorBars.name = "name";
+    checkboxIsShowingHonorBars.value = "value";
+    checkboxIsShowingHonorBars.id = "idIsShowingHonorBars";
+    checkboxIsShowingHonorBars.checked = isShowingHonorBars;
+
+    checkboxIsShowingHonorBars.addEventListener("change", () => {
+        let isShowingHonorBarsNew = checkboxIsShowingHonorBars.checked;
+        SetStorage(StorageKey.IsShowingHonorBars, isShowingHonorBarsNew);
+    });
+
+    var isShowingHonorBarsLabel = document.createElement('label')
+    isShowingHonorBarsLabel.htmlFor = "idIsShowingHonorBars";
+    isShowingHonorBarsLabel.appendChild(document.createTextNode('Are you displaying honor bars?'));
+    isShowingHonorBarsNode.appendChild(isShowingHonorBarsLabel);
+    isShowingHonorBarsNode.appendChild(checkboxIsShowingHonorBars);
+    contentDiv.appendChild(isShowingHonorBarsNode);
+
 
     let textExplanation = document.createElement("div");
     textExplanation.className = "TDup_optionsTabContentDiv";
@@ -1042,7 +1049,6 @@ function BuildOptionMenu_Pages(tabs, menu) {
     let divForCheckbox = document.createElement("div");
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Profile, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Faction, true);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Attack, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Bounty, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Search, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Competition, true);
@@ -1082,7 +1088,7 @@ function BuildOptionsCheckboxPageWhereItsEnabled(parentDiv, pageType, defaultVal
 }
 
 function BuildOptionMenu_TornStats(tabs, menu) {
-    let contentDiv = BuildOptionMenu(tabs, menu, "TornStats");
+    let contentDiv = BuildOptionMenu(tabs, menu, "TornStats", true);
 
     let tornStatsCheckBoxNode = document.createElement("div");
     tornStatsCheckBoxNode.className = "TDup_optionsTabContentDiv";
@@ -1201,7 +1207,7 @@ function BuildOptionMenu_TornStats(tabs, menu) {
 }
 
 function BuildOptionMenu_Debug(tabs, menu) {
-    let contentDiv = BuildOptionMenu(tabs, menu, "Debug");
+    let contentDiv = BuildOptionMenu(tabs, menu, "Debug", false);
 
     // USE SHOW PREDICTION DETAILS
     let PredictionDetailsBoxNode = document.createElement("div");
@@ -1244,7 +1250,7 @@ function BuildOptionMenu_Debug(tabs, menu) {
 }
 
 function BuildOptionMenu_Infos(menuArea, contentArea) {
-    let contentDiv = BuildOptionMenu(menuArea, contentArea, "Infos");
+    let contentDiv = BuildOptionMenu(menuArea, contentArea, "Infos", false);
 
     let TabContent_Content = document.createElement("div");
     TabContent_Content.className = "TDup_optionsTabContentDiv";
@@ -1270,6 +1276,14 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
     DiscordLink.appendChild(DiscordLinkImg);
 
     contentDiv.appendChild(DiscordLink);
+}
+
+function RefreshOptionMenuWithSubscription() {
+    const pagesShouldBeHiddenWhenInactive = document.getElementsByClassName("TDup_tablinksShouldBeHiddenWhenInactive");
+    let isValid = GetStorageBool(StorageKey.IsPrimaryAPIKeyValid) && IsSubscriptionValid();
+    for (let i = 0; i < pagesShouldBeHiddenWhenInactive.length; i++) {
+        pagesShouldBeHiddenWhenInactive[i].style.display = isValid ? "block" : "none";
+    }
 }
 
 function BuildSettingsMenu(node) {
@@ -1316,6 +1330,8 @@ function BuildSettingsMenu(node) {
 
     // Get the element with id="defaultOpen" and click on it
     document.getElementById("TDup_tablinks_defaultOpen").click();
+
+    RefreshOptionMenuWithSubscription();
 }
 
 // #endregion
@@ -1343,7 +1359,7 @@ function InjectOptionMenu(node) {
         }
         else {
             TDup_PredictorOptionsDiv.style.display = "block";
-            if (GetStorageBool(StorageKey.IsBasicAPIKeyValid)) {
+            if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
                 FetchUserDataFromBSPServer();
             }
         }
@@ -1422,7 +1438,7 @@ function InjectInProfilePage(node) {
         }
         divWhereToInject = el[i];
         isInjected = true;
-        if (GetStorageBool(StorageKey.IsBasicAPIKeyValid)) {
+        if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
             GetPredictionForPlayer(ProfileTargetId, OnProfilePlayerStatsRetrieved);
         }
     }
@@ -1655,7 +1671,7 @@ function FetchUserDataFromBSPServer() {
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
-            url: `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.BasicAPIKey)}/${GM_info.script.version}`,
+            url: `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${GM_info.script.version}`,
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -1687,9 +1703,11 @@ function FetchUserDataFromBSPServer() {
                             + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg "bsp". Process is automated and treated within a minute)</div>';
                     }
                     else {
-                        CleanPredictionsCache();
                         subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg bsp. Process is automated and treated within a minute)</div>';
                     }
+
+                    RefreshOptionMenuWithSubscription();
+
                 } catch (err) {
                     reject(err);
                 }
@@ -1705,7 +1723,7 @@ function FetchScoreAndTBS(targetId) {
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
-            url: `http://www.lol-manager.com/api/battlestats/${GetStorage(StorageKey.BasicAPIKey)}/${targetId}/${GM_info.script.version}`,
+            url: `http://www.lol-manager.com/api/battlestats/${GetStorage(StorageKey.PrimaryAPIKey)}/${targetId}/${GM_info.script.version}`,
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -1729,7 +1747,7 @@ function FetchScoreAndTBS(targetId) {
 // #region API Torn
 
 function VerifyTornAPIKey(callback) {
-    var urlToUse = "https://api.torn.com/user/?comment=BSPAuth&key=" + GetStorage(StorageKey.BasicAPIKey);
+    var urlToUse = "https://api.torn.com/user/?comment=BSPAuth&key=" + GetStorage(StorageKey.PrimaryAPIKey);
     GM.xmlHttpRequest({
         method: "GET",
         url: urlToUse,
