@@ -1529,13 +1529,10 @@ function InjectInGenericGridPage(isInit, node) {
 // #region Script OnLoad
 function InitColors() {
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
-        var color = localStorage["tdup.battleStatsPredictor.colorSettings_color_v5_" + i];
-        if (color != undefined) {
-            LOCAL_COLORS[i].color = color;
-        }
-        var maxvalue = localStorage["tdup.battleStatsPredictor.colorSettings_maxValue_v5_" + i];
-        if (maxvalue != undefined) {
-            LOCAL_COLORS[i].maxValue = parseInt(maxvalue);
+        let colorThresholdstr = GetStorage(StorageKey.ColorStatsThreshold + i);
+        if (colorThresholdstr != undefined) {
+            let colorThreshold = JSON.parse(colorThresholdstr);
+            LOCAL_COLORS[i] = colorThreshold;
         }
     }
 }
