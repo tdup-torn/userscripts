@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     6.1
+// @version     6.2
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -16,6 +16,8 @@
 // @match       https://www.torn.com/imarket.php*
 // @match       https://www.torn.com/forums.php*
 // @match       https://www.torn.com/loader.php*
+// @match       https://www.torn.com/blacklist.php*
+// @match       https://www.torn.com/friendlist.php*
 // @run-at      document-end
 // @grant       GM.xmlHttpRequest
 // @grant       GM_setValue
@@ -230,6 +232,8 @@ const PageType = {
     Forum: 'Forum',
     ForumThread: 'ForumThread',
     Abroad: 'Abroad',
+    Enemies: 'Enemies',
+    Friends: 'Friends',
 };
 
 //https://www.torn.com/index.php => profile
@@ -249,6 +253,8 @@ var mapPageTypeAddress = {
     [PageType.Forum]: 'https://www.torn.com/forums.php',
     [PageType.ForumThread]: 'https://www.torn.com/forums.php#/p=threads',
     [PageType.Abroad]: 'https://www.torn.com/index.php?page=people',
+    [PageType.Enemies]: 'https://www.torn.com/blacklist.php',
+    [PageType.Friends]: 'https://www.torn.com/friendlist.php',
 }
 
 function LogInfo(value) {
@@ -586,6 +592,18 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     }
     else if (IsPage(PageType.RecruitCitizens) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px';
+    }
+    else if (IsPage(PageType.Friends)) {
+        spyMargin = '0px 23px';
+        if (isShowingHonorBars) {
+            mainMarginWhenDisplayingHonorBars = '5px 0px';
+        }        
+    }
+    else if (IsPage(PageType.Enemies)) {
+        spyMargin = '0px 23px';
+        if (isShowingHonorBars) {
+            mainMarginWhenDisplayingHonorBars = '5px 0px';
+        }  
     }
     else if (IsPage(PageType.HallOfFame) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px';
@@ -1062,6 +1080,8 @@ function BuildOptionMenu_Pages(tabs, menu) {
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Abroad, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Competition, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.HallOfFame, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Enemies, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Friends, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.RecruitCitizens, false);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Company, false);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Hospital, false);
@@ -1709,10 +1729,10 @@ function FetchUserDataFromBSPServer() {
                         subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Your subscription expires in '
                             + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
                             + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg "bsp". Process is automated and treated within a minute)</div>';
+                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with message "bsp". Process is automated and treated within a minute)</div>';
                     }
                     else {
-                        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with msg bsp. Process is automated and treated within a minute)</div>';
+                        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with message "bsp". Process is automated and treated within a minute)</div>';
                     }
 
                     RefreshOptionMenuWithSubscription();
