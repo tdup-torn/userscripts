@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     6.2
+// @version     6.3
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -18,6 +18,7 @@
 // @match       https://www.torn.com/loader.php*
 // @match       https://www.torn.com/blacklist.php*
 // @match       https://www.torn.com/friendlist.php*
+// @match       https://www.torn.com/pmarket.php*
 // @run-at      document-end
 // @grant       GM.xmlHttpRequest
 // @grant       GM_setValue
@@ -231,9 +232,11 @@ const PageType = {
     Market: 'Market',
     Forum: 'Forum',
     ForumThread: 'ForumThread',
+    ForumSearch: 'ForumSearch',
     Abroad: 'Abroad',
     Enemies: 'Enemies',
     Friends: 'Friends',
+    PointMarket: 'Point Market',
 };
 
 //https://www.torn.com/index.php => profile
@@ -252,9 +255,11 @@ var mapPageTypeAddress = {
     [PageType.Market]: 'https://www.torn.com/imarket.php',
     [PageType.Forum]: 'https://www.torn.com/forums.php',
     [PageType.ForumThread]: 'https://www.torn.com/forums.php#/p=threads',
+    [PageType.ForumSearch]: 'https://www.torn.com/forums.php#/p=search',
     [PageType.Abroad]: 'https://www.torn.com/index.php?page=people',
     [PageType.Enemies]: 'https://www.torn.com/blacklist.php',
     [PageType.Friends]: 'https://www.torn.com/friendlist.php',
+    [PageType.PointMarket]: 'https://www.torn.com/pmarket.php',
 }
 
 function LogInfo(value) {
@@ -608,6 +613,12 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     else if (IsPage(PageType.HallOfFame) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px';
     }
+    else if (IsPage(PageType.PointMarket) && isShowingHonorBars) {
+        mainMarginWhenDisplayingHonorBars = '5px -5px';
+    }
+    else if (IsPage(PageType.Market) && isShowingHonorBars) {
+        mainMarginWhenDisplayingHonorBars = '-27px 55px';
+    }
     else if (IsPage(PageType.Hospital) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px 6px';
     }
@@ -621,7 +632,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         spyMargin = '0px 23px';
         if (isShowingHonorBars) {
             mainMarginWhenDisplayingHonorBars = '7px 0px';
-            if (IsPage(PageType.ForumThread)) {
+            if (IsPage(PageType.ForumThread) || IsPage(PageType.ForumSearch)) {
                 spyMargin = '-5px 15px';
                 mainMarginWhenDisplayingHonorBars = '-26px 28px';
             }
@@ -1086,6 +1097,7 @@ function BuildOptionMenu_Pages(tabs, menu) {
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Company, false);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Hospital, false);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Market, false);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.PointMarket, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Forum, false);
     contentDiv.appendChild(divForCheckbox);
 }
