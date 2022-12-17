@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     6.0
+// @version     6.1
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -229,6 +229,7 @@ const PageType = {
     Market: 'Market',
     Forum: 'Forum',
     ForumThread: 'ForumThread',
+    Abroad: 'Abroad',
 };
 
 //https://www.torn.com/index.php => profile
@@ -247,6 +248,7 @@ var mapPageTypeAddress = {
     [PageType.Market]: 'https://www.torn.com/imarket.php',
     [PageType.Forum]: 'https://www.torn.com/forums.php',
     [PageType.ForumThread]: 'https://www.torn.com/forums.php#/p=threads',
+    [PageType.Abroad]: 'https://www.torn.com/index.php?page=people',
 }
 
 function LogInfo(value) {
@@ -590,6 +592,12 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     }
     else if (IsPage(PageType.Hospital) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px 6px';
+    }
+    else if (IsPage(PageType.Abroad)) {
+        spyMargin = '0px 20px';
+        if (isShowingHonorBars) {
+            mainMarginWhenDisplayingHonorBars = '5px -4px';            
+        }
     }
     else if (IsPage(PageType.Forum)) {
         spyMargin = '0px 23px';
@@ -1051,6 +1059,7 @@ function BuildOptionMenu_Pages(tabs, menu) {
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Faction, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Bounty, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Search, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Abroad, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Competition, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.HallOfFame, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.RecruitCitizens, false);
