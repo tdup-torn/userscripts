@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     6.4
+// @version     6.5
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -1534,7 +1534,7 @@ function InjectOptionMenu(node) {
 function InjectImportSpiesButton(node) {
     if (!node) return;
 
-    if (!GetStorageBool(StorageKey.IsTornStatsEnabled) || !GetStorageBool(StorageKey.IsTornStatsAPIKeyValid)) return;
+    if (!GetStorageBool(StorageKey.IsTornStatsAPIKeyValid)) return;
 
     mainNode = node;
     var topPageLinksList = node.querySelector("#top-page-links-list");
