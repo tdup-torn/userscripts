@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     6.6
+// @version     6.7
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -1636,10 +1636,18 @@ function InjectImportSpiesButton(node) {
     }
 }
 
-function InjectInProfilePage(node) {
-    if (!node) return;
+function InjectInProfilePage(isInit, node) {
+    var el;
+    if (isInit == true) {
+        el = document.querySelectorAll('.empty-block')
+    }
+    else if (node == undefined) {
+        return;
+    }
+    else {
+        el = node.querySelectorAll('.empty-block')
+    }
 
-    var el = node.querySelectorAll('.empty-block')
     for (var i = 0; i < el.length; ++i) {
         if (isInjected) {
             break;
@@ -1652,7 +1660,17 @@ function InjectInProfilePage(node) {
     }
 
     if (!svgAttackDivFound) {
-        var el2 = node.querySelectorAll('.profile-button-attack')
+        var el2;
+        if (isInit == true) {
+            el2 = document.querySelectorAll('.profile-button-attack')
+        }
+        else if (node == undefined) {
+            return;
+        }
+        else {
+            el2 = node.querySelectorAll('.profile-button-attack')
+        }
+
         for (i = 0; i < el2.length; ++i) {
             divSvgAttackToColor = el2[i].children[0];
             svgAttackDivFound = true;
@@ -1829,7 +1847,7 @@ function IsBSPEnabledOnCurrentPage() {
 
     // Inject in already loaded page:
     if (IsPage(PageType.Profile)) {
-        //InjectInProfilePage(node);
+        InjectInProfilePage(true, undefined);
     }
     else if (IsPage(PageType.Faction)) {
         //InjectInFactionPage(node);
@@ -1850,7 +1868,7 @@ function IsBSPEnabledOnCurrentPage() {
             for (const node of mutation.addedNodes) {
                 if (node.querySelector) {
                     if (IsPage(PageType.Profile)) {
-                        InjectInProfilePage(node);
+                        InjectInProfilePage(false, node);
                     }
                     if (IsPage(PageType.Faction)) {
                         InjectInFactionPage(node);
