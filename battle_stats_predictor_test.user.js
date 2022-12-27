@@ -649,7 +649,7 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     let tbsRatioFormatted = parseInt(tbsRatio.toFixed(0));
     tbsRatioFormatted = tbsRatioFormatted.toLocaleString('en-US');
 
-    divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">' + extraIndicator + '<img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' +
+    divWhereToInject.innerHTML = '<div style="font-size: 18px; text-align: center; margin-top:7px">' + extraIndicator + '<img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' +
         formattedBattleStats + ' <label style = "color:' + colorComparedToUs + '"; "> (' + tbsRatioFormatted + '%) </label></div >';
 }
 
@@ -1632,7 +1632,7 @@ function InjectImportSpiesButton(node) {
     }
 }
 
-function InjectInProfilePage(isInit, node) {
+function InjectInProfilePage(isInit = true, node = undefined) {
     console.log("InjectInProfilePage + isInit = " + isInit);
     var el;
     if (isInit == true) {
@@ -1848,6 +1848,7 @@ function IsBSPEnabledOnCurrentPage() {
     if (IsPage(PageType.Profile)) {
         console.log("Inject In Profile Page.. (init=true)");
         InjectInProfilePage(true, undefined);
+        setTimeout(InjectInProfilePage, 3000);
     }
     else if (IsPage(PageType.Faction)) {
         //InjectInFactionPage(node);
@@ -1892,6 +1893,8 @@ function IsBSPEnabledOnCurrentPage() {
     }
 
     observer.observe(document, { attributes: false, childList: true, characterData: false, subtree: true });
+
+
 
 })();
 
