@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     6.7
+// @version     6.8
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -154,11 +154,8 @@ var TDup_PredictorOptionsDiv;
 var TDup_PredictorOptionsMenuArea;
 var TDup_PredictorOptionsContentArea;
 
-var isInjected = false;
 var ProfileTargetId = -1;
 var divWhereToInject;
-var svgAttackDivFound = false;
-var divSvgAttackToColor;
 var dictDivPerPlayer = {};
 
 // #endregion
@@ -641,16 +638,16 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
 
     let extraIndicator = '';
     if (consolidatedData.IsUsingSpy) {
-        extraIndicator = '<img title="Data coming from spy (' + consolidatedData.Spy.Source +')" width="13" height="13" style="position:absolute; margin: 5px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/>';
+        extraIndicator = '<img title="Data coming from spy (' + consolidatedData.Spy.Source + ')" width="13" height="13" style="position:absolute; margin: 5px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/>';
     }
     else if (consolidatedData.OldSpyStrongerThanPrediction) {
-        extraIndicator = '<img title="Old spy (' + consolidatedData.Spy.Source +') having greater TBS than prediction, showing old spy data" width="18" height="18" style="position:absolute; margin: 0px -20px; z-index: 102;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png"/>';
+        extraIndicator = '<img title="Old spy (' + consolidatedData.Spy.Source + ') having greater TBS than prediction, showing old spy data" width="18" height="18" style="position:absolute; margin: 0px -20px; z-index: 102;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png"/>';
     }
 
     let tbsRatioFormatted = parseInt(tbsRatio.toFixed(0));
     tbsRatioFormatted = tbsRatioFormatted.toLocaleString('en-US');
 
-    divWhereToInject.innerHTML += '<div style="font-size: 18px; text-align: center; margin-top:7px">' + extraIndicator + '<img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' +
+    divWhereToInject.innerHTML = '<div style="font-size: 18px; text-align: center; margin-top:7px">' + extraIndicator + '<img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' +
         formattedBattleStats + ' <label style = "color:' + colorComparedToUs + '"; "> (' + tbsRatioFormatted + '%) </label></div >';
 }
 
@@ -667,8 +664,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         if (isShowingHonorBars) {
             spyMargin = '-16px 15px';
         }
-        else if (IsUrlEndsWith('/war/rank'))
-        {
+        else if (IsUrlEndsWith('/war/rank')) {
             spyMargin = '0px 23px';
         }
     }
@@ -685,13 +681,13 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         spyMargin = '0px 23px';
         if (isShowingHonorBars) {
             mainMarginWhenDisplayingHonorBars = '5px 0px';
-        }        
+        }
     }
     else if (IsPage(PageType.Enemies)) {
         spyMargin = '0px 23px';
         if (isShowingHonorBars) {
             mainMarginWhenDisplayingHonorBars = '5px 0px';
-        }  
+        }
     }
     else if (IsPage(PageType.HallOfFame) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px';
@@ -708,7 +704,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     else if (IsPage(PageType.Abroad)) {
         spyMargin = '0px 20px';
         if (isShowingHonorBars) {
-            mainMarginWhenDisplayingHonorBars = '5px -4px';            
+            mainMarginWhenDisplayingHonorBars = '5px -4px';
         }
     }
     else if (IsPage(PageType.Forum)) {
@@ -743,10 +739,10 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
 
     let extraIndicator = '';
     if (consolidatedData.IsUsingSpy) {
-        extraIndicator = '<img title="Data coming from spy (' + consolidatedData.Spy.Source +')" width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />';
+        extraIndicator = '<img title="Data coming from spy (' + consolidatedData.Spy.Source + ')" width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />';
     }
     else if (consolidatedData.OldSpyStrongerThanPrediction) {
-        extraIndicator = '<img title="Old spy (' + consolidatedData.Spy.Source +') having greater TBS than prediction -> showing old spy data instead" width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png" />';
+        extraIndicator = '<img title="Old spy (' + consolidatedData.Spy.Source + ') having greater TBS than prediction -> showing old spy data instead" width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png" />';
     }
 
     let toInject = '';
@@ -955,8 +951,7 @@ function BuildOptionMenu_Colors(tabs, menu) {
     });
 
     // Automatic import stats
-    if (GetStorageBool(StorageKey.IsAutoImportStats) == true)
-    {        
+    if (GetStorageBool(StorageKey.IsAutoImportStats) == true) {
         let dateConsideredTooOld = new Date();
         dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 1);
 
@@ -967,10 +962,9 @@ function BuildOptionMenu_Colors(tabs, menu) {
             lastDateAutoImportStatsDate = new Date(lastDateAutoImportStats);
             doIt = lastDateAutoImportStatsDate < dateConsideredTooOld;
         }
-        if (doIt)
-        {
+        if (doIt) {
             SetStorage(StorageKey.AutoImportStatsLastDate, new Date());
-            GetPlayerStatsFromTornAPI(OnPlayerStatsFromTornAPI);            
+            GetPlayerStatsFromTornAPI(OnPlayerStatsFromTornAPI);
         }
     }
 
@@ -1347,7 +1341,7 @@ function BuildOptionMenu_YATA(tabs, menu) {
 }
 
 function BuildOptionMenu_TornStats(tabs, menu) {
-    let contentDiv = BuildOptionMenu(tabs, menu, "TornStats", true);    
+    let contentDiv = BuildOptionMenu(tabs, menu, "TornStats", true);
 
     // TornStats spies
     let tornStatsNode = document.createElement("div");
@@ -1407,8 +1401,8 @@ function BuildOptionMenu_TornStats(tabs, menu) {
 
     let tornStatsImportTipsDiv = document.createElement("div");
     tornStatsImportTipsDiv.className = "TDup_optionsTabContentDiv";
-    tornStatsImportTipsDiv.innerHTML = 'To import TornStats spies, we need to do it faction by faction (unlike Yata where we can grab all the spies in 1-click) <br />'+
-    'So go on a specific faction, and click on the [BSP IMPORT SPIES] button at the top of the page, or use YATA instead';
+    tornStatsImportTipsDiv.innerHTML = 'To import TornStats spies, we need to do it faction by faction (unlike Yata where we can grab all the spies in 1-click) <br />' +
+        'So go on a specific faction, and click on the [BSP IMPORT SPIES] button at the top of the page, or use YATA instead';
     tornStatsNode.appendChild(tornStatsImportTipsDiv);
 
     contentDiv.appendChild(tornStatsNode);
@@ -1636,7 +1630,7 @@ function InjectImportSpiesButton(node) {
     }
 }
 
-function InjectInProfilePage(isInit, node) {
+function InjectInProfilePage(isInit = true, node = undefined) {
     var el;
     if (isInit == true) {
         el = document.querySelectorAll('.empty-block')
@@ -1649,31 +1643,11 @@ function InjectInProfilePage(isInit, node) {
     }
 
     for (var i = 0; i < el.length; ++i) {
-        if (isInjected) {
-            break;
-        }
+        console.log("InjectInProfilePage-GetPredictionForPlayer + isInit = " + isInit + " i =" + i);
         divWhereToInject = el[i];
-        isInjected = true;
         if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
+            console.log("InjectInProfilePage-GetPredictionForPlayer + isInit = " + isInit);
             GetPredictionForPlayer(ProfileTargetId, OnProfilePlayerStatsRetrieved);
-        }
-    }
-
-    if (!svgAttackDivFound) {
-        var el2;
-        if (isInit == true) {
-            el2 = document.querySelectorAll('.profile-button-attack')
-        }
-        else if (node == undefined) {
-            return;
-        }
-        else {
-            el2 = node.querySelectorAll('.profile-button-attack')
-        }
-
-        for (i = 0; i < el2.length; ++i) {
-            divSvgAttackToColor = el2[i].children[0];
-            svgAttackDivFound = true;
         }
     }
 }
@@ -1827,7 +1801,9 @@ function IsBSPEnabledOnCurrentPage() {
     InitColors();
 
     if (window.location.href.startsWith("https://www.torn.com/profiles.php")) {
+        console.log("Inject Option Menu...");
         InjectOptionMenu(document.querySelector(".content-title"));
+        console.log("Inject Option Menu done.");
     }
 
     if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
@@ -1835,10 +1811,12 @@ function IsBSPEnabledOnCurrentPage() {
     }
 
     if (!IsSubscriptionValid()) {
+        console.log("BSP Subscription invalid");
         return;
     }
 
     if (!IsBSPEnabledOnCurrentPage()) {
+        console.log("BSP disabled on current page");
         return;
     }
 
@@ -1847,7 +1825,9 @@ function IsBSPEnabledOnCurrentPage() {
 
     // Inject in already loaded page:
     if (IsPage(PageType.Profile)) {
+        console.log("Inject In Profile Page.. (init=true)");
         InjectInProfilePage(true, undefined);
+        setTimeout(InjectInProfilePage, 3000);
     }
     else if (IsPage(PageType.Faction)) {
         //InjectInFactionPage(node);
@@ -1893,6 +1873,8 @@ function IsBSPEnabledOnCurrentPage() {
 
     observer.observe(document, { attributes: false, childList: true, characterData: false, subtree: true });
 
+
+
 })();
 
 // #endregion
@@ -1937,10 +1919,10 @@ function FetchUserDataFromBSPServer() {
                         var minutes_difference = parseInt(time_difference / (1000 * 60));
                         minutes_difference %= 60;
 
-                        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Your subscription expires in '
+                        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Thank you for using Battle Stats Predictor (BSP) script!<br /><br />Your subscription expires in '
                             + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
                             + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for' + text +'</div>';
+                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for' + text + '</div>';
                     }
                     else {
                         subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
