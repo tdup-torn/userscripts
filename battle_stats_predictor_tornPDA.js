@@ -2023,34 +2023,39 @@ function VerifyTornAPIKey(callback) {
     LogInfo("Verifying Torn API Key is valid");
     let methodToUse = GetStorageBool(StorageKey.UseTornPDA) == true ? PDA_httpGet : GM.xmlHttpRequest;
     //let versionClient = GetStorageBool(StorageKey.UseTornPDA) == true ? "PDA" : GM_info.script.version;
-    methodToUse({
-        method: "GET",
-        url: urlToUse,
-        onload: (r) => {
-            let j = JSONparse(r.responseText);
-            if (!j) {
-                callback(false, "Couldn't check (unexpected response)");
-                return;
-            }
+    try {
+        methodToUse({
+            method: "GET",
+            url: urlToUse,
+            onload: (r) => {
+                let j = JSONparse(r.responseText);
+                if (!j) {
+                    callback(false, "Couldn't check (unexpected response)");
+                    return;
+                }
 
-            if (j.error && j.error.code > 0) {
-                callback(false, j.error.error);
-                return;
-            }
+                if (j.error && j.error.code > 0) {
+                    callback(false, j.error.error);
+                    return;
+                }
 
-            if (j.status != undefined && !j.status) {
-                callback(false, "unknown issue");
-                return;
-            }
-            else {
-                callback(true);
-                return;
-            }
-        },
-        onabort: () => callback(false, "Couldn't check (aborted)"),
-        onerror: () => callback(false, "Couldn't check (error)"),
-        ontimeout: () => callback(false, "Couldn't check (timeout)")
-    })
+                if (j.status != undefined && !j.status) {
+                    callback(false, "unknown issue");
+                    return;
+                }
+                else {
+                    callback(true);
+                    return;
+                }
+            },
+            onabort: () => callback(false, "Couldn't check (aborted)"),
+            onerror: () => callback(false, "Couldn't check (error)"),
+            ontimeout: () => callback(false, "Couldn't check (timeout)")
+        })
+    }
+    catch (ex) {
+        LogInfo("VerifyTornAPIKey exception: " + ex);
+    }    
 }
 
 function GetPlayerStatsFromTornAPI(callback) {
