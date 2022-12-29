@@ -1480,14 +1480,15 @@ function BuildOptionMenu_Debug(tabs, menu) {
 function BuildOptionMenu_Infos(menuArea, contentArea) {
     let contentDiv = BuildOptionMenu(menuArea, contentArea, "Infos", false);
 
-    if (GM_info != undefined) {
+    LogInfo("BuildOptionMenu_Infos start");
+    if (GetStorageBool(StorageKey.UseTornPDA) == false) {
         let TabContent_Content = document.createElement("div");
         TabContent_Content.className = "TDup_optionsTabContentDiv";
         TabContent_Content.innerHTML = "Script version : " + GM_info.script.version;
         contentDiv.appendChild(TabContent_Content);
     }
 
-
+    LogInfo("BuildOptionMenu_Infos 1");
     let ForumThread = document.createElement("div");
     ForumThread.className = "TDup_optionsTabContentDiv";
     ForumThread.innerHTML = 'Read basic setup, Q&A and R+ the script if you like it on the <a href="https://www.torn.com/forums.php#/p=threads&f=67&t=16290324&b=0&a=0&to=22705010"> Forum thread</a>';
@@ -1505,8 +1506,10 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
     DiscordLinkImg.innerHTML = '<a href="https://discord.gg/zgrVX5j6MQ"><img width="64" height="64" title="Discord" src="https://wiki.soldat.pl/images/6/6f/DiscordLogo.png" /> </a>';
 
     DiscordLink.appendChild(DiscordLinkImg);
+    LogInfo("BuildOptionMenu_Infos 2");
 
     contentDiv.appendChild(DiscordLink);
+    LogInfo("BuildOptionMenu_Infos finished");
 }
 
 function RefreshOptionMenuWithSubscription() {
