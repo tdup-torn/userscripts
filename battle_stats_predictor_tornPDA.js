@@ -2021,10 +2021,33 @@ function FetchScoreAndTBS(targetId) {
 function VerifyTornAPIKey(callback) {
     var urlToUse = "https://api.torn.com/user/?comment=BSPAuth&key=" + GetStorage(StorageKey.PrimaryAPIKey);
     LogInfo("Verifying Torn API Key is valid");
-    let methodToUse = GetStorageBool(StorageKey.UseTornPDA) == true ? PDA_httpGet : GM.xmlHttpRequest;
+    //let methodToUse = GetStorageBool(StorageKey.UseTornPDA) == true ? PDA_httpGet : GM.xmlHttpRequest;
     //let versionClient = GetStorageBool(StorageKey.UseTornPDA) == true ? "PDA" : GM_info.script.version;
-    try {
-        methodToUse({
+
+    if (GetStorageBool(StorageKey.UseTornPDA) == true) {
+        const tornAPIAnswer = await PDA_httpGet(urlToUse);
+        let j = JSONparse(tornAPIAnswer.responseText);
+        if (!j) {
+            callback(false, "Couldn't check (unexpected response)");
+            return;
+        }
+
+        if (j.error && j.error.code > 0) {
+            callback(false, j.error.error);
+            return;
+        }
+
+        if (j.status != undefined && !j.status) {
+            callback(false, "unknown issue");
+            return;
+        }
+        else {
+            callback(true);
+            return;
+        }
+    }
+    else {
+        GM.xmlHttpRequest({
             method: "GET",
             url: urlToUse,
             onload: (r) => {
@@ -2052,9 +2075,6 @@ function VerifyTornAPIKey(callback) {
             onerror: () => callback(false, "Couldn't check (error)"),
             ontimeout: () => callback(false, "Couldn't check (timeout)")
         })
-    }
-    catch (ex) {
-        LogInfo("VerifyTornAPIKey exception: " + ex);
     }    
 }
 
