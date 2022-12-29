@@ -2018,7 +2018,7 @@ function FetchScoreAndTBS(targetId) {
 
 // #region API Torn
 
-function VerifyTornAPIKey(callback) {
+async function VerifyTornAPIKey(callback) {
     var urlToUse = "https://api.torn.com/user/?comment=BSPAuth&key=" + GetStorage(StorageKey.PrimaryAPIKey);
     LogInfo("Verifying Torn API Key is valid");
     //let methodToUse = GetStorageBool(StorageKey.UseTornPDA) == true ? PDA_httpGet : GM.xmlHttpRequest;
