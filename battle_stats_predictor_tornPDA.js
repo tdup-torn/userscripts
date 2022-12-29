@@ -1550,12 +1550,19 @@ function BuildSettingsMenu(node) {
     TDup_PredictorOptionsDiv.appendChild(table);
     node.appendChild(TDup_PredictorOptionsDiv);
 
+    LogInfo("Building Option menu Global");
     BuildOptionMenu_Global(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea, true);
+    LogInfo("Building Option menu Colors");
     BuildOptionMenu_Colors(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
+    LogInfo("Building Option menu Pages");
     BuildOptionMenu_Pages(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
+    LogInfo("Building Option menu YATA");
     BuildOptionMenu_YATA(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
+    LogInfo("Building Option menu TornStats");
     BuildOptionMenu_TornStats(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
+    LogInfo("Building Option menu Debug");
     BuildOptionMenu_Debug(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
+    LogInfo("Building Option menu Infos");
     BuildOptionMenu_Infos(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
 
     TDup_PredictorOptionsDiv.style.display = "none";
@@ -1673,10 +1680,10 @@ function InjectInProfilePage(isInit = true, node = undefined) {
     }
 
     for (var i = 0; i < el.length; ++i) {
-        console.log("InjectInProfilePage-GetPredictionForPlayer + isInit = " + isInit + " i =" + i);
+        LogInfo("InjectInProfilePage-GetPredictionForPlayer + isInit = " + isInit + " i =" + i);
         divWhereToInject = el[i];
         if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
-            console.log("InjectInProfilePage-GetPredictionForPlayer + isInit = " + isInit);
+            LogInfo("InjectInProfilePage-GetPredictionForPlayer + isInit = " + isInit);
             GetPredictionForPlayer(ProfileTargetId, OnProfilePlayerStatsRetrieved);
         }
     }
@@ -1831,31 +1838,32 @@ function IsBSPEnabledOnCurrentPage() {
     InitColors();
 
     if (window.location.href.startsWith("https://www.torn.com/profiles.php")) {
-        console.log("Inject Option Menu...");
+        LogInfo("Inject Option Menu...");
         InjectOptionMenu(document.querySelector(".content-title"));
-        console.log("Inject Option Menu done.");
+        LogInfo("Inject Option Menu done.");
     }
 
     if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
+        LogInfo("Inject Import Spies Menu...");
         InjectImportSpiesButton(document.querySelector(".content-title"));
+        LogInfo("Inject Import Spies Menu done.");
     }
 
     if (!IsSubscriptionValid()) {
-        console.log("BSP Subscription invalid");
+        LogInfo("BSP Subscription invalid");
         return;
     }
 
     if (!IsBSPEnabledOnCurrentPage()) {
-        console.log("BSP disabled on current page");
+        LogInfo("BSP disabled on current page");
         return;
     }
 
     let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
 
-
     // Inject in already loaded page:
     if (IsPage(PageType.Profile)) {
-        console.log("Inject In Profile Page.. (init=true)");
+        LogInfo("Inject In Profile Page.. (init)");
         InjectInProfilePage(true, undefined);
         setTimeout(InjectInProfilePage, 3000);
     }
@@ -1919,110 +1927,57 @@ function FetchUserDataFromBSPServer() {
     }
 
     return new Promise((resolve, reject) => {
-
-        if (GetStorageBool(StorageKey.UseTornPDA) == true) {
-            let pdaVersion = "PDA";
-            PDA_httpGet({
-                method: 'GET',
-                url: `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${pdaVersion}`,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                onload: (response) => {
-                    try {
-                        let result = JSON.parse(response.responseText);
-                        if (result == undefined) {
-                            subscriptionEndText.innerHTML = '<div style="color:red">WARNING - An error occured while fetching the subscription end date.</div>';
-                            return;
-                        }
-
-                        SetStorage(StorageKey.DateSubscriptionEnd, result.SubscriptionEnd);
-
-                        let text = ' 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with message "bsp". Process is automated and treated within a minute. You can send in bulk)';
-
-                        if (result.SubscriptionActive) {
-                            var dateNow = new Date();
-                            var offsetInMinute = dateNow.getTimezoneOffset();
-                            var dateSubscriptionEnd = new Date(result.SubscriptionEnd);
-                            dateSubscriptionEnd.setMinutes(dateSubscriptionEnd.getMinutes() - offsetInMinute);
-                            var time_difference = dateSubscriptionEnd - dateNow;
-                            var days_difference = parseInt(time_difference / (1000 * 60 * 60 * 24));
-                            var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
-                            hours_difference %= 24;
-                            var minutes_difference = parseInt(time_difference / (1000 * 60));
-                            minutes_difference %= 60;
-
-                            subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Thank you for using Battle Stats Predictor (BSP) script!<br /><br />Your subscription expires in '
-                                + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
-                                + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                                + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for' + text + '</div>';
-                        }
-                        else {
-                            subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
-                        }
-
-                        RefreshOptionMenuWithSubscription();
-
-                    } catch (err) {
-                        reject(err);
+        let methodToUse = GetStorageBool(StorageKey.UseTornPDA) == true ? PDA_httpGet : GM.xmlHttpRequest;
+        let versionClient = GetStorageBool(StorageKey.UseTornPDA) == true ? "PDA" : GM_info.script.version;
+        methodToUse({
+            method: 'GET',
+            url: `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${versionClient}`,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            onload: (response) => {
+                try {
+                    let result = JSON.parse(response.responseText);
+                    if (result == undefined) {
+                        subscriptionEndText.innerHTML = '<div style="color:red">WARNING - An error occured while fetching the subscription end date.</div>';
+                        return;
                     }
-                },
-                onerror: (err) => {
+
+                    SetStorage(StorageKey.DateSubscriptionEnd, result.SubscriptionEnd);
+
+                    let text = ' 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with message "bsp". Process is automated and treated within a minute. You can send in bulk)';
+
+                    if (result.SubscriptionActive) {
+                        var dateNow = new Date();
+                        var offsetInMinute = dateNow.getTimezoneOffset();
+                        var dateSubscriptionEnd = new Date(result.SubscriptionEnd);
+                        dateSubscriptionEnd.setMinutes(dateSubscriptionEnd.getMinutes() - offsetInMinute);
+                        var time_difference = dateSubscriptionEnd - dateNow;
+                        var days_difference = parseInt(time_difference / (1000 * 60 * 60 * 24));
+                        var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
+                        hours_difference %= 24;
+                        var minutes_difference = parseInt(time_difference / (1000 * 60));
+                        minutes_difference %= 60;
+
+                        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Thank you for using Battle Stats Predictor (BSP) script!<br /><br />Your subscription expires in '
+                            + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
+                            + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
+                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for' + text + '</div>';
+                    }
+                    else {
+                        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
+                    }
+
+                    RefreshOptionMenuWithSubscription();
+
+                } catch (err) {
                     reject(err);
                 }
-            });
-        }
-        else {
-            GM.xmlHttpRequest({
-                method: 'GET',
-                url: `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${GM_info.script.version}`,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                onload: (response) => {
-                    try {
-                        let result = JSON.parse(response.responseText);
-                        if (result == undefined) {
-                            subscriptionEndText.innerHTML = '<div style="color:red">WARNING - An error occured while fetching the subscription end date.</div>';
-                            return;
-                        }
-
-                        SetStorage(StorageKey.DateSubscriptionEnd, result.SubscriptionEnd);
-
-                        let text = ' 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with message "bsp". Process is automated and treated within a minute. You can send in bulk)';
-
-                        if (result.SubscriptionActive) {
-                            var dateNow = new Date();
-                            var offsetInMinute = dateNow.getTimezoneOffset();
-                            var dateSubscriptionEnd = new Date(result.SubscriptionEnd);
-                            dateSubscriptionEnd.setMinutes(dateSubscriptionEnd.getMinutes() - offsetInMinute);
-                            var time_difference = dateSubscriptionEnd - dateNow;
-                            var days_difference = parseInt(time_difference / (1000 * 60 * 60 * 24));
-                            var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
-                            hours_difference %= 24;
-                            var minutes_difference = parseInt(time_difference / (1000 * 60));
-                            minutes_difference %= 60;
-
-                            subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Thank you for using Battle Stats Predictor (BSP) script!<br /><br />Your subscription expires in '
-                                + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
-                                + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                                + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for' + text + '</div>';
-                        }
-                        else {
-                            subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
-                        }
-
-                        RefreshOptionMenuWithSubscription();
-
-                    } catch (err) {
-                        reject(err);
-                    }
-                },
-                onerror: (err) => {
-                    reject(err);
-                }
-            });
-        }
+            },
+            onerror: (err) => {
+                reject(err);
+            }
+        });
 
     });
 }
@@ -2034,52 +1989,26 @@ function FetchScoreAndTBS(targetId) {
         return;
     }
 
-    if (GetStorageBool(StorageKey.UseTornPDA) == true) {
-        let pdaVersion = "PDA";
-        return new Promise((resolve, reject) => {
-            PDA_httpGet({
-                method: 'GET',
-                url: `http://www.lol-manager.com/api/battlestats/${GetStorage(StorageKey.PrimaryAPIKey)}/${targetId}/${pdaVersion}`,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                onload: (response) => {
-                    try {
-                        resolve(JSON.parse(response.responseText));
-                    } catch (err) {
-                        reject(err);
-                    }
-                },
-                onerror: (err) => {
-                    reject(err);
-                }
-            });
-        });
-    }
-    else {
-        return new Promise((resolve, reject) => {
-            GM.xmlHttpRequest({
-                method: 'GET',
-                url: `http://www.lol-manager.com/api/battlestats/${GetStorage(StorageKey.PrimaryAPIKey)}/${targetId}/${GM_info.script.version}`,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                onload: (response) => {
-                    try {
-                        resolve(JSON.parse(response.responseText));
-                    } catch (err) {
-                        reject(err);
-                    }
-                },
-                onerror: (err) => {
-                    reject(err);
-                }
-            });
-        });
-    }
-
+    let methodToUse = GetStorageBool(StorageKey.UseTornPDA) == true ? PDA_httpGet : GM.xmlHttpRequest;
+    let versionClient = GetStorageBool(StorageKey.UseTornPDA) == true ? "PDA" : GM_info.script.version;
+    methodToUse({
+        method: 'GET',
+        url: `http://www.lol-manager.com/api/battlestats/${GetStorage(StorageKey.PrimaryAPIKey)}/${targetId}/${versionClient}`,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        onload: (response) => {
+            try {
+                resolve(JSON.parse(response.responseText));
+            } catch (err) {
+                reject(err);
+            }
+        },
+        onerror: (err) => {
+            reject(err);
+        }
+    });
 }
-
 
 // #endregion
 
@@ -2087,71 +2016,44 @@ function FetchScoreAndTBS(targetId) {
 
 function VerifyTornAPIKey(callback) {
     var urlToUse = "https://api.torn.com/user/?comment=BSPAuth&key=" + GetStorage(StorageKey.PrimaryAPIKey);
-    if (GetStorageBool(StorageKey.UseTornPDA) == true) {
-        PDA_httpGet({
-            method: "GET",
-            url: urlToUse,
-            onload: (r) => {
-                let j = JSONparse(r.responseText);
-                if (!j) {
-                    callback(false, "Couldn't check (unexpected response)");
-                    return;
-                }
+    LogInfo("Verifying Torn API Key is valid");
+    let methodToUse = GetStorageBool(StorageKey.UseTornPDA) == true ? PDA_httpGet : GM.xmlHttpRequest;
+    //let versionClient = GetStorageBool(StorageKey.UseTornPDA) == true ? "PDA" : GM_info.script.version;
+    methodToUse({
+        method: "GET",
+        url: urlToUse,
+        onload: (r) => {
+            let j = JSONparse(r.responseText);
+            if (!j) {
+                callback(false, "Couldn't check (unexpected response)");
+                return;
+            }
 
-                if (j.error && j.error.code > 0) {
-                    callback(false, j.error.error);
-                    return;
-                }
+            if (j.error && j.error.code > 0) {
+                callback(false, j.error.error);
+                return;
+            }
 
-                if (j.status != undefined && !j.status) {
-                    callback(false, "unknown issue");
-                    return;
-                }
-                else {
-                    callback(true);
-                    return;
-                }
-            },
-            onabort: () => callback(false, "Couldn't check (aborted)"),
-            onerror: () => callback(false, "Couldn't check (error)"),
-            ontimeout: () => callback(false, "Couldn't check (timeout)")
-        })
-    }
-    else {
-        GM.xmlHttpRequest({
-            method: "GET",
-            url: urlToUse,
-            onload: (r) => {
-                let j = JSONparse(r.responseText);
-                if (!j) {
-                    callback(false, "Couldn't check (unexpected response)");
-                    return;
-                }
-
-                if (j.error && j.error.code > 0) {
-                    callback(false, j.error.error);
-                    return;
-                }
-
-                if (j.status != undefined && !j.status) {
-                    callback(false, "unknown issue");
-                    return;
-                }
-                else {
-                    callback(true);
-                    return;
-                }
-            },
-            onabort: () => callback(false, "Couldn't check (aborted)"),
-            onerror: () => callback(false, "Couldn't check (error)"),
-            ontimeout: () => callback(false, "Couldn't check (timeout)")
-        })
-    }
+            if (j.status != undefined && !j.status) {
+                callback(false, "unknown issue");
+                return;
+            }
+            else {
+                callback(true);
+                return;
+            }
+        },
+        onabort: () => callback(false, "Couldn't check (aborted)"),
+        onerror: () => callback(false, "Couldn't check (error)"),
+        ontimeout: () => callback(false, "Couldn't check (timeout)")
+    })
 }
 
 function GetPlayerStatsFromTornAPI(callback) {
     var urlToUse = "https://api.torn.com/user/?selections=battlestats&comment=BSPGetStats&key=" + GetStorage(StorageKey.BattleStatsAPIKey);
-    GM.xmlHttpRequest({
+    LogInfo("Getting Player Stats from Torn API");
+    let methodToUse = GetStorageBool(StorageKey.UseTornPDA) == true ? PDA_httpGet : GM.xmlHttpRequest;
+    methodToUse({
         method: "GET",
         url: urlToUse,
         onload: (r) => {
@@ -2185,7 +2087,8 @@ function GetPlayerStatsFromTornAPI(callback) {
 // #region API TornStats
 function VerifyTornStatsAPIKey(callback) {
     return new Promise((resolve, reject) => {
-        GM.xmlHttpRequest({
+        let methodToUse = GetStorageBool(StorageKey.UseTornPDA) == true ? PDA_httpGet : GM.xmlHttpRequest;
+        methodToUse({
             method: 'GET',
             url: `https://www.tornstats.com/api/v2/${GetStorage(StorageKey.TornStatsAPIKey)}`,
             headers: {
@@ -2218,7 +2121,8 @@ function VerifyTornStatsAPIKey(callback) {
 
 function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedElem) {
     return new Promise((resolve, reject) => {
-        GM.xmlHttpRequest({
+        let methodToUse = GetStorageBool(StorageKey.UseTornPDA) == true ? PDA_httpGet : GM.xmlHttpRequest;
+        methodToUse({
             method: 'GET',
             url: `https://www.tornstats.com/api/v2/${GetStorage(StorageKey.TornStatsAPIKey)}/spy/faction/${factionId}`,
             headers: {
@@ -2283,7 +2187,8 @@ function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedEl
 
 function FetchSpiesFromYata(callback) {
     return new Promise((resolve, reject) => {
-        GM.xmlHttpRequest({
+        let methodToUse = GetStorageBool(StorageKey.UseTornPDA) == true ? PDA_httpGet : GM.xmlHttpRequest;
+        methodToUse({
             method: 'GET',
             url: `https://yata.yt/api/v1/spies/?key=${GetStorage(StorageKey.YataAPIKey)}`,
             headers: {
