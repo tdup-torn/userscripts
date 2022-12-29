@@ -1480,10 +1480,13 @@ function BuildOptionMenu_Debug(tabs, menu) {
 function BuildOptionMenu_Infos(menuArea, contentArea) {
     let contentDiv = BuildOptionMenu(menuArea, contentArea, "Infos", false);
 
-    let TabContent_Content = document.createElement("div");
-    TabContent_Content.className = "TDup_optionsTabContentDiv";
-    TabContent_Content.innerHTML = "Script version : " + GM_info.script.version;
-    contentDiv.appendChild(TabContent_Content);
+    if (GM_info != undefined) {
+        let TabContent_Content = document.createElement("div");
+        TabContent_Content.className = "TDup_optionsTabContentDiv";
+        TabContent_Content.innerHTML = "Script version : " + GM_info.script.version;
+        contentDiv.appendChild(TabContent_Content);
+    }
+
 
     let ForumThread = document.createElement("div");
     ForumThread.className = "TDup_optionsTabContentDiv";
@@ -1918,9 +1921,10 @@ function FetchUserDataFromBSPServer() {
     return new Promise((resolve, reject) => {
 
         if (GetStorageBool(StorageKey.UseTornPDA) == true) {
+            let pdaVersion = "PDA";
             PDA_httpGet({
                 method: 'GET',
-                url: `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${GM_info.script.version}`,
+                url: `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${pdaVersion}`,
                 headers: {
                     'Content-Type': 'application/json'
                 },
@@ -2030,25 +2034,50 @@ function FetchScoreAndTBS(targetId) {
         return;
     }
 
-    return new Promise((resolve, reject) => {
-        GM.xmlHttpRequest({
-            method: 'GET',
-            url: `http://www.lol-manager.com/api/battlestats/${GetStorage(StorageKey.PrimaryAPIKey)}/${targetId}/${GM_info.script.version}`,
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            onload: (response) => {
-                try {
-                    resolve(JSON.parse(response.responseText));
-                } catch (err) {
+    if (GetStorageBool(StorageKey.UseTornPDA) == true) {
+        let pdaVersion = "PDA";
+        return new Promise((resolve, reject) => {
+            PDA_httpGet({
+                method: 'GET',
+                url: `http://www.lol-manager.com/api/battlestats/${GetStorage(StorageKey.PrimaryAPIKey)}/${targetId}/${pdaVersion}`,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                onload: (response) => {
+                    try {
+                        resolve(JSON.parse(response.responseText));
+                    } catch (err) {
+                        reject(err);
+                    }
+                },
+                onerror: (err) => {
                     reject(err);
                 }
-            },
-            onerror: (err) => {
-                reject(err);
-            }
+            });
         });
-    });
+    }
+    else {
+        return new Promise((resolve, reject) => {
+            GM.xmlHttpRequest({
+                method: 'GET',
+                url: `http://www.lol-manager.com/api/battlestats/${GetStorage(StorageKey.PrimaryAPIKey)}/${targetId}/${GM_info.script.version}`,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                onload: (response) => {
+                    try {
+                        resolve(JSON.parse(response.responseText));
+                    } catch (err) {
+                        reject(err);
+                    }
+                },
+                onerror: (err) => {
+                    reject(err);
+                }
+            });
+        });
+    }
+
 }
 
 
