@@ -822,6 +822,7 @@ function BuildOptionMenu_Global(tabs, menu) {
     btnValidatemainAPIKey.className = "TDup_buttonInOptionMenu";
 
     function OnTornAPIKeyVerified(success, reason) {
+        LogInfo("OnTornAPIKeyVerified success = " + success + " reason : " + reason);
         btnValidatemainAPIKey.disabled = false;
         SetStorage(StorageKey.IsPrimaryAPIKeyValid, success);
         if (success === true) {
