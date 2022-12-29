@@ -2026,8 +2026,12 @@ async function VerifyTornAPIKey(callback) {
 
     if (GetStorageBool(StorageKey.UseTornPDA) == true) {
         LogInfo("PDA_httpGet calling");
-        const tornAPIAnswer = PDA_httpGet(urlToUse);
+        let tornAPIAnswer = PDA_httpGet(urlToUse);
         LogInfo("PDA_httpGet called");
+        LogInfo(tornAPIAnswer.responseHeaders);
+        LogInfo(tornAPIAnswer.responseText);
+        LogInfo(tornAPIAnswer.status);
+        LogInfo(tornAPIAnswer.statusText);
         let j = JSONparse(tornAPIAnswer.responseText);
         if (!j) {
             callback(false, "Couldn't check (unexpected response)");
