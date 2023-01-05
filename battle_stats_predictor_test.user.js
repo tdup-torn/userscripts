@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     6.8
+// @version     6.9
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -156,8 +156,6 @@ var TDup_PredictorOptionsContentArea;
 
 var ProfileTargetId = -1;
 var divWhereToInject;
-var svgAttackDivFound = false;
-var divSvgAttackToColor;
 var dictDivPerPlayer = {};
 
 // #endregion
@@ -469,12 +467,15 @@ function GetMostRecentSpyFromCache(playerId) {
 
     if (tornStatsSpy == undefined) {
         yataSpy.Source = "YATA";
+        yataSpy.total = yataSpy.total;
         yataSpy.timestamp = yataSpy.total_timestamp;
+        yataSpy.Score = parseInt(Math.sqrt(yataSpy.strength) + Math.sqrt(yataSpy.defense) + Math.sqrt(yataSpy.speed) + Math.sqrt(yataSpy.dexterity));
         return yataSpy;
     }
 
     if (yataSpy == undefined) {
         tornStatsSpy.Source = "TornStats";
+        tornStatsSpy.Score = parseInt(Math.sqrt(tornStatsSpy.strength) + Math.sqrt(tornStatsSpy.defense) + Math.sqrt(tornStatsSpy.speed) + Math.sqrt(tornStatsSpy.dexterity));
         return tornStatsSpy;
     }
 
@@ -485,11 +486,13 @@ function GetMostRecentSpyFromCache(playerId) {
         objectToReturn.IsSpy = true;
         objectToReturn.total = yataSpy.total;
         objectToReturn.timestamp = yataTimeStamp;
+        objectToReturn.Score = parseInt(Math.sqrt(yataSpy.strength) + Math.sqrt(yataSpy.defense) + Math.sqrt(yataSpy.speed) + Math.sqrt(yataSpy.dexterity));
         objectToReturn.Source = "YATA";
         return objectToReturn;
     }
 
     tornStatsSpy.Source = "TornStats";
+    tornStatsSpy.Score = parseInt(Math.sqrt(tornStatsSpy.strength) + Math.sqrt(tornStatsSpy.defense) + Math.sqrt(tornStatsSpy.speed) + Math.sqrt(tornStatsSpy.dexterity));
     return tornStatsSpy;
 
 }
@@ -574,6 +577,7 @@ function GetConsolidatedDataForPlayerStats(prediction) {
     let objectToReturn = new Object();
     objectToReturn.IsUsingSpy = prediction.IsSpy === true;
     objectToReturn.TargetTBS = 0;
+    objectToReturn.Score = 0;
     objectToReturn.Success = SUCCESS;
     objectToReturn.OldSpyStrongerThanPrediction = false;
     objectToReturn.Spy = undefined;
@@ -581,6 +585,7 @@ function GetConsolidatedDataForPlayerStats(prediction) {
     let isUsingSpy = prediction.IsSpy === true;
     if (isUsingSpy) {
         objectToReturn.TargetTBS = prediction.total;
+        objectToReturn.Score = prediction.Score;
         objectToReturn.Spy = prediction;
     }
     else {
@@ -600,6 +605,11 @@ function GetConsolidatedDataForPlayerStats(prediction) {
                     objectToReturn.TargetTBS = (intTBS + intTBSBalanced) / 2;
                     if (prediction.Result == TOO_STRONG)
                         objectToReturn.TargetTBS = intTBS;
+
+                    //let a = intTBSBalanced / 4;
+                    //let scoreSqrd = 16 * a;
+                    //let score = Math.sqrt(scoreSqrd);
+                    //objectToReturn.Score = parseInt(score);
 
                     if (prediction.attachedSpy != undefined) {
                         if (prediction.attachedSpy.total > 0 && prediction.attachedSpy.total > objectToReturn.TargetTBS) {
@@ -639,8 +649,13 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     }
 
     let extraIndicator = '';
+    let FFToDisplay = '';
     if (consolidatedData.IsUsingSpy) {
         extraIndicator = '<img title="Data coming from spy (' + consolidatedData.Spy.Source + ')" width="13" height="13" style="position:absolute; margin: 5px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/>';
+        let FFPredicted = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
+        FFPredicted = Math.max(1, FFPredicted);
+        FFPredicted = FFPredicted.toFixed(2);
+        FFToDisplay = "FF: " + FFPredicted;
     }
     else if (consolidatedData.OldSpyStrongerThanPrediction) {
         extraIndicator = '<img title="Old spy (' + consolidatedData.Spy.Source + ') having greater TBS than prediction, showing old spy data" width="18" height="18" style="position:absolute; margin: 0px -20px; z-index: 102;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png"/>';
@@ -650,7 +665,7 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     tbsRatioFormatted = tbsRatioFormatted.toLocaleString('en-US');
 
     divWhereToInject.innerHTML = '<div style="font-size: 18px; text-align: center; margin-top:7px">' + extraIndicator + '<img src="https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png" width="18" height="18" style="margin-right:5px;"/>' +
-        formattedBattleStats + ' <label style = "color:' + colorComparedToUs + '"; "> (' + tbsRatioFormatted + '%) </label></div >';
+        formattedBattleStats + ' <label style = "color:' + colorComparedToUs + '"; "> (' + tbsRatioFormatted + '%) ' + FFToDisplay + ' </label></div >';
 }
 
 function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
@@ -741,7 +756,11 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
 
     let extraIndicator = '';
     if (consolidatedData.IsUsingSpy) {
-        extraIndicator = '<img title="Data coming from spy (' + consolidatedData.Spy.Source + ')" width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />';
+        let FFPredicted = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
+        FFPredicted = Math.max(1, FFPredicted);
+        FFPredicted = FFPredicted.toFixed(2);
+
+        extraIndicator = '<img title="Data coming from spy (' + consolidatedData.Spy.Source + ') FF : ' + FFPredicted + ' " width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />';
     }
     else if (consolidatedData.OldSpyStrongerThanPrediction) {
         extraIndicator = '<img title="Old spy (' + consolidatedData.Spy.Source + ') having greater TBS than prediction -> showing old spy data instead" width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png" />';
@@ -1633,7 +1652,6 @@ function InjectImportSpiesButton(node) {
 }
 
 function InjectInProfilePage(isInit = true, node = undefined) {
-    console.log("InjectInProfilePage + isInit = " + isInit);
     var el;
     if (isInit == true) {
         el = document.querySelectorAll('.empty-block')
@@ -1651,24 +1669,6 @@ function InjectInProfilePage(isInit = true, node = undefined) {
         if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
             console.log("InjectInProfilePage-GetPredictionForPlayer + isInit = " + isInit);
             GetPredictionForPlayer(ProfileTargetId, OnProfilePlayerStatsRetrieved);
-        }
-    }
-
-    if (!svgAttackDivFound) {
-        var el2;
-        if (isInit == true) {
-            el2 = document.querySelectorAll('.profile-button-attack')
-        }
-        else if (node == undefined) {
-            return;
-        }
-        else {
-            el2 = node.querySelectorAll('.profile-button-attack')
-        }
-
-        for (i = 0; i < el2.length; ++i) {
-            divSvgAttackToColor = el2[i].children[0];
-            svgAttackDivFound = true;
         }
     }
 }
