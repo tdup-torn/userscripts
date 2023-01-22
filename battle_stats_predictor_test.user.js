@@ -1277,7 +1277,7 @@ function BuildOptionMenu_Colors(tabs, menu) {
     comparisonDex.innerHTML = '<div style="text-align: right; margin-right:10px;">Dex&nbsp</div>';
     raw = table.insertRow(0);
     cell = raw.insertCell(0);
-    cell.width = '10%';
+    cell.width = '50%';
     cell.appendChild(comparisonDex);
 
     scoreDexInput = document.createElement("input");
