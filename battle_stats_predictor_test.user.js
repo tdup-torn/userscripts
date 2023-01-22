@@ -662,7 +662,6 @@ function ExportPredictorStorage() {
 }
 
 function ClearOutdatedPredictionInCache() {
-    localStorage.removeItem(StorageKey.AutoClearOutdatedCacheLastDate);
     let lastDateAutoClearOutdatedCache = GetStorage(StorageKey.AutoClearOutdatedCacheLastDate);
     if (lastDateAutoClearOutdatedCache != undefined) {
         let dateConsideredTooOld = new Date();
