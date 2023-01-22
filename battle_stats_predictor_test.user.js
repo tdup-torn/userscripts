@@ -1439,7 +1439,7 @@ function AddColorPanel(isBSScoreMode, colorSettingsNode, colorItem, id) {
     let colorThresholdInput = document.createElement("input");
     colorThresholdInput.type = 'number';
     colorThresholdInput.value = isBSScoreMode ? parseInt(colorItem.maxValueScore) : parseInt(colorItem.maxValue);
-    colorThresholdInput.style.width = '50px';
+    colorThresholdInput.style.width = '40px';
     colorThresholdInput.disabled = !colorItem.canModify;
 
     colorThresholdInput.addEventListener("change", () => {
