@@ -690,7 +690,7 @@ function ClearOutdatedPredictionInCache() {
                 expirationDate.setDate(expirationDate.getDate() - 2);
                 var predictionDate = new Date(prediction.PredictionDate);
                 if (predictionDate < expirationDate) {
-
+                    localStorage.removeItem(key);
                     numberOfPredictionCleared++;
                 }
             }
