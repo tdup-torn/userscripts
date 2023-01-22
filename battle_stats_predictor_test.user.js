@@ -1430,6 +1430,7 @@ function BuildCustomizeColorThresholdPanel(isBSScoreMode) {
 
 function AddColorPanel(isBSScoreMode, colorSettingsNode, colorItem, id) {
     let divColor = document.createElement("div");
+    divColor.className = "TDup_optionsTabContentDiv";
 
     let text = document.createElement("label");
     text.innerHTML = 'Up to';
@@ -1438,7 +1439,7 @@ function AddColorPanel(isBSScoreMode, colorSettingsNode, colorItem, id) {
     let colorThresholdInput = document.createElement("input");
     colorThresholdInput.type = 'number';
     colorThresholdInput.value = isBSScoreMode ? parseInt(colorItem.maxValueScore) : parseInt(colorItem.maxValue);
-    colorThresholdInput.style.width = '70px';
+    colorThresholdInput.style.width = '50px';
     colorThresholdInput.disabled = !colorItem.canModify;
 
     colorThresholdInput.addEventListener("change", () => {
