@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     7.0
+// @version     7.1
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -348,7 +348,7 @@ function IsUrlEndsWith(value) {
 
 function GetColorMaxValueDifference(ratio) {
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
-        if (ratio < LOCAL_COLORS[i].maxValueScore) {
+        if (ratio < LOCAL_COLORS[i].maxValue) {
             return LOCAL_COLORS[i].color;
         }
     }
@@ -357,7 +357,7 @@ function GetColorMaxValueDifference(ratio) {
 
 function GetColorScoreDifference(ratio) {
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
-        if (ratio < LOCAL_COLORS[i].maxValue) {
+        if (ratio < LOCAL_COLORS[i].maxValueScore) {
             return LOCAL_COLORS[i].color;
         }
     }
@@ -868,7 +868,7 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         formattedBattleStats = FormatBattleStats(consolidatedData.Score);
 
         let ScoreRatio = 100 * consolidatedData.Score / localBattleStats.Score;
-        colorComparedToUs = GetColorMaxValueDifference(ScoreRatio);
+        colorComparedToUs = GetColorScoreDifference(ScoreRatio);
 
         ratioFormatted = parseInt(ScoreRatio.toFixed(0));
         ratioFormatted = ratioFormatted.toLocaleString('en-US');
@@ -979,7 +979,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     let showScoreInstead = GetStorageBool(StorageKey.IsShowingBattleStatsScore);
     if (showScoreInstead == true) {
         let scoreRatio = 100 * consolidatedData.Score / localBattleStats.Score;
-        colorComparedToUs = GetColorMaxValueDifference(scoreRatio);
+        colorComparedToUs = GetColorScoreDifference(scoreRatio);
         formattedBattleStats = FormatBattleStats(consolidatedData.Score);
         FFPredicted = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
         FFPredicted = FFPredicted.toFixed(2);
