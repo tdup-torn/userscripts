@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     7.1
+// @version     7.2
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -20,6 +20,7 @@
 // @match       https://www.torn.com/friendlist.php*
 // @match       https://www.torn.com/pmarket.php*
 // @match       https://www.torn.com/properties.php*
+// @match       https://www.torn.com/war.php*
 // @run-at      document-end
 // @grant       GM.xmlHttpRequest
 // @grant       GM_setValue
@@ -81,6 +82,7 @@ const StorageKey = {
     BSPColorTheme: 'tdup.battleStatsPredictor.BspColorTheme', //TDTODO : allow users to tweak this
     ColorStatsThreshold: 'tdup.battleStatsPredictor.ColorStatsThreshold_',
     IsShowingBattleStatsScore: 'tdup.battleStatsPredictor.IsShowingBattleStatsScore',
+    IsShowingBattleStatsPercentage: 'tdup.battleStatsPredictor.IsShowingBattleStatsPercentage',
 
     // Cache management
     AutoClearOutdatedCacheLastDate: 'tdup.battleStatsPredictor.AutoClearOutdatedCacheLastDate',
@@ -269,6 +271,7 @@ const PageType = {
     Friends: 'Friends',
     PointMarket: 'Point Market',
     Properties: 'Properties',
+    War: 'War',
 };
 
 var mapPageTypeAddress = {
@@ -292,11 +295,12 @@ var mapPageTypeAddress = {
     [PageType.Friends]: 'https://www.torn.com/friendlist.php',
     [PageType.PointMarket]: 'https://www.torn.com/pmarket.php',
     [PageType.Properties]: 'https://www.torn.com/properties.php',
+    [PageType.War]: 'https://www.torn.com/war.php',
 }
 
 function LogInfo(value) {
-    var now = new Date();
-    console.log(now.toISOString() + ": " + value);
+    //var now = new Date();
+    //console.log(now.toISOString() + ": " + value);
 }
 
 function JSONparse(str) {
@@ -855,7 +859,8 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     let ratioFormatted = parseInt(tbsRatio.toFixed(0));
     ratioFormatted = ratioFormatted.toLocaleString('en-US');
 
-    let iconToUse = "https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png";
+    //let iconToUse = "https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png";
+    let iconToUse = "https://i.postimg.cc/G26PdvYL/weight-lifting-up.png";
     let formattedBattleStats = FormatBattleStats(consolidatedData.TargetTBS);
     if (consolidatedData.Success == FAIL) {
         colorComparedToUs = "pink";
@@ -873,7 +878,8 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         ratioFormatted = parseInt(ScoreRatio.toFixed(0));
         ratioFormatted = ratioFormatted.toLocaleString('en-US');
 
-        iconToUse = "https://game-icons.net/icons/000000/transparent/1x1/lorc/sword-clash.png";
+        iconToUse = "https://i.postimg.cc/P5KmNgZF/sword-clash.png";
+        //iconToUse = "https://game-icons.net/icons/000000/transparent/1x1/lorc/sword-clash.png";
     }
 
     let extraIndicator = '';
@@ -961,12 +967,16 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     }
     else if (IsPage(PageType.Bounty)) {
         isShowingHonorBars = false; // No honor bars in bounty page, ever.
+        spyMargin = '1px 24px';
     }
     else if (IsPage(PageType.Properties)) {
         mainMarginWhenDisplayingHonorBars = '0px';
         if (isShowingHonorBars) {
             spyMargin = '-6px 15px';
         }
+    }
+    else if (IsPage(PageType.War)) {
+        spyMargin = isShowingHonorBars ? '-16px 15px' : '-4px 24px';
     }
 
     let consolidatedData = GetConsolidatedDataForPlayerStats(prediction);
@@ -980,14 +990,28 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     if (showScoreInstead == true) {
         let scoreRatio = 100 * consolidatedData.Score / localBattleStats.Score;
         colorComparedToUs = GetColorScoreDifference(scoreRatio);
-        formattedBattleStats = FormatBattleStats(consolidatedData.Score);
+        if (GetStorageBool(StorageKey.IsShowingBattleStatsPercentage)) {
+            let ratioToDisplay = Math.min(999, scoreRatio);
+            formattedBattleStats = ratioToDisplay.toFixed(0) + "%";
+        }
+        else {
+            formattedBattleStats = FormatBattleStats(consolidatedData.Score);
+        }
+
         FFPredicted = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
         FFPredicted = FFPredicted.toFixed(2);
     }
     else {
         let tbsRatio = 100 * consolidatedData.TargetTBS / localBattleStats.TBS;
         colorComparedToUs = GetColorMaxValueDifference(tbsRatio);
-        formattedBattleStats = FormatBattleStats(consolidatedData.TargetTBS);
+
+        if (GetStorageBool(StorageKey.IsShowingBattleStatsPercentage)) {
+            let ratioToDisplay = Math.min(999, tbsRatio);
+            formattedBattleStats = ratioToDisplay.toFixed(0) + "%";
+        }
+        else {
+            formattedBattleStats = FormatBattleStats(consolidatedData.TargetTBS);
+        }
     }
 
     if (consolidatedData.Success == FAIL) {
@@ -1376,6 +1400,30 @@ function BuildOptionMenu_Colors(tabs, menu) {
     let colorSettingsNode = document.createElement("div");
     colorSettingsNode.className = "TDup_optionsTabContentDiv";
 
+    // Show Percentage instead
+    let isShowingBattleStatsPercentageDiv = document.createElement("div");
+    isShowingBattleStatsPercentageDiv.className = "TDup_optionsTabContentDiv";
+    let isShowingBattleStatsPercentage = GetStorageBoolWithDefaultValue(StorageKey.IsShowingBattleStatsPercentage, false);
+
+    let checkboxisShowingBattleStatsPercentage = document.createElement('input');
+    checkboxisShowingBattleStatsPercentage.type = "checkbox";
+    checkboxisShowingBattleStatsPercentage.name = "name";
+    checkboxisShowingBattleStatsPercentage.value = "value";
+    checkboxisShowingBattleStatsPercentage.id = "idIsShowingBattleStatsPercentage";
+    checkboxisShowingBattleStatsPercentage.checked = isShowingBattleStatsPercentage;
+
+    checkboxisShowingBattleStatsPercentage.addEventListener("change", () => {
+        let isShowingBattleStatsPercentage = checkboxisShowingBattleStatsPercentage.checked;
+        SetStorage(StorageKey.IsShowingBattleStatsPercentage, isShowingBattleStatsPercentage);
+    });
+
+    var isShowingBattleStatsPercentageLabel = document.createElement('label')
+    isShowingBattleStatsPercentageLabel.htmlFor = "idIsShowingBattleStatsPercentage";
+    isShowingBattleStatsPercentageLabel.innerHTML = 'Display percentage rather than values in grid format';
+    isShowingBattleStatsPercentageDiv.appendChild(isShowingBattleStatsPercentageLabel);
+    isShowingBattleStatsPercentageDiv.appendChild(checkboxisShowingBattleStatsPercentage);
+    contentDiv.appendChild(isShowingBattleStatsPercentageDiv);
+
     // Show Score instead
     let isShowingBattleStatsScoreDiv = document.createElement("div");
     isShowingBattleStatsScoreDiv.className = "TDup_optionsTabContentDiv";
@@ -1396,7 +1444,7 @@ function BuildOptionMenu_Colors(tabs, menu) {
 
     var isShowingBattleStatsScoreLabel = document.createElement('label')
     isShowingBattleStatsScoreLabel.htmlFor = "idIsShowingBattleScore";
-    isShowingBattleStatsScoreLabel.innerHTML = '[Beta] Use <a href="https://wiki.torn.com/wiki/Chain#Fair_fights" target="_blank">Battle Stat Score</a> rather than TBS (Total Battle Stats)';
+    isShowingBattleStatsScoreLabel.innerHTML = 'Use <a href="https://wiki.torn.com/wiki/Chain#Fair_fights" target="_blank">Battle Stat Score</a> rather than TBS (Total Battle Stats)';
     isShowingBattleStatsScoreDiv.appendChild(isShowingBattleStatsScoreLabel);
     isShowingBattleStatsScoreDiv.appendChild(checkboxisShowingBattleStatsScore);
     contentDiv.appendChild(isShowingBattleStatsScoreDiv);
@@ -1569,6 +1617,7 @@ function BuildOptionMenu_Pages(tabs, menu) {
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Hospital, false);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.PointMarket, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Properties, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.War, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Market, false, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Forum, false, true);
     contentDiv.appendChild(divForCheckbox);
@@ -1730,8 +1779,7 @@ function BuildOptionMenu_TornStats(tabs, menu) {
 
     let tornStatsImportTipsDiv = document.createElement("div");
     tornStatsImportTipsDiv.className = "TDup_optionsTabContentDiv";
-    tornStatsImportTipsDiv.innerHTML = 'To import TornStats spies, we need to do it faction by faction (unlike Yata where we can grab all the spies in 1-click) <br />' +
-        'So go on a specific faction, and click on the [BSP IMPORT SPIES] button at the top of the page, or use YATA instead';
+    tornStatsImportTipsDiv.innerHTML = 'To import TornStats spies, go on a specific faction page, and click on the [BSP IMPORT SPIES] button at the top of the page.';
     tornStatsNode.appendChild(tornStatsImportTipsDiv);
 
     contentDiv.appendChild(tornStatsNode);
@@ -2313,7 +2361,7 @@ function IsBSPEnabledOnCurrentPage() {
         InjectInProfilePage(true, undefined);
         setTimeout(InjectInProfilePage, 3000);
     }
-    else if (IsPage(PageType.Faction)) {
+    else if (IsPage(PageType.Faction) || IsPage(PageType.War)) {
         //InjectInFactionPage(node);
     }
     else if (IsPage(PageType.Bounty)) {
@@ -2334,7 +2382,7 @@ function IsBSPEnabledOnCurrentPage() {
                     if (IsPage(PageType.Profile)) {
                         InjectInProfilePage(false, node);
                     }
-                    if (IsPage(PageType.Faction)) {
+                    if (IsPage(PageType.Faction) || IsPage(PageType.War)) {
                         InjectInFactionPage(node);
                     }
                     else if (IsPage(PageType.Bounty)) {
