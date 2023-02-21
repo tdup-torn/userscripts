@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     7.2
+// @version     7.3
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -953,6 +953,9 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         spyMargin = '0px 20px';
         if (isShowingHonorBars) {
             mainMarginWhenDisplayingHonorBars = '5px -4px';
+        }
+        else {
+            spyMargin = '0px 23px';
         }
     }
     else if (IsPage(PageType.Forum)) {
@@ -2401,6 +2404,10 @@ function IsBSPEnabledOnCurrentPage() {
         var hrefCanon = canonical.href;
         const urlParams = new URLSearchParams(hrefCanon);
         ProfileTargetId = urlParams.get('https://www.torn.com/profiles.php?XID');
+    }
+    else {
+        const urlParams = new URL(window.location).searchParams;
+        ProfileTargetId = urlParams.get('XID');
     }
 
     observer.observe(document, { attributes: false, childList: true, characterData: false, subtree: true });
