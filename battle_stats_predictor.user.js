@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     7.3
+// @version     7.4
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -1284,7 +1284,7 @@ function BuildOptionMenu_Colors(tabs, menu) {
 
     let apiRegister = document.createElement("div");
     apiRegister.className = "TDup_optionsTabContentDiv";
-    apiRegister.innerHTML = '<a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BSP_Main&user=basic,personalstats,profile,battlestats" target="_blank"><input type"button" class="TDup_buttonInOptionMenu" style="width:280px;" value="Generate a key with access to your battlestats"/></a>';
+    apiRegister.innerHTML = '<a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BSP_Gym&user=basic,personalstats,profile,battlestats" target="_blank"><input type"button" class="TDup_buttonInOptionMenu" style="width:280px;" value="Generate a key with access to your battlestats"/></a>';
     contentDiv.appendChild(apiRegister);
 
     if (GetStorageBoolWithDefaultValue(StorageKey.IsBattleStatsAPIKeyValid, false) == true) {
