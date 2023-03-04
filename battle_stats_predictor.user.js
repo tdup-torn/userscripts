@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     7.4
+// @version     7.5
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -336,6 +336,9 @@ function FormatBattleStats(number) {
             break;
         case 5:
             toReturn += "t";
+            break;
+        case 6:
+            toReturn += "q";
             break;
     }
 
@@ -859,7 +862,6 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     let ratioFormatted = parseInt(tbsRatio.toFixed(0));
     ratioFormatted = ratioFormatted.toLocaleString('en-US');
 
-    //let iconToUse = "https://game-icons.net/icons/000000/transparent/1x1/delapouite/weight-lifting-up.png";
     let iconToUse = "https://i.postimg.cc/G26PdvYL/weight-lifting-up.png";
     let formattedBattleStats = FormatBattleStats(consolidatedData.TargetTBS);
     if (consolidatedData.Success == FAIL) {
@@ -879,7 +881,6 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         ratioFormatted = ratioFormatted.toLocaleString('en-US');
 
         iconToUse = "https://i.postimg.cc/P5KmNgZF/sword-clash.png";
-        //iconToUse = "https://game-icons.net/icons/000000/transparent/1x1/lorc/sword-clash.png";
     }
 
     let extraIndicator = '';
@@ -1025,34 +1026,48 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         formattedBattleStats = "Error";
     }
 
-    let extraIndicator = '';
-    let title = '';
-    if (consolidatedData.IsUsingSpy) {
-        let FFPredicted = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
-        FFPredicted = Math.max(1, FFPredicted);
-        FFPredicted = FFPredicted.toFixed(2);
-
-        extraIndicator = '<img width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />';
-        title = 'title="Data coming from spy (' + consolidatedData.Spy.Source + ') FF : ' + FFPredicted + ' "';
-    }
-    else if (consolidatedData.OldSpyStrongerThanPrediction) {
-        extraIndicator = '<img width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png" />';
-        title = 'title="Old spy (' + consolidatedData.Spy.Source + ' FF Predicted = ' + FFPredicted + ') having greater TBS than prediction -> showing old spy data instead"';
-    }
-    else if (showScoreInstead) {
-        title = 'title="FF Predicted = ' + FFPredicted + '"';
-    }
-
-    let toInject = '';
-    if (isShowingHonorBars)
-        toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
-    else
-        toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
-
     for (let i = 0; i < dictDivPerPlayer[targetId].length; i++) {
         if (dictDivPerPlayer[targetId][i].innerHTML.startsWith('<a href="https://www.torn.com/loader2.php?sid=getInAttack')) {
             continue;
         }
+
+        if (dictDivPerPlayer[targetId][i].className == "user name ") {
+            //WALL:
+            if (isShowingHonorBars) {
+                mainMarginWhenDisplayingHonorBars = "-28px 54px";
+                spyMargin = '0px 23px';
+            }
+            else {
+                spyMargin = '3px 23px';
+            }
+        }
+
+        let extraIndicator = '';
+        let title = '';
+        if (consolidatedData.IsUsingSpy) {
+            let FFPredicted = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
+            FFPredicted = Math.max(1, FFPredicted);
+            FFPredicted = FFPredicted.toFixed(2);
+
+            extraIndicator = '<img width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />';
+            title = 'title="Data coming from spy (' + consolidatedData.Spy.Source + ') FF : ' + FFPredicted + ' "';
+        }
+        else if (consolidatedData.OldSpyStrongerThanPrediction) {
+            extraIndicator = '<img width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png" />';
+            title = 'title="Old spy (' + consolidatedData.Spy.Source + ' FF Predicted = ' + FFPredicted + ') having greater TBS than prediction -> showing old spy data instead"';
+        }
+        else if (showScoreInstead) {
+            title = 'title="FF Predicted = ' + FFPredicted + '"';
+        }
+
+
+        let toInject = '';
+        if (isShowingHonorBars)
+            toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+        else
+            toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+
+
         dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
     }
 }
@@ -2195,7 +2210,9 @@ function InjectInFactionPage(node) {
             var myArray = iter.href.split("?XID=");
             if (myArray.length == 2) {
                 let playerId = parseInt(myArray[1]);
-                if (iter.rel == "noopener noreferrer") {
+                let isWall = iter.className == "user name ";
+
+                if (iter.rel == "noopener noreferrer" || isWall == true) {
                     if (!(playerId in dictDivPerPlayer)) {
                         dictDivPerPlayer[playerId] = new Array();
                     }
