@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     7.5
+// @version     7.6
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -1031,8 +1031,9 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             continue;
         }
 
-        if (dictDivPerPlayer[targetId][i].className == "user name ") {
-            //WALL:
+        let isWall = IsPage(PageType.Faction) && dictDivPerPlayer[targetId][i].className == "user name ";
+        if (isWall) {
+            //WALL display
             if (isShowingHonorBars) {
                 mainMarginWhenDisplayingHonorBars = "-28px 54px";
                 spyMargin = '0px 23px';
