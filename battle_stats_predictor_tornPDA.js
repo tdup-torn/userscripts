@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.0
+// @version     8.1
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -299,8 +299,8 @@ var mapPageTypeAddress = {
 }
 
 function LogInfo(value) {
-    //var now = new Date();
-    //console.log(now.toISOString() + ": " + value);
+    var now = new Date();
+    console.error(now.toISOString() + ": " + value);
 }
 
 function JSONparse(str) {
@@ -2437,6 +2437,7 @@ function IsBSPEnabledOnCurrentPage() {
 // #region API BSP
 
 function FetchUserDataFromBSPServer() {
+    console.error("FetchUserDataFromBSPServer fetching..");
     console.log("FetchUserDataFromBSPServer fetching..");
 
     let primaryAPIKey = GetStorage(StorageKey.PrimaryAPIKey);
