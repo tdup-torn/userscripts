@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     7.9
+// @version     8.0
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -2437,6 +2437,8 @@ function IsBSPEnabledOnCurrentPage() {
 // #region API BSP
 
 function FetchUserDataFromBSPServer() {
+    console.log("FetchUserDataFromBSPServer fetching..");
+
     let primaryAPIKey = GetStorage(StorageKey.PrimaryAPIKey);
     if (primaryAPIKey == undefined || primaryAPIKey == "") {
         LogInfo("BSP : Calling FetchUserDataFromBSPServer with primaryAPIKey undefined or empty, abording");
@@ -2444,7 +2446,7 @@ function FetchUserDataFromBSPServer() {
     }
 
     let url = `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${GM_info.script.version}`;
-    PDA_httpGet(surl)
+    PDA_httpGet(url)
         .then(response => {
             if (response.status == '200') {
                 let result = JSON.parse(response.responseText);
