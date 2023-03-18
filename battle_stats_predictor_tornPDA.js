@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     7.7
+// @version     7.8
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -733,7 +733,7 @@ function AutoImportStats() {
 
 // #region Get Data for Player
 
-async function GetPredictionForPlayer(targetId, callback) {
+function GetPredictionForPlayer(targetId, callback) {
     if (targetId == undefined || targetId < 1) return;
     if (IsNPC(targetId) == true) return;
 
