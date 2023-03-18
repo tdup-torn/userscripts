@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     7.8
+// @version     7.9
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -774,7 +774,7 @@ function GetPredictionForPlayer(targetId, callback) {
     }
 
     LogInfo("Prediction for target " + targetId + " not found in the cache, querying BSP server..");
-    const newPrediction = await FetchScoreAndTBS(targetId);
+    /*const newPrediction = await FetchScoreAndTBS(targetId);
     LogInfo("Prediction for target " + targetId + " not found in the cache, value retrieved from BSP server!");
     if (newPrediction != undefined) {
         SetPredictionInCache(targetId, newPrediction);
@@ -783,7 +783,7 @@ function GetPredictionForPlayer(targetId, callback) {
     if (targetSpy != undefined) {
         newPrediction.attachedSpy = targetSpy;
     }
-    callback(targetId, newPrediction);
+    callback(targetId, newPrediction);*/
 }
 
 // #endregion
