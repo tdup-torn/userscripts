@@ -2443,58 +2443,51 @@ function FetchUserDataFromBSPServer() {
         return;
     }
 
-    return new Promise((resolve, reject) => {
-        //GM.xmlHttpRequest({
-        await xmlHttpRequest({
-            method: 'GET',
-            url: `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${GM_info.script.version}`,
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            onload: (response) => {
-                try {
-                    let result = JSON.parse(response.responseText);
-                    if (result == undefined) {
-                        subscriptionEndText.innerHTML = '<div style="color:red">WARNING - An error occured while fetching the subscription end date.</div>';
-                        return;
-                    }
-
-                    SetStorage(StorageKey.DateSubscriptionEnd, result.SubscriptionEnd);
-
-                    let text = ' 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with message "bsp". Process is automated and treated within a minute. You can send in bulk)';
-
-                    if (result.SubscriptionActive) {
-                        var dateNow = new Date();
-                        var offsetInMinute = dateNow.getTimezoneOffset();
-                        var dateSubscriptionEnd = new Date(result.SubscriptionEnd);
-                        dateSubscriptionEnd.setMinutes(dateSubscriptionEnd.getMinutes() - offsetInMinute);
-                        var time_difference = dateSubscriptionEnd - dateNow;
-                        var days_difference = parseInt(time_difference / (1000 * 60 * 60 * 24));
-                        var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
-                        hours_difference %= 24;
-                        var minutes_difference = parseInt(time_difference / (1000 * 60));
-                        minutes_difference %= 60;
-
-                        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Thank you for using Battle Stats Predictor (BSP) script!<br /><br />Your subscription expires in '
-                            + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
-                            + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for' + text + '</div>';
-                    }
-                    else {
-                        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
-                    }
-
-                    RefreshOptionMenuWithSubscription();
-
-                } catch (err) {
-                    reject(err);
+    let url = `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${GM_info.script.version}`;
+    PDA_httpGet(surl)
+        .then(response => {
+            if (response.status == '200') {
+                let result = JSON.parse(response.responseText);
+                if (result == undefined) {
+                    subscriptionEndText.innerHTML = '<div style="color:red">WARNING - An error occured while fetching the subscription end date.</div>';
+                    return;
                 }
-            },
-            onerror: (err) => {
-                reject(err);
+
+                SetStorage(StorageKey.DateSubscriptionEnd, result.SubscriptionEnd);
+
+                let text = ' 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with message "bsp". Process is automated and treated within a minute. You can send in bulk)';
+
+                if (result.SubscriptionActive) {
+                    var dateNow = new Date();
+                    var offsetInMinute = dateNow.getTimezoneOffset();
+                    var dateSubscriptionEnd = new Date(result.SubscriptionEnd);
+                    dateSubscriptionEnd.setMinutes(dateSubscriptionEnd.getMinutes() - offsetInMinute);
+                    var time_difference = dateSubscriptionEnd - dateNow;
+                    var days_difference = parseInt(time_difference / (1000 * 60 * 60 * 24));
+                    var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
+                    hours_difference %= 24;
+                    var minutes_difference = parseInt(time_difference / (1000 * 60));
+                    minutes_difference %= 60;
+
+                    subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Thank you for using Battle Stats Predictor (BSP) script!<br /><br />Your subscription expires in '
+                        + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
+                        + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
+                        + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for' + text + '</div>';
+                }
+                else {
+                    subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
+                }
+
+                RefreshOptionMenuWithSubscription();
             }
+            else {
+                console.log(`[FetchUserDataFromBSPServer] error`)
+            }
+        })
+        .catch(e => {
+            console.log("FetchUserDataFromBSPServer exception: ");
+            console.error(e);
         });
-    });
 }
 
 function FetchScoreAndTBS(targetId) {
@@ -2505,8 +2498,7 @@ function FetchScoreAndTBS(targetId) {
     }
 
     return new Promise((resolve, reject) => {
-       // GM.xmlHttpRequest({
-        await xmlHttpRequest({
+        GM.xmlHttpRequest({
             method: 'GET',
             url: `http://www.lol-manager.com/api/battlestats/${GetStorage(StorageKey.PrimaryAPIKey)}/${targetId}/${GM_info.script.version}`,
             headers: {
@@ -2533,8 +2525,7 @@ function FetchScoreAndTBS(targetId) {
 
 function VerifyTornAPIKey(callback) {
     var urlToUse = "https://api.torn.com/user/?comment=BSPAuth&key=" + GetStorage(StorageKey.PrimaryAPIKey);
-    //GM.xmlHttpRequest({
-    await xmlHttpRequest({
+    GM.xmlHttpRequest({
         method: "GET",
         url: urlToUse,
         onload: (r) => {
