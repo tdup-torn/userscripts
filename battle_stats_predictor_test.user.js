@@ -15,12 +15,12 @@
 // @match       https://www.torn.com/hospitalview.php*
 // @match       https://www.torn.com/imarket.php*
 // @match       https://www.torn.com/forums.php*
-// @match       https://www.torn.com/loader.php*
 // @match       https://www.torn.com/blacklist.php*
 // @match       https://www.torn.com/friendlist.php*
 // @match       https://www.torn.com/pmarket.php*
 // @match       https://www.torn.com/properties.php*
 // @match       https://www.torn.com/war.php*
+// @match       https://www.torn.com/preferences.php*
 // @run-at      document-end
 // @grant       GM.xmlHttpRequest
 // @grant       GM_setValue
@@ -43,7 +43,7 @@ const StorageKey = {
 
     // To avoid showing prediction on own profile
     PlayerId: 'tdup.battleStatsPredictor.PlayerId',
-    IsEnableOnOwnProfile: 'tdup.battleStatsPredictor.IsEnableOnOwnProfile',
+    IsEnabledOnOwnProfile: 'tdup.battleStatsPredictor.IsEnabledOnOwnProfile',
 
     // Used only on the client side, to import user battlestats. This is not required but useful to have your stats up to date locally, for accurate color code.
     // You can fill manually your stats, or not fill your stat at all, and don't use the color code system.
@@ -198,9 +198,6 @@ var styleToAdd = document.createElement('style');
 
 styleToAdd.innerHTML += '.iconStats {height: 20px; width: 32px; position: relative; text-align: center; font-size: 12px; font-weight:bold; color: black; box-sizing: border-box; border: 1px solid black;line-height: 18px;font-family: initial;}';
 
-//styleToAdd.innerHTML += '.TDup_optionsTabContent {all : initial;}';
-//styleToAdd.innerHTML += '.TDup_optionsTabContent * { all: unset;}';
-
 /* Style the tab */
 styleToAdd.innerHTML += '.TDup_optionsMenu {border: 1px solid #ccc;background-color: #f1f1f1;}';
 
@@ -240,14 +237,10 @@ styleToAdd.innerHTML += '.TDup_optionsTabContent input[type = button] { margin:0
 styleToAdd.innerHTML += '.TDup_optionsTabContent input:disabled[type = button] { background-color: #AAAAAA; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent input[type = number] { text-align: right; }';
 
-/*styleToAdd.innerHTML += '.TDup_optionsTabContent div { margin:10px 0px !important; }';*/
-
 styleToAdd.innerHTML += '.TDup_button {  background-color: ' + GetColorTheme() + '; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
 styleToAdd.innerHTML += 'font-size: 12px;font-weight: 100; line-height: 1;  margin: 0; max-width: none; min-width: 10px;  outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;';
 styleToAdd.innerHTML += 'text-transform: none;  user-select: none; -webkit-user-select: none;  touch-action: manipulation; width: 100%;}';
 styleToAdd.innerHTML += '.TDup_button: hover, .TDup_button:focus { opacity: .75;}'
-/*styleToAdd.innerHTML += '.TDup_button:disabled { background-color: #AAAAAA; }';*/
-
 
 // Get the first script tag
 var ref = document.querySelector('script');
@@ -281,6 +274,8 @@ const PageType = {
     PointMarket: 'Point Market',
     Properties: 'Properties',
     War: 'War',
+    ChainReport: 'ChainReport',
+    RWReport: 'RWReport',
 };
 
 var mapPageTypeAddress = {
@@ -305,6 +300,8 @@ var mapPageTypeAddress = {
     [PageType.PointMarket]: 'https://www.torn.com/pmarket.php',
     [PageType.Properties]: 'https://www.torn.com/properties.php',
     [PageType.War]: 'https://www.torn.com/war.php',
+    [PageType.ChainReport]: 'https://www.torn.com/war.php?step=chainreport',
+    [PageType.RWReport]: 'https://www.torn.com/war.php?step=rankreport',    
 }
 
 function LogInfo(value) {
@@ -927,7 +924,7 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         imgType = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
     }
 
-    var relativeTime = formatRelativeTime(predictionDate);
+    var relativeTime = FormatRelativeTime(predictionDate);
 
     divWhereToInject.innerHTML = '<table style=width:100%;font-family:initial>' +
         '<tr style="font-size:small;color:white;background-color:#344556" >' +        
@@ -947,7 +944,7 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         '</table> ';
 }
 
-function convertLocalDateToUTCIgnoringTimezone(date) {
+function ConvertLocalDateToUTCIgnoringTimezone(date) {
     const timestamp = Date.UTC(
         date.getFullYear(),
         date.getMonth(),
@@ -961,7 +958,7 @@ function convertLocalDateToUTCIgnoringTimezone(date) {
     return new Date(timestamp);
 }
 
-function formatRelativeTime(date) {
+function FormatRelativeTime(date) {
     var now = new Date();// convertLocalDateToUTCIgnoringTimezone(new Date());
     var diff = Math.round((now - date) / 1000); // difference in seconds
 
@@ -1147,12 +1144,18 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
 
 
         let toInject = '';
-        if (isShowingHonorBars)
+        if (isShowingHonorBars) {
             toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+        }            
         else
+        {
             toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
 
-
+            if (IsPage(PageType.War) && !IsPage(PageType.ChainReport) && !IsPage(PageType.RWReport)) {
+                dictDivPerPlayer[targetId][i].style.position = "absolute";
+            }
+        }
+        
         dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
     }
 }
@@ -1671,6 +1674,33 @@ function BuildOptionMenu_Pages(tabs, menu) {
     isShowingHonorBarsNode.appendChild(checkboxIsShowingHonorBars);
     contentDiv.appendChild(isShowingHonorBarsNode);
 
+    // Enable on own profile
+    //
+
+    let isEnabledOnOwnProfileNode = document.createElement("div");
+    isEnabledOnOwnProfileNode.className = "TDup_optionsTabContentDiv";
+    let isEnabledOnOwnProfile = GetStorageBoolWithDefaultValue(StorageKey.IsEnabledOnOwnProfile, false);
+
+    let checkboxisEnabledOnOwnProfile = document.createElement('input');
+    checkboxisEnabledOnOwnProfile.type = "checkbox";
+    checkboxisEnabledOnOwnProfile.name = "name";
+    checkboxisEnabledOnOwnProfile.value = "value";
+    checkboxisEnabledOnOwnProfile.id = "idisEnabledOnOwnProfile";
+    checkboxisEnabledOnOwnProfile.checked = isEnabledOnOwnProfile;
+
+    checkboxisEnabledOnOwnProfile.addEventListener("change", () => {
+        let IsEnabledOnOwnProfile = checkboxisEnabledOnOwnProfile.checked;
+        SetStorage(StorageKey.IsEnabledOnOwnProfile, IsEnabledOnOwnProfile);
+    });
+
+    var isEnabledOnOwnProfileLabel = document.createElement('label')
+    isEnabledOnOwnProfileLabel.htmlFor = "idisEnabledOnOwnProfile";
+    isEnabledOnOwnProfileLabel.appendChild(document.createTextNode('Display BSP on own profile?'));
+    isEnabledOnOwnProfileNode.appendChild(isEnabledOnOwnProfileLabel);
+    isEnabledOnOwnProfileNode.appendChild(checkboxisEnabledOnOwnProfile);
+    contentDiv.appendChild(isEnabledOnOwnProfileNode);
+    //
+
     // Spy
     let spyNumberOfDaysDiv = document.createElement("div");
     spyNumberOfDaysDiv.className = "TDup_optionsTabContentDiv";
@@ -1917,36 +1947,6 @@ function BuildOptionMenu_TornStats(tabs, menu) {
 
 function BuildOptionMenu_Debug(tabs, menu) {
     let contentDiv = BuildOptionMenu(tabs, menu, "Debug", false);
-
-    // Enable on own profile
-    //
-
-    let isEnabledOnOwnProfileNode = document.createElement("div");
-    isEnabledOnOwnProfileNode.className = "TDup_optionsTabContentDiv";
-    let isEnabledOnOwnProfile = GetStorageBoolWithDefaultValue(StorageKey.IsEnableOnOwnProfile, false);
-
-    let checkboxisEnabledOnOwnProfile = document.createElement('input');
-    checkboxisEnabledOnOwnProfile.type = "checkbox";
-    checkboxisEnabledOnOwnProfile.name = "name";
-    checkboxisEnabledOnOwnProfile.value = "value";
-    checkboxisEnabledOnOwnProfile.id = "idisEnabledOnOwnProfile";
-    checkboxisEnabledOnOwnProfile.checked = isEnabledOnOwnProfile;
-
-    checkboxisEnabledOnOwnProfile.addEventListener("change", () => {
-        let isEnableOnOwnProfile = checkboxisEnabledOnOwnProfile.checked;
-        SetStorage(StorageKey.IsEnableOnOwnProfile, isEnableOnOwnProfile);
-    });
-
-    var isEnabledOnOwnProfileLabel = document.createElement('label')
-    isEnabledOnOwnProfileLabel.htmlFor = "idisEnabledOnOwnProfile";
-    isEnabledOnOwnProfileLabel.appendChild(document.createTextNode('Display BSP on own profile?'));
-    isEnabledOnOwnProfileNode.appendChild(isEnabledOnOwnProfileLabel);
-    isEnabledOnOwnProfileNode.appendChild(checkboxisEnabledOnOwnProfile);
-    contentDiv.appendChild(isEnabledOnOwnProfileNode);
-    //
-
-
-
 
     let YATAColor = "pink";
     let TornStatsColor = "green";
@@ -2241,11 +2241,6 @@ function InjectImportSpiesButton(node) {
     btnImportTornStatsSpies.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
     btnImportTornStatsSpies.innerHTML = '<div class="TDup_button">BSP Import Spies</div>';
 
-    //btnValidatemainAPIKey = document.createElement("input");
-    //btnValidatemainAPIKey.type = "button";
-    //btnValidatemainAPIKey.value = "Validate";
-    //btnValidatemainAPIKey.className = "TDup_buttonInOptionMenu";
-
     let successImportTornStatsSpiesForFaction = document.createElement("label");
     successImportTornStatsSpiesForFaction.innerHTML = 'Spies imported!';
     successImportTornStatsSpiesForFaction.style.color = 'green';
@@ -2274,6 +2269,16 @@ function InjectImportSpiesButton(node) {
             }
         }
 
+    }
+
+    el = document.querySelector('.view-wars');
+    if (el != undefined) {
+
+        let url = el.href;
+        let hrefArray2 = url.split("ranked/");
+        if (hrefArray2.length == 2) {
+            factionIdStr = hrefArray2[1];
+        }
     }
 
     let factionId = parseInt(factionIdStr);
@@ -2338,7 +2343,7 @@ function InjectInProfilePage(isInit = true, node = undefined) {
     for (var i = 0; i < el.length; ++i) {
         let profileId = GetStorage(StorageKey.PlayerId);
         if (profileId != undefined && profileId == ProfileTargetId) {
-            if (GetStorageBoolWithDefaultValue(StorageKey.IsEnableOnOwnProfile, false) == false) {
+            if (GetStorageBoolWithDefaultValue(StorageKey.IsEnabledOnOwnProfile, false) == false) {
                 continue;
             }
         }
