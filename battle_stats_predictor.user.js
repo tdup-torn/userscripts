@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     7.6
+// @version     7.7
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -982,6 +982,17 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     else if (IsPage(PageType.War)) {
         spyMargin = isShowingHonorBars ? '-16px 15px' : '-4px 24px';
     }
+    else if (IsPage(PageType.Competition) && isShowingHonorBars) {
+
+        if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=revenge"))
+        {
+            mainMarginWhenDisplayingHonorBars = '0px 0px';
+        }
+        else
+        {
+            mainMarginWhenDisplayingHonorBars = '10px 0px';
+        }
+    }
 
     let consolidatedData = GetConsolidatedDataForPlayerStats(prediction);
     let localBattleStats = GetLocalBattleStats();
@@ -1043,6 +1054,21 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             }
         }
 
+        if (IsPage(PageType.Competition) && isShowingHonorBars) {
+            if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=recent"))
+            {
+                if (HasParentWithClass(dictDivPerPlayer[targetId][i],"name lost"))
+                {
+                    mainMarginWhenDisplayingHonorBars = "12px 0px";
+                }
+                else if (HasParentWithClass(dictDivPerPlayer[targetId][i], "name right"))
+                {
+                    mainMarginWhenDisplayingHonorBars = "0px 0px";
+                }
+            }
+        }
+
+
         let extraIndicator = '';
         let title = '';
         if (consolidatedData.IsUsingSpy) {
@@ -1071,6 +1097,19 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
 
         dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
     }
+}
+
+function HasParentWithClass(element, className) {
+    let parent = element.parentElement;
+
+    while (parent) {
+        if (parent.classList.value.startsWith(className)) {
+            return true;
+        }
+        parent = parent.parentElement;
+    }
+
+    return false;
 }
 
 // #endregion
