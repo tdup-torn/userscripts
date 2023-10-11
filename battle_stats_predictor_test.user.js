@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     7.7
+// @version     8.0
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -86,6 +86,7 @@ const StorageKey = {
 
     // Display choice
     IsShowingHonorBars: 'tdup.battleStatsPredictor.isShowingHonorBars',
+    IsShowingAlternativeProfileDisplay: 'tdup.battleStatsPredictor.isShowingAlternativeProfileDisplay',
     BSPColorTheme: 'tdup.battleStatsPredictor.BspColorTheme', //TDTODO : allow users to tweak this
     ColorStatsThreshold: 'tdup.battleStatsPredictor.ColorStatsThreshold_',
     IsShowingBattleStatsScore: 'tdup.battleStatsPredictor.IsShowingBattleStatsScore',
@@ -188,15 +189,11 @@ var divWhereToInject;
 var dictDivPerPlayer = {};
 
 var mainColor = "#344556";
-//var mainBSPIcon = "https://i.postimg.cc/xTsh9DJ5/BSPLogo9.png";
-//var mainBSPIcon = "https://i.postimg.cc/bYCjSQ7z/BSPLogo11.png";
 var mainBSPIcon = "https://i.postimg.cc/K8cNpzCS/BSPLogo11low.png";
 
 // #endregion
 
 // #region Styles
-
-//var mainColor = "cadetblue";
 
 var styleToAdd = document.createElement('style');
 
@@ -396,10 +393,9 @@ function IsSubscriptionValid() {
 }
 
 function GetColorTheme() {
-    return mainColor;
     let color = GetStorage(StorageKey.BSPColorTheme);
     if (color == undefined) {
-        return "cadetblue";
+        return mainColor;
     }
 }
 
@@ -858,10 +854,10 @@ function GetConsolidatedDataForPlayerStats(prediction) {
     return objectToReturn;
 }
 
+
 function OnProfilePlayerStatsRetrieved(playerId, prediction) {
-    if (prediction == undefined) {
+    if (prediction == undefined)
         return;
-    }
 
     let localBattleStats = GetLocalBattleStats();
     let localTBS = localBattleStats.TBS;
@@ -907,30 +903,31 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         extraIndicator = '<img title="Old spy (' + consolidatedData.Spy.Source + ') having greater TBS than prediction, showing old spy data" width="18" height="18" style="position:absolute; margin: 0px -20px; z-index: 102;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png"/>';
     }
 
-    divWhereToInject.innerHTML = '<div style="font-size: 18px; text-align: center; margin-top:7px">' + extraIndicator + '<img src="' + iconToUse + '" width="18" height="18" style="margin-right:5px;"/>' +
-        formattedBattleStats + ' <label style = "color:' + colorComparedToUs + '"; "> (' + ratioFormatted + '%) ' + FFToDisplay + ' </label></div >';
 
     let FFPredicted2 = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
     FFPredicted2 = Math.max(1, FFPredicted2);
     FFPredicted2 = FFPredicted2.toFixed(2);
 
-    // let spyDate = new Date(targetSpy.timestamp * 1000);
-    //let imgType = "https://i.postimg.cc/Px57NvYZ/perspective-dice-six-faces-random.png";
-    //let imgType = "https://i.postimg.cc/WtLFPySx/BSPLogo7.png";
     let imgType = mainBSPIcon;
 
-    var predictionDate = new Date(prediction.PredictionDate);
+    if (!(prediction.PredictionDate instanceof Date)) {
+        prediction.PredictionDate = new Date(prediction.PredictionDate);
+    }
 
     if (prediction.IsSpy) {
-        predictionDate = new Date(prediction.timestamp * 1000);
+        prediction.PredictionDate = new Date(prediction.timestamp * 1000);
         imgType = "https://freesvg.org/storage/img/thumb/primary-favorites.png";
         imgType = "https://i.postimg.cc/qRqk2y70/torn-Stats.png";
         imgType = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
     }
 
-    var relativeTime = FormatRelativeTime(predictionDate);
+    var relativeTime = FormatRelativeTime(prediction.PredictionDate);
 
-    divWhereToInject.innerHTML = '<table style=width:100%;font-family:initial>' +
+    let divStats = document.createElement("div");
+
+    divWhereToInject.insertBefore(divStats, divWhereToInject.firstChild);
+
+    divStats.innerHTML = '<table style=width:100%;font-family:initial>' +
         '<tr style="font-size:small;color:white;background-color:#344556" >' +
         '<th style="border: 1px solid gray;"> TBS</th>' +
         '<th style="border: 1px solid gray;"> BScore </th>' +
@@ -949,23 +946,19 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
 }
 
 function ConvertLocalDateToUTCIgnoringTimezone(date) {
-    const timestamp = Date.UTC(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        date.getHours(),
-        date.getMinutes(),
-        date.getSeconds(),
-        date.getMilliseconds(),
-    );
+    return new Date(date.getUTCFullYear(), date.getUTCMonth(),
+        date.getUTCDate(), date.getUTCHours(),
+        date.getUTCMinutes(), date.getUTCSeconds());
+}
 
-    return new Date(timestamp);
+function DateUTCNow() {
+    let now = new Date();
+    return ConvertLocalDateToUTCIgnoringTimezone(now);
 }
 
 function FormatRelativeTime(date) {
-    var now = new Date();// convertLocalDateToUTCIgnoringTimezone(new Date());
-    var diff = Math.round((now - date) / 1000); // difference in seconds
-
+    let dateNow = new Date();
+    let diff = Math.round((dateNow - date) / 1000);
 
     if (diff < 60) {
         return diff + ' second' + (diff > 1 ? 's' : '') + ' ago';
@@ -980,7 +973,6 @@ function FormatRelativeTime(date) {
         return hours + ' day' + (hours > 1 ? 's' : '') + ' ago';
     }
     else {
-        // Use toLocaleString to format the date if it's more than a day ago
         return date.toLocaleString();
     }
 }
@@ -1067,6 +1059,15 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     else if (IsPage(PageType.War)) {
         spyMargin = isShowingHonorBars ? '-16px 15px' : '-4px 24px';
     }
+    else if (IsPage(PageType.Competition) && isShowingHonorBars) {
+
+        if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=revenge")) {
+            mainMarginWhenDisplayingHonorBars = '0px 0px';
+        }
+        else {
+            mainMarginWhenDisplayingHonorBars = '10px 0px';
+        }
+    }
 
     let consolidatedData = GetConsolidatedDataForPlayerStats(prediction);
     let localBattleStats = GetLocalBattleStats();
@@ -1128,6 +1129,17 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             }
         }
 
+        if (IsPage(PageType.Competition) && isShowingHonorBars) {
+            if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=recent")) {
+                if (HasParentWithClass(dictDivPerPlayer[targetId][i], "name lost")) {
+                    mainMarginWhenDisplayingHonorBars = "12px 0px";
+                }
+                else if (HasParentWithClass(dictDivPerPlayer[targetId][i], "name right")) {
+                    mainMarginWhenDisplayingHonorBars = "0px 0px";
+                }
+            }
+        }
+
         let extraIndicator = '';
         let title = '';
         if (consolidatedData.IsUsingSpy) {
@@ -1161,6 +1173,19 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
 
         dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
     }
+}
+
+function HasParentWithClass(element, className) {
+    let parent = element.parentElement;
+
+    while (parent) {
+        if (parent.classList.value.startsWith(className)) {
+            return true;
+        }
+        parent = parent.parentElement;
+    }
+
+    return false;
 }
 
 // #endregion
@@ -1274,11 +1299,11 @@ function BuildOptionMenu_Global(tabs, menu) {
     // Subscription info
     subscriptionEndText = document.createElement("div");
     subscriptionEndText.className = "TDup_optionsTabContentDiv";
-    subscriptionEndText.innerHTML = '<div style="color:' + mainColor + '">Please fill a valid API Key, and press on validate to get your subscription details</div>';
+    subscriptionEndText.innerHTML = '<div style="color:' + GetColorTheme() + '">Please fill a valid API Key, and press on validate to get your subscription details</div>';
 
     if (GetStorageBoolWithDefaultValue(StorageKey.IsPrimaryAPIKeyValid, false) == true) {
         apiRegister.style.display = "none";
-        subscriptionEndText.innerHTML = '<div style="color:' + mainColor + '">Fetching subscription infos from BSP server, it should not be long... </div>';
+        subscriptionEndText.innerHTML = '<div style="color:' + GetColorTheme() + '">Fetching subscription infos from BSP server, it should not be long... </div>';
     }
     contentDiv.appendChild(subscriptionEndText);
 }
@@ -1676,6 +1701,30 @@ function BuildOptionMenu_Pages(tabs, menu) {
     isShowingHonorBarsNode.appendChild(isShowingHonorBarsLabel);
     isShowingHonorBarsNode.appendChild(checkboxIsShowingHonorBars);
     contentDiv.appendChild(isShowingHonorBarsNode);
+
+    // Alternative profile display
+    let isShowingAlternativeProfileDisplayNode = document.createElement("div");
+    isShowingAlternativeProfileDisplayNode.className = "TDup_optionsTabContentDiv";
+    let isShowingAlternativeProfileDisplay = GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false);
+
+    let checkboxIsShowingAlternativeProfileDisplay = document.createElement('input');
+    checkboxIsShowingAlternativeProfileDisplay.type = "checkbox";
+    checkboxIsShowingAlternativeProfileDisplay.name = "name";
+    checkboxIsShowingAlternativeProfileDisplay.value = "value";
+    checkboxIsShowingAlternativeProfileDisplay.id = "idIsShowingAlternativeProfileDisplay";
+    checkboxIsShowingAlternativeProfileDisplay.checked = isShowingAlternativeProfileDisplay;
+
+    checkboxIsShowingAlternativeProfileDisplay.addEventListener("change", () => {
+        let isShowingAlternativeProfileDisplayNew = checkboxIsShowingAlternativeProfileDisplay.checked;
+        SetStorage(StorageKey.IsShowingAlternativeProfileDisplay, isShowingAlternativeProfileDisplayNew);
+    });
+
+    var isShowingAlternativeProfileDisplayLabel = document.createElement('label')
+    isShowingAlternativeProfileDisplayLabel.htmlFor = "idIsShowingAlternativeProfileDisplay";
+    isShowingAlternativeProfileDisplayLabel.appendChild(document.createTextNode('Use alternative display on profile?'));
+    isShowingAlternativeProfileDisplayNode.appendChild(isShowingAlternativeProfileDisplayLabel);
+    isShowingAlternativeProfileDisplayNode.appendChild(checkboxIsShowingAlternativeProfileDisplay);
+    contentDiv.appendChild(isShowingAlternativeProfileDisplayNode);
 
     // Enable on own profile
     //
@@ -2298,6 +2347,45 @@ function InjectImportSpiesButton(node) {
     }
 }
 
+var isBSPOptionDisplay = false;
+function InjectOptionMenu(node) {
+    if (!node)
+        node = document;
+
+    if (isBSPOptionDisplay)
+        return;
+
+    mainNode = node;
+    var topPageLinksList = node.querySelector("#top-page-links-list");
+    if (topPageLinksList == undefined)
+        return;
+
+    //node.style.position = "relative";
+
+    let btnOpenSettings = document.createElement("a");
+    btnOpenSettings.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
+    btnOpenSettings.innerHTML = '<div class="TDup_button" style="font-size:x-small"><img src="' + mainBSPIcon + '" style="max-width:100px;max-height:16px;vertical-align:middle;"/>Settings</div>';
+
+    btnOpenSettings.addEventListener("click", () => {
+        if (TDup_PredictorOptionsDiv == undefined) {
+            BuildSettingsMenu(document.querySelector(".content-title"));
+        }
+
+        if (TDup_PredictorOptionsDiv.style.display == "block") {
+            TDup_PredictorOptionsDiv.style.display = "none";
+        }
+        else {
+            TDup_PredictorOptionsDiv.style.display = "block";
+            if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
+                FetchUserDataFromBSPServer();
+            }
+        }
+    });
+
+    topPageLinksList.appendChild(btnOpenSettings);
+    isBSPOptionDisplay = true;
+}
+
 function InjectBSPSettingsButtonInProfile(node) {
     if (!node)
         return;
@@ -2327,33 +2415,56 @@ function InjectBSPSettingsButtonInProfile(node) {
     node.insertBefore(btnOpenSettingsProfile, node.children[1]);
 }
 
+var statsAlreadyDisplayedOnProfile = false;
 function InjectInProfilePage(isInit = true, node = undefined) {
+    if (statsAlreadyDisplayedOnProfile)
+        return;
+
+
+
+    var mainContainer = document;
+
     var el;
     if (isInit == true) {
-        el = document.querySelectorAll('.empty-block')
+        mainContainer = document;
     }
     else if (node == undefined) {
         return;
     }
     else {
-        el = node.querySelectorAll('.empty-block')
+        mainContainer = node;
     }
 
-    for (var i = 0; i < el.length; ++i) {
-        let profileId = GetStorage(StorageKey.PlayerId);
-        if (profileId != undefined && profileId == ProfileTargetId) {
-            if (GetStorageBoolWithDefaultValue(StorageKey.IsEnabledOnOwnProfile, false) == false) {
-                continue;
-            }
+    el = mainContainer.querySelectorAll('.empty-block');
+    if (el.length == 0)
+        return;
+
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false)) {
+        el = document.querySelectorAll('.user-information');
+    }
+
+    InjectOptionMenu(document.querySelector(".content-title"));
+
+    if (ProfileTargetId == -1)
+        return;
+
+    if (el.length == 0)
+        return;
+
+    statsAlreadyDisplayedOnProfile = true;
+    divWhereToInject = el[0];
+
+    let profileId = GetStorage(StorageKey.PlayerId);
+    if (profileId != undefined && profileId == ProfileTargetId) {
+        if (GetStorageBoolWithDefaultValue(StorageKey.IsEnabledOnOwnProfile, false) == false) {
+            return;
         }
+    }
 
-        divWhereToInject = el[i];
+    AutoSyncTornStatsPlayer(ProfileTargetId);
 
-        AutoSyncTornStatsPlayer(ProfileTargetId);
-
-        if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
-            GetPredictionForPlayer(ProfileTargetId, OnProfilePlayerStatsRetrieved);
-        }
+    if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
+        GetPredictionForPlayer(ProfileTargetId, OnProfilePlayerStatsRetrieved);
     }
 }
 
@@ -2516,6 +2627,10 @@ function IsBSPEnabledOnCurrentPage() {
     LogInfo("Inject Option Menu done.");
 
     if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
+        //if (window.location.href.startsWith("https://www.torn.com/factions.php?step=your&type=1#/tab=controls")) //TDTODO
+        //{
+        //    return;
+        //}
         InjectImportSpiesButton(document.querySelector(".content-title"));
     }
 
@@ -2636,7 +2751,7 @@ function FetchUserDataFromBSPServer() {
                         var minutes_difference = parseInt(time_difference / (1000 * 60));
                         minutes_difference %= 60;
 
-                        subscriptionEndText.innerHTML = '<div style="color:' + mainColor + '">Thank you for using Battle Stats Predictor (BSP) script!<br /><br /> <div style="font-weight:bolder;">Your subscription expires in '
+                        subscriptionEndText.innerHTML = '<div style="color:' + GetColorTheme() + '">Thank you for using Battle Stats Predictor (BSP) script!<br /><br /> <div style="font-weight:bolder;">Your subscription expires in '
                             + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
                             + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
                             + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.</div><br /><br />You can extend it for' + text + '</div>';
@@ -2810,7 +2925,7 @@ function AutoSyncTornStatsFaction(factionId) {
         let dateConsideredTooOld = new Date();
         dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 15);
         if (new Date(lastDateAutoSyncThisFaction) > dateConsideredTooOld) {
-            LogInfo("AutoSyncTornStatsFaction  - " + factionId + " - Too recent call in database, skipying");
+            LogInfo("AutoSyncTornStatsFaction  - " + factionId + " - Too recent call in database, skipping");
             return;
         }
     }
