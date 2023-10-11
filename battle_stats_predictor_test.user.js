@@ -33,6 +33,11 @@
 // @author      TDup
 // ==/UserScript==
 
+// ##### INSTALLATION README #####
+// ##### YOU SHOULD NOT NEED TO EDIT ANYTHING HERE
+// ##### THE SETUP OF THIS SCRIPT IS DONE THROUGH THE BSP OPTION WINDOW, AVAILABLE ON YOUR PROFILE PAGE, ONCE THIS SCRIPT IS INSTALLED
+// ##### MORE INFO HERE : https://www.torn.com/forums.php#/p=threads&f=67&t=16290324&b=0&a=0&to=22705010
+
 // #region LocalStorage
 
 const StorageKey = {
@@ -107,7 +112,6 @@ function GetStorageBoolWithDefaultValue(key, defaultValueIfUnset) {
         return defaultValueIfUnset;
     }
 }
-
 function SetStorage(key, value) {
     try {
         localStorage[key] = value;
@@ -397,6 +401,7 @@ function GetColorTheme() {
     if (color == undefined) {
         return mainColor;
     }
+    return JSON.parse(color);
 }
 
 function IsNPC(targetID) {
@@ -933,14 +938,18 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         divWhereToInject.insertBefore(divStats, divWhereToInject.firstChild);
     }
 
-    divStats.innerHTML = '<table style=width:100%;font-family:initial>' +
-        '<tr style="font-size:small;color:white;background-color:#344556" >' +
-        '<th style="border: 1px solid gray;"> TBS</th>' +
-        '<th style="border: 1px solid gray;"> BScore </th>' +
-        '<th style="border: 1px solid gray;"> FF </th>' +
-        '<th style="border: 1px solid gray;"> Source</th>' +
-        '<th style="border: 1px solid gray;"> Date </th>' +
-        '</tr>' +
+    let statsDivContent = '<table style=width:100%;font-family:initial>';
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingStatsHeader, true))
+    { 
+        statsDivContent += '<tr style="font-size:small;color:white;background-color:#344556" >' +
+            '<th style="border: 1px solid gray;"> TBS</th>' +
+            '<th style="border: 1px solid gray;"> BScore </th>' +
+            '<th style="border: 1px solid gray;"> FF </th>' +
+            '<th style="border: 1px solid gray;"> Source</th>' +
+            '<th style="border: 1px solid gray;"> Date </th>' +
+            '</tr>';
+    }
+    statsDivContent +=
         '<tr style="font-size:x-large;background-color: ' + colorComparedToUs + '"> ' +
         '<td style="vertical-align: middle;font-weight: 600;text-align:center;border: 1px solid gray;">' + FormatBattleStats(consolidatedData.TargetTBS) + '</td>' +
         '<td style="vertical-align: middle;font-weight: 600;text-align:center;border: 1px solid gray;">' + FormatBattleStats(consolidatedData.Score) + '</td>' +
@@ -949,6 +958,8 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         '<td style="vertical-align: middle;text-align:center;border: 1px solid gray;font-size: medium;background-color:#344556;color:white;">' + relativeTime + ' </td>' +
         '</tr>' +
         '</table> ';
+
+    divStats.innerHTML = statsDivContent;
 }
 
 function ConvertLocalDateToUTCIgnoringTimezone(date) {
@@ -1681,83 +1692,66 @@ function AddColorPanel(isBSScoreMode, colorSettingsNode, colorItem, id) {
     colorSettingsNode.appendChild(divColor);
 }
 
+function AddOption(contentDiv, StorageKeyValue, defaultValue, textToDisplay, name) {
+    // Alternative profile display
+    let optionNode = document.createElement("div");
+    optionNode.className = "TDup_optionsTabContentDiv";
+    let isShowingAlternativeProfileDisplay = GetStorageBoolWithDefaultValue(StorageKeyValue, defaultValue);
+
+    let optionCheckbox = document.createElement('input');
+    optionCheckbox.type = "checkbox";
+    optionCheckbox.name = "name";
+    optionCheckbox.value = "value";
+    optionCheckbox.id = "id" + name;
+    optionCheckbox.checked = isShowingAlternativeProfileDisplay;
+
+    optionCheckbox.addEventListener("change", () => {
+        let isOptionValue = optionCheckbox.checked;
+        SetStorage(StorageKeyValue, isOptionValue);
+    });
+
+    var optionLabel = document.createElement('label')
+    optionLabel.htmlFor = "id"+ name;
+    optionLabel.appendChild(document.createTextNode(textToDisplay));
+    optionNode.appendChild(optionLabel);
+    optionNode.appendChild(optionCheckbox);
+    contentDiv.appendChild(optionNode);
+}
+
 function BuildOptionMenu_Pages(tabs, menu) {
     let contentDiv = BuildOptionMenu(tabs, menu, "Pages", true);
 
     // Displaying Honor bars
-    let isShowingHonorBarsNode = document.createElement("div");
-    isShowingHonorBarsNode.className = "TDup_optionsTabContentDiv";
-    let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
-
-    let checkboxIsShowingHonorBars = document.createElement('input');
-    checkboxIsShowingHonorBars.type = "checkbox";
-    checkboxIsShowingHonorBars.name = "name";
-    checkboxIsShowingHonorBars.value = "value";
-    checkboxIsShowingHonorBars.id = "idIsShowingHonorBars";
-    checkboxIsShowingHonorBars.checked = isShowingHonorBars;
-
-    checkboxIsShowingHonorBars.addEventListener("change", () => {
-        let isShowingHonorBarsNew = checkboxIsShowingHonorBars.checked;
-        SetStorage(StorageKey.IsShowingHonorBars, isShowingHonorBarsNew);
-    });
-
-    var isShowingHonorBarsLabel = document.createElement('label')
-    isShowingHonorBarsLabel.htmlFor = "idIsShowingHonorBars";
-    isShowingHonorBarsLabel.appendChild(document.createTextNode('Are you displaying honor bars?'));
-    isShowingHonorBarsNode.appendChild(isShowingHonorBarsLabel);
-    isShowingHonorBarsNode.appendChild(checkboxIsShowingHonorBars);
-    contentDiv.appendChild(isShowingHonorBarsNode);
-
-    // Alternative profile display
-    let isShowingAlternativeProfileDisplayNode = document.createElement("div");
-    isShowingAlternativeProfileDisplayNode.className = "TDup_optionsTabContentDiv";
-    let isShowingAlternativeProfileDisplay = GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false);
-
-    let checkboxIsShowingAlternativeProfileDisplay = document.createElement('input');
-    checkboxIsShowingAlternativeProfileDisplay.type = "checkbox";
-    checkboxIsShowingAlternativeProfileDisplay.name = "name";
-    checkboxIsShowingAlternativeProfileDisplay.value = "value";
-    checkboxIsShowingAlternativeProfileDisplay.id = "idIsShowingAlternativeProfileDisplay";
-    checkboxIsShowingAlternativeProfileDisplay.checked = isShowingAlternativeProfileDisplay;
-
-    checkboxIsShowingAlternativeProfileDisplay.addEventListener("change", () => {
-        let isShowingAlternativeProfileDisplayNew = checkboxIsShowingAlternativeProfileDisplay.checked;
-        SetStorage(StorageKey.IsShowingAlternativeProfileDisplay, isShowingAlternativeProfileDisplayNew);
-    });
-
-    var isShowingAlternativeProfileDisplayLabel = document.createElement('label')
-    isShowingAlternativeProfileDisplayLabel.htmlFor = "idIsShowingAlternativeProfileDisplay";
-    isShowingAlternativeProfileDisplayLabel.appendChild(document.createTextNode('Use alternative profile stats location?'));
-    isShowingAlternativeProfileDisplayNode.appendChild(isShowingAlternativeProfileDisplayLabel);
-    isShowingAlternativeProfileDisplayNode.appendChild(checkboxIsShowingAlternativeProfileDisplay);
-    contentDiv.appendChild(isShowingAlternativeProfileDisplayNode);
+    AddOption(contentDiv, StorageKey.IsShowingHonorBars, true, 'Are you displaying honor bars?', 'isShowingHonorBars');
 
     // Enable on own profile
-    //
+    AddOption(contentDiv, StorageKey.IsEnabledOnOwnProfile, false, 'Show stats on your own profile page?', 'IsEnabledOnOwnProfile');
 
-    let isEnabledOnOwnProfileNode = document.createElement("div");
-    isEnabledOnOwnProfileNode.className = "TDup_optionsTabContentDiv";
-    let isEnabledOnOwnProfile = GetStorageBoolWithDefaultValue(StorageKey.IsEnabledOnOwnProfile, false);
+    // Alternative profile display
+    AddOption(contentDiv, StorageKey.IsShowingAlternativeProfileDisplay, false, 'Use alternative profile stats location?', 'IsShowingAlternativeProfileDisplay');
 
-    let checkboxisEnabledOnOwnProfile = document.createElement('input');
-    checkboxisEnabledOnOwnProfile.type = "checkbox";
-    checkboxisEnabledOnOwnProfile.name = "name";
-    checkboxisEnabledOnOwnProfile.value = "value";
-    checkboxisEnabledOnOwnProfile.id = "idisEnabledOnOwnProfile";
-    checkboxisEnabledOnOwnProfile.checked = isEnabledOnOwnProfile;
+    // Alternative profile display
+    AddOption(contentDiv, StorageKey.IsShowingStatsHeader, true, 'Show headers on profile stats?', 'IsShowingHeadersOnProfileStats');
 
-    checkboxisEnabledOnOwnProfile.addEventListener("change", () => {
-        let IsEnabledOnOwnProfile = checkboxisEnabledOnOwnProfile.checked;
-        SetStorage(StorageKey.IsEnabledOnOwnProfile, IsEnabledOnOwnProfile);
+    // BSP Color schema
+    let colorSchemaDiv = document.createElement("div");
+    colorSchemaDiv.className = "TDup_optionsTabContentDiv";
+
+    let colorPickerInput = document.createElement("input");
+    colorPickerInput.type = "color";
+    colorPickerInput.value = GetColorTheme();
+
+    colorPickerInput.addEventListener("change", () => {
+        let color = colorPickerInput.value;
+        SetStorage(StorageKey.BSPColorTheme, JSON.stringify(color));
     });
 
-    var isEnabledOnOwnProfileLabel = document.createElement('label')
-    isEnabledOnOwnProfileLabel.htmlFor = "idisEnabledOnOwnProfile";
-    isEnabledOnOwnProfileLabel.appendChild(document.createTextNode('Show stats on your own profile page?'));
-    isEnabledOnOwnProfileNode.appendChild(isEnabledOnOwnProfileLabel);
-    isEnabledOnOwnProfileNode.appendChild(checkboxisEnabledOnOwnProfile);
-    contentDiv.appendChild(isEnabledOnOwnProfileNode);
-    //
+    let colorThemeLabel = document.createElement("label");
+    colorThemeLabel.innerHTML = 'BSP Theme color ';
+
+    colorSchemaDiv.appendChild(colorThemeLabel);
+    colorSchemaDiv.appendChild(colorPickerInput);
+    contentDiv.appendChild(colorSchemaDiv);
 
     // Spy
     let spyNumberOfDaysDiv = document.createElement("div");
@@ -1993,7 +1987,7 @@ function BuildOptionMenu_TornStats(tabs, menu) {
 
     var isAutoImportTornStatsSpiesLabel = document.createElement('label')
     isAutoImportTornStatsSpiesLabel.htmlFor = "idIsAutoImportTornStatsSpies";
-    isAutoImportTornStatsSpiesLabel.appendChild(document.createTextNode('Auto Import TornStats spies?'));
+    isAutoImportTornStatsSpiesLabel.appendChild(document.createTextNode('Auto Import TornStats spies? (will auto query TornStats on profile or faction page)'));
     isAutoImportTornStatsSpiesNode.appendChild(isAutoImportTornStatsSpiesLabel);
     isAutoImportTornStatsSpiesNode.appendChild(checkboxisAutoImportTornStatsSpies);
     tornStatsNode.appendChild(isAutoImportTornStatsSpiesNode);
