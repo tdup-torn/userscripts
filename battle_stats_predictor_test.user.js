@@ -916,8 +916,8 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
 
     if (prediction.IsSpy) {
         prediction.PredictionDate = new Date(prediction.timestamp * 1000);
-        imgType = "https://freesvg.org/storage/img/thumb/primary-favorites.png";
-        imgType = "https://i.postimg.cc/qRqk2y70/torn-Stats.png";
+        //imgType = "https://freesvg.org/storage/img/thumb/primary-favorites.png";
+        //imgType = "https://i.postimg.cc/qRqk2y70/torn-Stats.png";
         imgType = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
     }
 
@@ -925,7 +925,13 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
 
     let divStats = document.createElement("div");
 
-    divWhereToInject.insertBefore(divStats, divWhereToInject.firstChild);
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false)) {
+        var referenceNode = divWhereToInject.firstChild.childNodes[1];
+        divWhereToInject.firstChild.insertBefore(divStats, referenceNode);
+    }
+    else {
+        divWhereToInject.insertBefore(divStats, divWhereToInject.firstChild);
+    }
 
     divStats.innerHTML = '<table style=width:100%;font-family:initial>' +
         '<tr style="font-size:small;color:white;background-color:#344556" >' +
@@ -1721,7 +1727,7 @@ function BuildOptionMenu_Pages(tabs, menu) {
 
     var isShowingAlternativeProfileDisplayLabel = document.createElement('label')
     isShowingAlternativeProfileDisplayLabel.htmlFor = "idIsShowingAlternativeProfileDisplay";
-    isShowingAlternativeProfileDisplayLabel.appendChild(document.createTextNode('Use alternative display on profile?'));
+    isShowingAlternativeProfileDisplayLabel.appendChild(document.createTextNode('Use alternative profile stats location?'));
     isShowingAlternativeProfileDisplayNode.appendChild(isShowingAlternativeProfileDisplayLabel);
     isShowingAlternativeProfileDisplayNode.appendChild(checkboxIsShowingAlternativeProfileDisplay);
     contentDiv.appendChild(isShowingAlternativeProfileDisplayNode);
@@ -1747,7 +1753,7 @@ function BuildOptionMenu_Pages(tabs, menu) {
 
     var isEnabledOnOwnProfileLabel = document.createElement('label')
     isEnabledOnOwnProfileLabel.htmlFor = "idisEnabledOnOwnProfile";
-    isEnabledOnOwnProfileLabel.appendChild(document.createTextNode('Display BSP on own profile?'));
+    isEnabledOnOwnProfileLabel.appendChild(document.createTextNode('Show stats on your own profile page?'));
     isEnabledOnOwnProfileNode.appendChild(isEnabledOnOwnProfileLabel);
     isEnabledOnOwnProfileNode.appendChild(checkboxisEnabledOnOwnProfile);
     contentDiv.appendChild(isEnabledOnOwnProfileNode);
