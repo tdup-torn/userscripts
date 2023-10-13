@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     7.7
+// @version     8.0
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -15,12 +15,12 @@
 // @match       https://www.torn.com/hospitalview.php*
 // @match       https://www.torn.com/imarket.php*
 // @match       https://www.torn.com/forums.php*
-// @match       https://www.torn.com/loader.php*
 // @match       https://www.torn.com/blacklist.php*
 // @match       https://www.torn.com/friendlist.php*
 // @match       https://www.torn.com/pmarket.php*
 // @match       https://www.torn.com/properties.php*
 // @match       https://www.torn.com/war.php*
+// @match       https://www.torn.com/preferences.php*
 // @run-at      document-end
 // @grant       GM.xmlHttpRequest
 // @grant       GM_setValue
@@ -33,6 +33,11 @@
 // @author      TDup
 // ==/UserScript==
 
+// ##### INSTALLATION README #####
+// ##### YOU SHOULD NOT NEED TO EDIT ANYTHING HERE
+// ##### THE SETUP OF THIS SCRIPT IS DONE THROUGH THE BSP OPTION WINDOW, AVAILABLE ON YOUR PROFILE PAGE, ONCE THIS SCRIPT IS INSTALLED
+// ##### MORE INFO HERE : https://www.torn.com/forums.php#/p=threads&f=67&t=16290324&b=0&a=0&to=22705010
+
 // #region LocalStorage
 
 const StorageKey = {
@@ -40,6 +45,10 @@ const StorageKey = {
     // This is the only key sent to the BSP backend.
     PrimaryAPIKey: 'tdup.battleStatsPredictor.PrimaryAPIKey',
     IsPrimaryAPIKeyValid: 'tdup.battleStatsPredictor.IsPrimaryAPIKeyValid',
+
+    // To avoid showing prediction on own profile
+    PlayerId: 'tdup.battleStatsPredictor.PlayerId',
+    IsEnabledOnOwnProfile: 'tdup.battleStatsPredictor.IsEnabledOnOwnProfile',
 
     // Used only on the client side, to import user battlestats. This is not required but useful to have your stats up to date locally, for accurate color code.
     // You can fill manually your stats, or not fill your stat at all, and don't use the color code system.
@@ -60,6 +69,9 @@ const StorageKey = {
     IsTornStatsAPIKeyValid: 'tdup.battleStatsPredictor.IsTornStatsApiKeyValid',
     OldTornStatsSpy: 'tdup.battleStatsPredictor.cache.spy.tornstats_', //TDTODO : to remove in a couple of versions (I keep it so it gets cleared)
     TornStatsSpy: 'tdup.battleStatsPredictor.cache.spy_v2.tornstats_',
+    IsAutoImportTornStatsSpies: 'tdup.battleStatsPredictor.tornstats_isAutoImportSpies',
+    AutoImportLastDatePlayer: 'tdup.battleStatsPredictor.tornstats_AutoImportLastDatePlayer_',
+    AutoImportLastDateFaction: 'tdup.battleStatsPredictor.tornstats_AutoImportLastDateFaction_',
 
     YataAPIKey: 'tdup.battleStatsPredictor.YataApiKey',
     IsYataAPIKeyValid: 'tdup.battleStatsPredictor.IsYataApiKeyValid',
@@ -79,7 +91,8 @@ const StorageKey = {
 
     // Display choice
     IsShowingHonorBars: 'tdup.battleStatsPredictor.isShowingHonorBars',
-    BSPColorTheme: 'tdup.battleStatsPredictor.BspColorTheme', //TDTODO : allow users to tweak this
+    IsShowingAlternativeProfileDisplay: 'tdup.battleStatsPredictor.isShowingAlternativeProfileDisplay',
+    BSPColorTheme: 'tdup.battleStatsPredictor.BspColorTheme',
     ColorStatsThreshold: 'tdup.battleStatsPredictor.ColorStatsThreshold_',
     IsShowingBattleStatsScore: 'tdup.battleStatsPredictor.IsShowingBattleStatsScore',
     IsShowingBattleStatsPercentage: 'tdup.battleStatsPredictor.IsShowingBattleStatsPercentage',
@@ -99,7 +112,6 @@ function GetStorageBoolWithDefaultValue(key, defaultValueIfUnset) {
         return defaultValueIfUnset;
     }
 }
-
 function SetStorage(key, value) {
     try {
         localStorage[key] = value;
@@ -176,21 +188,22 @@ var TDup_PredictorOptionsMenuArea;
 var TDup_PredictorOptionsContentArea;
 
 var ProfileTargetId = -1;
+var FactionTargetId = -1;
 var divWhereToInject;
 var dictDivPerPlayer = {};
+
+var PREDICTION_VALIDITY_DAYS = 5;
+
+var mainColor = "#344556";
+var mainBSPIcon = "https://i.postimg.cc/K8cNpzCS/BSPLogo11low.png";
 
 // #endregion
 
 // #region Styles
 
-//var mainColor = "cadetblue";
-
 var styleToAdd = document.createElement('style');
 
 styleToAdd.innerHTML += '.iconStats {height: 20px; width: 32px; position: relative; text-align: center; font-size: 12px; font-weight:bold; color: black; box-sizing: border-box; border: 1px solid black;line-height: 18px;font-family: initial;}';
-
-//styleToAdd.innerHTML += '.TDup_optionsTabContent {all : initial;}';
-//styleToAdd.innerHTML += '.TDup_optionsTabContent * { all: unset;}';
 
 /* Style the tab */
 styleToAdd.innerHTML += '.TDup_optionsMenu {border: 1px solid #ccc;background-color: #f1f1f1;}';
@@ -216,7 +229,7 @@ styleToAdd.innerHTML += 'font-size: 12px; margin: 5px; max-width: none; outline:
 
 /* Style the tab content */
 
-styleToAdd.innerHTML += '.TDup_optionsTabContentDiv { padding: 10px 10px;}';
+styleToAdd.innerHTML += '.TDup_optionsTabContentDiv { padding: 10px 6px;}';
 styleToAdd.innerHTML += '.TDup_optionsTabContentDiv a { display: initial !important;}';
 
 styleToAdd.innerHTML += '.TDup_optionsTabContentDivSmall { padding: 5px 5px;}';
@@ -226,19 +239,17 @@ styleToAdd.innerHTML += '.TDup_optionsTabContent label { margin:10px 0px; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent p { margin:10px 0px; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent a { color:black !important;}';
 
+styleToAdd.innerHTML += '.TDup_ColoredStatsInjectionDiv { position:absolute;}';
+
 styleToAdd.innerHTML += '.TDup_optionsTabContent input { margin:0px 10px !important; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent input[type = button] { margin:0px 10px 0px 0px !important; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent input:disabled[type = button] { background-color: #AAAAAA; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent input[type = number] { text-align: right; }';
 
-/*styleToAdd.innerHTML += '.TDup_optionsTabContent div { margin:10px 0px !important; }';*/
-
 styleToAdd.innerHTML += '.TDup_button {  background-color: ' + GetColorTheme() + '; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
 styleToAdd.innerHTML += 'font-size: 12px;font-weight: 100; line-height: 1;  margin: 0; max-width: none; min-width: 10px;  outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;';
 styleToAdd.innerHTML += 'text-transform: none;  user-select: none; -webkit-user-select: none;  touch-action: manipulation; width: 100%;}';
 styleToAdd.innerHTML += '.TDup_button: hover, .TDup_button:focus { opacity: .75;}'
-/*styleToAdd.innerHTML += '.TDup_button:disabled { background-color: #AAAAAA; }';*/
-
 
 // Get the first script tag
 var ref = document.querySelector('script');
@@ -272,6 +283,8 @@ const PageType = {
     PointMarket: 'Point Market',
     Properties: 'Properties',
     War: 'War',
+    ChainReport: 'ChainReport',
+    RWReport: 'RWReport',
 };
 
 var mapPageTypeAddress = {
@@ -296,11 +309,13 @@ var mapPageTypeAddress = {
     [PageType.PointMarket]: 'https://www.torn.com/pmarket.php',
     [PageType.Properties]: 'https://www.torn.com/properties.php',
     [PageType.War]: 'https://www.torn.com/war.php',
+    [PageType.ChainReport]: 'https://www.torn.com/war.php?step=chainreport',
+    [PageType.RWReport]: 'https://www.torn.com/war.php?step=rankreport',
 }
 
 function LogInfo(value) {
-    //var now = new Date();
-    //console.log(now.toISOString() + ": " + value);
+    var now = new Date();
+    console.log(": [** BSP **] " + now.toISOString() + " - " + value);
 }
 
 function JSONparse(str) {
@@ -388,8 +403,9 @@ function IsSubscriptionValid() {
 function GetColorTheme() {
     let color = GetStorage(StorageKey.BSPColorTheme);
     if (color == undefined) {
-        return "cadetblue";
+        return mainColor;
     }
+    return JSON.parse(color);
 }
 
 function IsNPC(targetID) {
@@ -672,7 +688,7 @@ function ClearOutdatedPredictionInCache() {
     let lastDateAutoClearOutdatedCache = GetStorage(StorageKey.AutoClearOutdatedCacheLastDate);
     if (lastDateAutoClearOutdatedCache != undefined) {
         let dateConsideredTooOld = new Date();
-        dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 1);
+        dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - PREDICTION_VALIDITY_DAYS);
         if (new Date(lastDateAutoClearOutdatedCache) > dateConsideredTooOld) {
             return;
         }
@@ -694,7 +710,7 @@ function ClearOutdatedPredictionInCache() {
             let prediction = JSON.parse(localStorage[key]);
             if (prediction != undefined) {
                 var expirationDate = new Date();
-                expirationDate.setDate(expirationDate.getDate() - 2);
+                expirationDate.setDate(expirationDate.getDate() - PREDICTION_VALIDITY_DAYS);
                 var predictionDate = new Date(prediction.PredictionDate);
                 if (predictionDate < expirationDate) {
                     localStorage.removeItem(key);
@@ -753,7 +769,7 @@ async function GetPredictionForPlayer(targetId, callback) {
     if (prediction != undefined) {
         var isPredictionValid = true;
         var expirationDate = new Date();
-        expirationDate.setDate(expirationDate.getDate() - 1);
+        expirationDate.setDate(expirationDate.getDate() - PREDICTION_VALIDITY_DAYS);
         var predictionDate = new Date(prediction.PredictionDate);
         if (predictionDate < expirationDate) {
             var key = StorageKey.BSPPrediction + targetId;
@@ -847,10 +863,10 @@ function GetConsolidatedDataForPlayerStats(prediction) {
     return objectToReturn;
 }
 
+
 function OnProfilePlayerStatsRetrieved(playerId, prediction) {
-    if (prediction == undefined) {
+    if (prediction == undefined)
         return;
-    }
 
     let localBattleStats = GetLocalBattleStats();
     let localTBS = localBattleStats.TBS;
@@ -859,45 +875,156 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     let tbsRatio = 100 * consolidatedData.TargetTBS / localTBS;
     let colorComparedToUs = GetColorMaxValueDifference(tbsRatio);
 
-    let ratioFormatted = parseInt(tbsRatio.toFixed(0));
-    ratioFormatted = ratioFormatted.toLocaleString('en-US');
+    let ScoreRatio = 0;
 
-    let iconToUse = "https://i.postimg.cc/G26PdvYL/weight-lifting-up.png";
-    let formattedBattleStats = FormatBattleStats(consolidatedData.TargetTBS);
-    if (consolidatedData.Success == FAIL) {
-        colorComparedToUs = "pink";
-        formattedBattleStats = "Wait";
-    } else if (consolidatedData.Success == MODEL_ERROR) {
-        colorComparedToUs = "pink";
-        formattedBattleStats = "Error";
-    }
-    else if (GetStorageBool(StorageKey.IsShowingBattleStatsScore) == true) {
+    if (consolidatedData.Success != FAIL && consolidatedData.Success != MODEL_ERROR && GetStorageBool(StorageKey.IsShowingBattleStatsScore) == true) {
         formattedBattleStats = FormatBattleStats(consolidatedData.Score);
 
-        let ScoreRatio = 100 * consolidatedData.Score / localBattleStats.Score;
+        ScoreRatio = 100 * consolidatedData.Score / localBattleStats.Score;
         colorComparedToUs = GetColorScoreDifference(ScoreRatio);
-
-        ratioFormatted = parseInt(ScoreRatio.toFixed(0));
-        ratioFormatted = ratioFormatted.toLocaleString('en-US');
-
-        iconToUse = "https://i.postimg.cc/P5KmNgZF/sword-clash.png";
     }
 
-    let extraIndicator = '';
-    let FFToDisplay = '';
-    if (consolidatedData.IsUsingSpy) {
-        extraIndicator = '<img title="Data coming from spy (' + consolidatedData.Spy.Source + ')" width="13" height="13" style="position:absolute; margin: 5px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/>';
-        let FFPredicted = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
-        FFPredicted = Math.max(1, FFPredicted);
-        FFPredicted = FFPredicted.toFixed(2);
-        FFToDisplay = "FF: " + FFPredicted;
-    }
-    else if (consolidatedData.OldSpyStrongerThanPrediction) {
-        extraIndicator = '<img title="Old spy (' + consolidatedData.Spy.Source + ') having greater TBS than prediction, showing old spy data" width="18" height="18" style="position:absolute; margin: 0px -20px; z-index: 102;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png"/>';
+    let FFPredicted2 = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
+    FFPredicted2 = Math.max(1, FFPredicted2);
+    FFPredicted2 = FFPredicted2.toFixed(2);
+
+    let imgType = mainBSPIcon;
+    let extraIndicator = "";
+
+    if (prediction.PredictionDate != undefined) {
+        if (!(prediction.PredictionDate instanceof Date)) {
+            if (!prediction.PredictionDate.endsWith("Z")) {
+                prediction.PredictionDate += "Z";
+            }
+            prediction.PredictionDate = new Date(prediction.PredictionDate);
+        }
     }
 
-    divWhereToInject.innerHTML = '<div style="font-size: 18px; text-align: center; margin-top:7px">' + extraIndicator + '<img src="' + iconToUse + '" width="18" height="18" style="margin-right:5px;"/>' +
-        formattedBattleStats + ' <label style = "color:' + colorComparedToUs + '"; "> (' + ratioFormatted + '%) ' + FFToDisplay + ' </label></div >';
+    if (prediction.IsSpy) {
+        prediction.PredictionDate = new Date(prediction.timestamp * 1000);
+        if (prediction.Source == "TornStats") {
+            imgType = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
+        }
+        else if (prediction.Source == "YATA") {
+            imgType = "https://www.imgbly.com/ib/jPTzuUgrTM.png";
+        }
+
+        extraIndicator = '<img width="18" height="18" style="position:absolute; margin: -10px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/>';
+    }
+
+    if (consolidatedData != undefined) {
+        if (consolidatedData.OldSpyStrongerThanPrediction) {
+            extraIndicator = '<img width="18" height="18" style="position:absolute; margin: -10px -10px;z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png"/>';
+            if (consolidatedData.Spy != undefined) {
+                prediction.PredictionDate = new Date(consolidatedData.Spy.timestamp * 1000);
+                if (consolidatedData.Spy.Source == "TornStats") {
+                    imgType = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
+                }
+                else if (consolidatedData.Spy.Source == "YATA") {
+                    imgType = "https://www.imgbly.com/ib/jPTzuUgrTM.png";
+                }
+            }
+        }
+    }
+
+    var relativeTime = FormatRelativeTime(prediction.PredictionDate);
+
+    let divStats = document.createElement("div");
+
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false)) {
+        var referenceNode = divWhereToInject.firstChild.childNodes[1];
+        divWhereToInject.firstChild.insertBefore(divStats, referenceNode);
+    }
+    else {
+        divWhereToInject.insertBefore(divStats, divWhereToInject.firstChild);
+    }
+
+    let isShowingBScore = GetStorageBool(StorageKey.IsShowingBattleStatsScore);
+
+    let statsDivContent = extraIndicator;
+    statsDivContent += '<table style=width:100%;font-family:initial>';
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingStatsHeader, true)) {
+        statsDivContent += '<tr style="font-size:small;color:white;background-color:#344556" >';
+        statsDivContent += '<th style="border: 1px solid gray;">' + (isShowingBScore ? "BScore" : "TBS") + '</th>';
+
+        statsDivContent += '<th style="border: 1px solid gray;"> % You</th>' +
+            '<th style="border: 1px solid gray;"> FF</th>' +
+            '<th style="border: 1px solid gray;"> Source</th>' +
+            '<th style="border: 1px solid gray;"> Date </th>' +
+            '</tr>';
+    }
+    statsDivContent += '<tr style="font-size:x-large;background-color: ' + colorComparedToUs + '"> ';
+    statsDivContent += '<td style="vertical-align: middle;font-weight: 600;text-align:center;border: 1px solid gray;">' + FormatBattleStats(isShowingBScore ? consolidatedData.Score : consolidatedData.TargetTBS) + '</td>';
+    statsDivContent += '<td style="vertical-align: middle;font-weight: 600;text-align:center;border: 1px solid gray;">' + parseInt(isShowingBScore ? ScoreRatio : tbsRatio) + '%</td>' +
+        '<td style="vertical-align: middle;font-weight: 600;text-align:center;border: 1px solid gray;">' + FFPredicted2 + ' </td>' +
+        '<td style="vertical-align: middle;border: 1px solid gray;text-align:center;background-color:#344556;"> <img src="' + imgType + '" style="max-width: 100px;max-height:30px"/> </td>' +
+        '<td style="vertical-align: middle;text-align:center;border: 1px solid gray;font-size: medium;background-color:#344556;color:white;">' + relativeTime + ' </td>' +
+        '</tr>' +
+        '</table> ';
+
+    divStats.innerHTML = statsDivContent;
+}
+
+function ConvertLocalDateToUTCIgnoringTimezone(date) {
+    return new Date(date.getUTCFullYear(), date.getUTCMonth(),
+        date.getUTCDate(), date.getUTCHours(),
+        date.getUTCMinutes(), date.getUTCSeconds());
+}
+
+function DateUTCNow() {
+    let now = new Date();
+    return ConvertLocalDateToUTCIgnoringTimezone(now);
+}
+
+function FormatRelativeTime(date) {
+    let dateNow = new Date();
+    let diff = Math.round((dateNow - date) / 1000);
+
+    if (diff < 60) {
+        return diff + ' second' + (diff > 1 ? 's' : '') + ' ago';
+    } else if (diff < 3600) {
+        var minutes = Math.floor(diff / 60);
+        return minutes + ' minute' + (minutes > 1 ? 's' : '') + ' ago';
+    } else if (diff < 86400) {
+        var hours = Math.floor(diff / 3600);
+        return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
+    } else if (diff < 86400 * 24) {
+        var hours = Math.floor(diff / (3600 * 24));
+        return hours + ' day' + (hours > 1 ? 's' : '') + ' ago';
+    } else if (diff < 86400 * 24 * 365) {
+        var hours = Math.floor(diff / (3600 * 24 * 365));
+        return hours + ' year' + (hours > 1 ? 's' : '') + ' ago';
+    }
+    else {
+        return date.toLocaleString();
+    }
+}
+
+function IsThereMyNodeAlready(node, urlAttack) {
+    // Base case: if the node is null, stop the recursion
+    if (!node) {
+        return false;
+    }
+
+    // Check if the current node has the specified class name
+    if (node.className === "TDup_ColoredStatsInjectionDiv") {
+        return true;
+    }
+
+    // Check if the inner HTML of the current node starts with the specified URL
+    if (node.href != undefined && node.href.startsWith(urlAttack)) {
+        return true;
+    }
+
+    // Recursively process child nodes
+    for (let i = 0; i < node.childNodes.length; i++) {
+        const childNode = node.childNodes[i];
+        let result = IsThereMyNodeAlready(childNode, urlAttack);
+        if (result) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
@@ -984,12 +1111,10 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     }
     else if (IsPage(PageType.Competition) && isShowingHonorBars) {
 
-        if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=revenge"))
-        {
+        if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=revenge")) {
             mainMarginWhenDisplayingHonorBars = '0px 0px';
         }
-        else
-        {
+        else {
             mainMarginWhenDisplayingHonorBars = '10px 0px';
         }
     }
@@ -1038,7 +1163,8 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     }
 
     for (let i = 0; i < dictDivPerPlayer[targetId].length; i++) {
-        if (dictDivPerPlayer[targetId][i].innerHTML.startsWith('<a href="https://www.torn.com/loader2.php?sid=getInAttack')) {
+
+        if (IsThereMyNodeAlready(dictDivPerPlayer[targetId][i], urlAttack)) {
             continue;
         }
 
@@ -1055,19 +1181,15 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         }
 
         if (IsPage(PageType.Competition) && isShowingHonorBars) {
-            if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=recent"))
-            {
-                if (HasParentWithClass(dictDivPerPlayer[targetId][i],"name lost"))
-                {
+            if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=recent")) {
+                if (HasParentWithClass(dictDivPerPlayer[targetId][i], "name lost")) {
                     mainMarginWhenDisplayingHonorBars = "12px 0px";
                 }
-                else if (HasParentWithClass(dictDivPerPlayer[targetId][i], "name right"))
-                {
+                else if (HasParentWithClass(dictDivPerPlayer[targetId][i], "name right")) {
                     mainMarginWhenDisplayingHonorBars = "0px 0px";
                 }
             }
         }
-
 
         let extraIndicator = '';
         let title = '';
@@ -1087,15 +1209,30 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             title = 'title="FF Predicted = ' + FFPredicted + '"';
         }
 
-
         let toInject = '';
-        if (isShowingHonorBars)
+        if (isShowingHonorBars) {
             toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
-        else
+        }
+        else {
             toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
 
+            if (IsPage(PageType.War) && !IsPage(PageType.ChainReport) && !IsPage(PageType.RWReport)) {
+                dictDivPerPlayer[targetId][i].style.position = "absolute";
+            }
+        }
 
-        dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+        if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true) && !IsPage(PageType.Bounty)) {
+            let coloredStatsInjectionDiv = document.createElement("div");
+            coloredStatsInjectionDiv.className = "TDup_ColoredStatsInjectionDiv";
+            coloredStatsInjectionDiv.innerHTML = toInject;
+
+            // Get the first child element of the parent (or null if there are no child elements)
+            var firstChild = dictDivPerPlayer[targetId][i].firstChild;
+            dictDivPerPlayer[targetId][i].insertBefore(coloredStatsInjectionDiv, firstChild);
+        }
+        else {
+            dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+        }
     }
 }
 
@@ -1157,7 +1294,7 @@ function BuildOptionMenu(menuArea, contentArea, name, shouldBeHiddenWhenInactive
 }
 
 function BuildOptionMenu_Global(tabs, menu) {
-    let contentDiv = BuildOptionMenu(tabs, menu, "Global", false, true);
+    let contentDiv = BuildOptionMenu(tabs, menu, "Profile", false, true);
 
     // API Key
     let mainAPIKeyLabel = document.createElement("label");
@@ -1184,7 +1321,7 @@ function BuildOptionMenu_Global(tabs, menu) {
             errorValidatemainAPIKey.style.visibility = "visible";
             apiRegister.style.display = "block";
             errorValidatemainAPIKey.innerHTML = reason;
-            subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Please fill a valid API Key, and press on validate to get your subscription details</div>';
+            subscriptionEndText.innerHTML = '<div style="color:red">Please fill a valid API Key, and press on validate to get your subscription details</div>';
         }
     }
 
@@ -1223,11 +1360,11 @@ function BuildOptionMenu_Global(tabs, menu) {
     // Subscription info
     subscriptionEndText = document.createElement("div");
     subscriptionEndText.className = "TDup_optionsTabContentDiv";
-    subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Please fill a valid API Key, and press on validate to get your subscription details</div>';
+    subscriptionEndText.innerHTML = '<div style="color:' + GetColorTheme() + '">Please fill a valid API Key, and press on validate to get your subscription details</div>';
 
     if (GetStorageBoolWithDefaultValue(StorageKey.IsPrimaryAPIKeyValid, false) == true) {
         apiRegister.style.display = "none";
-        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Fetching subscription infos from BSP server, it should not be long... </div>';
+        subscriptionEndText.innerHTML = '<div style="color:' + GetColorTheme() + '">Fetching subscription infos from BSP server, it should not be long... </div>';
     }
     contentDiv.appendChild(subscriptionEndText);
 }
@@ -1268,7 +1405,7 @@ function OnPlayerStatsFromTornAPI(success, reason) {
 }
 
 function BuildOptionMenu_Colors(tabs, menu) {
-    let contentDiv = BuildOptionMenu(tabs, menu, "Colors", true);
+    let contentDiv = BuildOptionMenu(tabs, menu, "Settings", true);
 
     let localBattleStats = GetLocalBattleStats();
 
@@ -1458,30 +1595,6 @@ function BuildOptionMenu_Colors(tabs, menu) {
     let colorSettingsNode = document.createElement("div");
     colorSettingsNode.className = "TDup_optionsTabContentDiv";
 
-    // Show Percentage instead
-    let isShowingBattleStatsPercentageDiv = document.createElement("div");
-    isShowingBattleStatsPercentageDiv.className = "TDup_optionsTabContentDiv";
-    let isShowingBattleStatsPercentage = GetStorageBoolWithDefaultValue(StorageKey.IsShowingBattleStatsPercentage, false);
-
-    let checkboxisShowingBattleStatsPercentage = document.createElement('input');
-    checkboxisShowingBattleStatsPercentage.type = "checkbox";
-    checkboxisShowingBattleStatsPercentage.name = "name";
-    checkboxisShowingBattleStatsPercentage.value = "value";
-    checkboxisShowingBattleStatsPercentage.id = "idIsShowingBattleStatsPercentage";
-    checkboxisShowingBattleStatsPercentage.checked = isShowingBattleStatsPercentage;
-
-    checkboxisShowingBattleStatsPercentage.addEventListener("change", () => {
-        let isShowingBattleStatsPercentage = checkboxisShowingBattleStatsPercentage.checked;
-        SetStorage(StorageKey.IsShowingBattleStatsPercentage, isShowingBattleStatsPercentage);
-    });
-
-    var isShowingBattleStatsPercentageLabel = document.createElement('label')
-    isShowingBattleStatsPercentageLabel.htmlFor = "idIsShowingBattleStatsPercentage";
-    isShowingBattleStatsPercentageLabel.innerHTML = 'Display percentage rather than values in grid format';
-    isShowingBattleStatsPercentageDiv.appendChild(isShowingBattleStatsPercentageLabel);
-    isShowingBattleStatsPercentageDiv.appendChild(checkboxisShowingBattleStatsPercentage);
-    contentDiv.appendChild(isShowingBattleStatsPercentageDiv);
-
     // Show Score instead
     let isShowingBattleStatsScoreDiv = document.createElement("div");
     isShowingBattleStatsScoreDiv.className = "TDup_optionsTabContentDiv";
@@ -1599,32 +1712,49 @@ function AddColorPanel(isBSScoreMode, colorSettingsNode, colorItem, id) {
     colorSettingsNode.appendChild(divColor);
 }
 
+function AddOption(contentDiv, StorageKeyValue, defaultValue, textToDisplay, name) {
+    // Alternative profile display
+    let optionNode = document.createElement("div");
+    optionNode.className = "TDup_optionsTabContentDiv";
+    let isShowingAlternativeProfileDisplay = GetStorageBoolWithDefaultValue(StorageKeyValue, defaultValue);
+
+    let optionCheckbox = document.createElement('input');
+    optionCheckbox.type = "checkbox";
+    optionCheckbox.name = "name";
+    optionCheckbox.value = "value";
+    optionCheckbox.id = "id" + name;
+    optionCheckbox.checked = isShowingAlternativeProfileDisplay;
+
+    optionCheckbox.addEventListener("change", () => {
+        let isOptionValue = optionCheckbox.checked;
+        SetStorage(StorageKeyValue, isOptionValue);
+    });
+
+    var optionLabel = document.createElement('label')
+    optionLabel.htmlFor = "id" + name;
+    optionLabel.appendChild(document.createTextNode(textToDisplay));
+    optionNode.appendChild(optionLabel);
+    optionNode.appendChild(optionCheckbox);
+    contentDiv.appendChild(optionNode);
+}
+
 function BuildOptionMenu_Pages(tabs, menu) {
     let contentDiv = BuildOptionMenu(tabs, menu, "Pages", true);
 
     // Displaying Honor bars
-    let isShowingHonorBarsNode = document.createElement("div");
-    isShowingHonorBarsNode.className = "TDup_optionsTabContentDiv";
-    let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
+    AddOption(contentDiv, StorageKey.IsShowingHonorBars, true, 'Are you displaying honor bars?', 'isShowingHonorBars');
 
-    let checkboxIsShowingHonorBars = document.createElement('input');
-    checkboxIsShowingHonorBars.type = "checkbox";
-    checkboxIsShowingHonorBars.name = "name";
-    checkboxIsShowingHonorBars.value = "value";
-    checkboxIsShowingHonorBars.id = "idIsShowingHonorBars";
-    checkboxIsShowingHonorBars.checked = isShowingHonorBars;
+    // Enable on own profile
+    AddOption(contentDiv, StorageKey.IsEnabledOnOwnProfile, false, 'Show stats on your own profile page?', 'IsEnabledOnOwnProfile');
 
-    checkboxIsShowingHonorBars.addEventListener("change", () => {
-        let isShowingHonorBarsNew = checkboxIsShowingHonorBars.checked;
-        SetStorage(StorageKey.IsShowingHonorBars, isShowingHonorBarsNew);
-    });
+    // Alternative profile display
+    AddOption(contentDiv, StorageKey.IsShowingAlternativeProfileDisplay, false, 'Use alternative profile stats location?', 'IsShowingAlternativeProfileDisplay');
 
-    var isShowingHonorBarsLabel = document.createElement('label')
-    isShowingHonorBarsLabel.htmlFor = "idIsShowingHonorBars";
-    isShowingHonorBarsLabel.appendChild(document.createTextNode('Are you displaying honor bars?'));
-    isShowingHonorBarsNode.appendChild(isShowingHonorBarsLabel);
-    isShowingHonorBarsNode.appendChild(checkboxIsShowingHonorBars);
-    contentDiv.appendChild(isShowingHonorBarsNode);
+    // Alternative profile display
+    AddOption(contentDiv, StorageKey.IsShowingStatsHeader, true, 'Show headers above profile stats?', 'IsShowingHeadersOnProfileStats');
+
+    // Show Percentage instead
+    AddOption(contentDiv, StorageKey.IsShowingBattleStatsPercentage, false, 'Display percentage rather than values in little colored squares?', 'IsShowingBattleStatsPercentage');
 
     // Spy
     let spyNumberOfDaysDiv = document.createElement("div");
@@ -1652,6 +1782,26 @@ function BuildOptionMenu_Pages(tabs, menu) {
     spyNumberOfDaysDiv.appendChild(tornStatsNumberOfDaysInput);
     spyNumberOfDaysDiv.appendChild(spyNumberOfDaysDivLabelPart2);
     contentDiv.appendChild(spyNumberOfDaysDiv);
+
+    // BSP Color schema
+    let colorSchemaDiv = document.createElement("div");
+    colorSchemaDiv.className = "TDup_optionsTabContentDiv";
+
+    let colorPickerInput = document.createElement("input");
+    colorPickerInput.type = "color";
+    colorPickerInput.value = GetColorTheme();
+
+    colorPickerInput.addEventListener("change", () => {
+        let color = colorPickerInput.value;
+        SetStorage(StorageKey.BSPColorTheme, JSON.stringify(color));
+    });
+
+    let colorThemeLabel = document.createElement("label");
+    colorThemeLabel.innerHTML = 'BSP Theme color ';
+
+    colorSchemaDiv.appendChild(colorThemeLabel);
+    colorSchemaDiv.appendChild(colorPickerInput);
+    contentDiv.appendChild(colorSchemaDiv);
 
     // Pages
     let textExplanation = document.createElement("div");
@@ -1837,8 +1987,35 @@ function BuildOptionMenu_TornStats(tabs, menu) {
 
     let tornStatsImportTipsDiv = document.createElement("div");
     tornStatsImportTipsDiv.className = "TDup_optionsTabContentDiv";
-    tornStatsImportTipsDiv.innerHTML = 'To import TornStats spies, go on a specific faction page, and click on the [BSP IMPORT SPIES] button at the top of the page.';
+    tornStatsImportTipsDiv.innerHTML = 'To import TornStats spies, go on a specific faction page, and click on the [BSP IMPORT SPIES] button at the top of the page. Or enable the Auto Import feature below!';
     tornStatsNode.appendChild(tornStatsImportTipsDiv);
+
+    //
+
+    let isAutoImportTornStatsSpiesNode = document.createElement("div");
+    isAutoImportTornStatsSpiesNode.className = "TDup_optionsTabContentDiv";
+    let isAutoImportTornStatsSpies = GetStorageBoolWithDefaultValue(StorageKey.IsAutoImportTornStatsSpies, false);
+
+    let checkboxisAutoImportTornStatsSpies = document.createElement('input');
+    checkboxisAutoImportTornStatsSpies.type = "checkbox";
+    checkboxisAutoImportTornStatsSpies.name = "name";
+    checkboxisAutoImportTornStatsSpies.value = "value";
+    checkboxisAutoImportTornStatsSpies.id = "idIsAutoImportTornStatsSpies";
+    checkboxisAutoImportTornStatsSpies.checked = isAutoImportTornStatsSpies;
+
+    checkboxisAutoImportTornStatsSpies.addEventListener("change", () => {
+        let isAutoImportTornStatsSpies = checkboxisAutoImportTornStatsSpies.checked;
+        SetStorage(StorageKey.IsAutoImportTornStatsSpies, isAutoImportTornStatsSpies);
+    });
+
+    var isAutoImportTornStatsSpiesLabel = document.createElement('label')
+    isAutoImportTornStatsSpiesLabel.htmlFor = "idIsAutoImportTornStatsSpies";
+    isAutoImportTornStatsSpiesLabel.appendChild(document.createTextNode('Auto Import TornStats spies? (will auto query TornStats on profile or faction page)'));
+    isAutoImportTornStatsSpiesNode.appendChild(isAutoImportTornStatsSpiesLabel);
+    isAutoImportTornStatsSpiesNode.appendChild(checkboxisAutoImportTornStatsSpies);
+    tornStatsNode.appendChild(isAutoImportTornStatsSpiesNode);
+
+    //
 
     contentDiv.appendChild(tornStatsNode);
 }
@@ -2085,8 +2262,11 @@ function BuildSettingsMenu(node) {
     let th = document.createElement("th");
     th.className = "TDup_optionsCellHeader";
     th.colSpan = 2;
-    let text = document.createTextNode("BSP Settings");
-    th.appendChild(text);
+
+    let imgDivTDup_PredictorOptionsDiv = document.createElement("div");
+    imgDivTDup_PredictorOptionsDiv.innerHTML = '<img src="' + mainBSPIcon + '" style="max-width:150px;max-height:100px;vertical-align:middle;" /> Settings';
+    th.appendChild(imgDivTDup_PredictorOptionsDiv);
+
     rowHeader.appendChild(th);
 
     let raw = table.insertRow();
@@ -2120,39 +2300,6 @@ function BuildSettingsMenu(node) {
 
 // #region Inject into pages
 
-function InjectOptionMenu(node) {
-    if (!node) return;
-
-    mainNode = node;
-    var topPageLinksList = node.querySelector("#top-page-links-list");
-    if (topPageLinksList == undefined)
-        return;
-
-    node.style.position = "relative";
-
-    let btnOpenSettings = document.createElement("a");
-    btnOpenSettings.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
-    btnOpenSettings.innerHTML = '<div class="TDup_button">BSP Settings</div>';
-
-    btnOpenSettings.addEventListener("click", () => {
-        if (TDup_PredictorOptionsDiv == undefined) {
-            BuildSettingsMenu(node);
-        }
-
-        if (TDup_PredictorOptionsDiv.style.display == "block") {
-            TDup_PredictorOptionsDiv.style.display = "none";
-        }
-        else {
-            TDup_PredictorOptionsDiv.style.display = "block";
-            if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
-                FetchUserDataFromBSPServer();
-            }
-        }
-    });
-
-    topPageLinksList.appendChild(btnOpenSettings);
-}
-
 function InjectImportSpiesButton(node) {
     if (!node) return;
 
@@ -2168,11 +2315,6 @@ function InjectImportSpiesButton(node) {
     let btnImportTornStatsSpies = document.createElement("a");
     btnImportTornStatsSpies.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
     btnImportTornStatsSpies.innerHTML = '<div class="TDup_button">BSP Import Spies</div>';
-
-    //btnValidatemainAPIKey = document.createElement("input");
-    //btnValidatemainAPIKey.type = "button";
-    //btnValidatemainAPIKey.value = "Validate";
-    //btnValidatemainAPIKey.className = "TDup_buttonInOptionMenu";
 
     let successImportTornStatsSpiesForFaction = document.createElement("label");
     successImportTornStatsSpiesForFaction.innerHTML = 'Spies imported!';
@@ -2204,12 +2346,22 @@ function InjectImportSpiesButton(node) {
 
     }
 
-    let factionId = parseInt(factionIdStr);
+    el = document.querySelector('.view-wars');
+    if (el != undefined) {
 
-    if (factionId > 0) {
+        let url = el.href;
+        let hrefArray2 = url.split("ranked/");
+        if (hrefArray2.length == 2) {
+            factionIdStr = hrefArray2[1];
+        }
+    }
+
+    FactionTargetId = parseInt(factionIdStr);
+
+    if (FactionTargetId > 0) {
         btnImportTornStatsSpies.addEventListener("click", () => {
             btnImportTornStatsSpies.disabled = true;
-            FetchFactionSpiesFromTornStats(factionId, btnImportTornStatsSpies, successImportTornStatsSpiesForFaction, errorImportTornStatsSpiesForFaction);
+            FetchFactionSpiesFromTornStats(FactionTargetId, btnImportTornStatsSpies, successImportTornStatsSpiesForFaction, errorImportTornStatsSpiesForFaction);
         });
 
         topPageLinksList.appendChild(btnImportTornStatsSpies);
@@ -2218,28 +2370,131 @@ function InjectImportSpiesButton(node) {
     }
 }
 
+var isBSPOptionDisplay = false;
+function InjectOptionMenu(node) {
+    if (!node)
+        node = document;
+
+    if (isBSPOptionDisplay)
+        return;
+
+    mainNode = node;
+    var topPageLinksList = node.querySelector("#top-page-links-list");
+    if (topPageLinksList == undefined)
+        return;
+
+    //node.style.position = "relative";
+
+    let btnOpenSettings = document.createElement("a");
+    btnOpenSettings.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
+    btnOpenSettings.innerHTML = '<div class="TDup_button" style="font-size:x-small"><img src="' + mainBSPIcon + '" style="max-width:100px;max-height:16px;vertical-align:middle;"/>Settings</div>';
+
+    btnOpenSettings.addEventListener("click", () => {
+        if (TDup_PredictorOptionsDiv == undefined) {
+            BuildSettingsMenu(document.querySelector(".content-title"));
+        }
+
+        if (TDup_PredictorOptionsDiv.style.display == "block") {
+            TDup_PredictorOptionsDiv.style.display = "none";
+        }
+        else {
+            TDup_PredictorOptionsDiv.style.display = "block";
+            if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
+                FetchUserDataFromBSPServer();
+            }
+        }
+    });
+
+    topPageLinksList.appendChild(btnOpenSettings);
+    isBSPOptionDisplay = true;
+}
+
+function InjectBSPSettingsButtonInProfile(node) {
+    if (!node)
+        return;
+
+    if (node.className.indexOf('mobile') !== -1) {
+        return;
+    }
+
+    var btnOpenSettingsProfile = document.createElement("a");
+    btnOpenSettingsProfile.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
+    btnOpenSettingsProfile.style.float = "none";
+    btnOpenSettingsProfile.innerHTML = '<div class="TDup_button" style="font-size:large"><img src="' + mainBSPIcon + '" style="max-width:100px;max-height:30px;vertical-align:middle;"/>Settings</div>';
+
+    btnOpenSettingsProfile.addEventListener("click", () => {
+        if (TDup_PredictorOptionsDiv == undefined) {
+            BuildSettingsMenu(document.querySelector(".content-title"));
+        }
+
+        if (TDup_PredictorOptionsDiv.style.display == "block") {
+            TDup_PredictorOptionsDiv.style.display = "none";
+        }
+        else {
+            TDup_PredictorOptionsDiv.style.display = "block";
+            if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
+                FetchUserDataFromBSPServer();
+            }
+        }
+    });
+
+    ;
+    node.insertBefore(btnOpenSettingsProfile, node.children[1]);
+}
+
+var statsAlreadyDisplayedOnProfile = false;
 function InjectInProfilePage(isInit = true, node = undefined) {
+    if (statsAlreadyDisplayedOnProfile)
+        return;
+
+    var mainContainer = document;
+
     var el;
     if (isInit == true) {
-        el = document.querySelectorAll('.empty-block')
+        mainContainer = document;
     }
     else if (node == undefined) {
         return;
     }
     else {
-        el = node.querySelectorAll('.empty-block')
+        mainContainer = node;
     }
 
-    for (var i = 0; i < el.length; ++i) {
-        divWhereToInject = el[i];
-        if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
-            GetPredictionForPlayer(ProfileTargetId, OnProfilePlayerStatsRetrieved);
+    el = mainContainer.querySelectorAll('.empty-block');
+    if (el.length == 0)
+        return;
+
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false)) {
+        el = document.querySelectorAll('.user-information');
+    }
+
+    if (ProfileTargetId == -1)
+        return;
+
+    if (el.length == 0)
+        return;
+
+    statsAlreadyDisplayedOnProfile = true;
+    divWhereToInject = el[0];
+
+    let profileId = GetStorage(StorageKey.PlayerId);
+    if (profileId != undefined && profileId == ProfileTargetId) {
+        if (GetStorageBoolWithDefaultValue(StorageKey.IsEnabledOnOwnProfile, false) == false) {
+            return;
         }
+    }
+
+    AutoSyncTornStatsPlayer(ProfileTargetId);
+
+    if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
+        GetPredictionForPlayer(ProfileTargetId, OnProfilePlayerStatsRetrieved);
     }
 }
 
 function InjectInFactionPage(node) {
     if (!node) return;
+
+    AutoSyncTornStatsFaction(FactionTargetId);
 
     let el = node.querySelectorAll('a');
     for (let i = 0; i < el.length; ++i) {
@@ -2388,15 +2643,18 @@ function IsBSPEnabledOnCurrentPage() {
 
     InitColors();
 
-    if (window.location.href.startsWith("https://www.torn.com/profiles.php")) {
-        LogInfo("Inject Option Menu...");
-        InjectOptionMenu(document.querySelector(".content-title"));
-        LogInfo("Inject Option Menu done.");
-    }
+    LogInfo("Inject Option Menu...");
+
+    InjectBSPSettingsButtonInProfile(document.querySelector(".container clearfix"));
+    InjectBSPSettingsButtonInProfile(document.querySelector("#sidebar"));
+    LogInfo("Inject Option Menu done.");
 
     if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
         InjectImportSpiesButton(document.querySelector(".content-title"));
     }
+
+    if (IsPage(PageType.Profile))
+        InjectOptionMenu(document.querySelector(".content-title"));
 
     if (!IsSubscriptionValid()) {
         LogInfo("BSP Subscription invalid");
@@ -2422,7 +2680,7 @@ function IsBSPEnabledOnCurrentPage() {
         setTimeout(InjectInProfilePage, 3000);
     }
     else if (IsPage(PageType.Faction) || IsPage(PageType.War)) {
-        //InjectInFactionPage(node);
+        //AutoSyncTornStatsFaction(factionId);
     }
     else if (IsPage(PageType.Bounty)) {
         InjectInBountyPagePage(true, undefined);
@@ -2439,6 +2697,8 @@ function IsBSPEnabledOnCurrentPage() {
         mutations.forEach(function (mutation) {
             for (const node of mutation.addedNodes) {
                 if (node.querySelector) {
+                    InjectBSPSettingsButtonInProfile(document.querySelector(".container clearfix"));
+
                     if (IsPage(PageType.Profile)) {
                         InjectInProfilePage(false, node);
                     }
@@ -2513,13 +2773,13 @@ function FetchUserDataFromBSPServer() {
                         var minutes_difference = parseInt(time_difference / (1000 * 60));
                         minutes_difference %= 60;
 
-                        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Thank you for using Battle Stats Predictor (BSP) script!<br /><br />Your subscription expires in '
+                        subscriptionEndText.innerHTML = '<div style="color:' + GetColorTheme() + '">Thank you for using Battle Stats Predictor (BSP) script!<br /><br /> <div style="font-weight:bolder;">Your subscription expires in '
                             + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
                             + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for' + text + '</div>';
+                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.</div><br /><br />You can extend it for' + text + '</div>';
                     }
                     else {
-                        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
+                        subscriptionEndText.innerHTML = '<div style="color:red">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
                     }
 
                     RefreshOptionMenuWithSubscription();
@@ -2590,6 +2850,7 @@ function VerifyTornAPIKey(callback) {
                 return;
             }
             else {
+                SetStorage(StorageKey.PlayerId, j.player_id);
                 callback(true);
                 return;
             }
@@ -2671,6 +2932,93 @@ function VerifyTornStatsAPIKey(callback) {
     });
 }
 
+var pageViewOnce = false;
+function AutoSyncTornStatsFaction(factionId) {
+    if (pageViewOnce == true)
+        return;
+
+    pageViewOnce = true;
+
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsAutoImportTornStatsSpies) == false)
+        return;
+
+    let lastDateAutoSyncThisFaction = GetStorage(StorageKey.AutoImportLastDateFaction + factionId);
+    if (lastDateAutoSyncThisFaction != undefined) {
+        let dateConsideredTooOld = new Date();
+        dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 15);
+        if (new Date(lastDateAutoSyncThisFaction) > dateConsideredTooOld) {
+            LogInfo("AutoSyncTornStatsFaction  - " + factionId + " - Too recent call in database, skipping");
+            return;
+        }
+    }
+
+    SetStorage(StorageKey.AutoImportLastDateFaction + factionId, new Date());
+    LogInfo("AutoSyncTornStatsFaction  - " + factionId + " - Getting spies from faction..");
+    return FetchFactionSpiesFromTornStats(factionId);
+}
+
+function AutoSyncTornStatsPlayer(playerId) {
+    if (pageViewOnce == true)
+        return;
+
+    pageViewOnce = true;
+
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsAutoImportTornStatsSpies) == false)
+        return;
+
+    let lastDateAutoSyncThisFaction = GetStorage(StorageKey.AutoImportLastDatePlayer + playerId);
+    if (lastDateAutoSyncThisFaction != undefined) {
+        let dateConsideredTooOld = new Date();
+        dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 15);
+        if (new Date(lastDateAutoSyncThisFaction) > dateConsideredTooOld) {
+            LogInfo("AutoSyncTornStatsPlayer  - " + playerId + " - Too recent call in database, skipying");
+            return;
+        }
+    }
+
+    SetStorage(StorageKey.AutoImportLastDatePlayer + playerId, new Date());
+    LogInfo("AutoSyncTornStatsPlayer  - " + playerId + " - Getting spies from player..");
+    return FetchPlayerSpiesFromTornStats(playerId);
+}
+
+function FetchPlayerSpiesFromTornStats(playerId) {
+
+    let urlToCall = "https://www.tornstats.com/api/v2/" + GetStorage(StorageKey.TornStatsAPIKey) + "/spy/user/" + playerId;
+
+    return new Promise((resolve, reject) => {
+        GM.xmlHttpRequest({
+            method: 'GET',
+            url: urlToCall,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            onload: (response) => {
+                try {
+                    var results = JSON.parse(response.responseText);
+
+                    if (results == undefined) {
+                        LogInfo("Error server: Spy not retrieved from TornStats for player " + playerId);
+                        return;
+                    }
+                    if (results.status === false) {
+                        LogInfo("Error request: Spy not retrieved from TornStats for player " + playerId);
+                        return;
+                    }
+
+                    LogInfo("Spy retrieved from TornStats for player " + playerId);
+                    let setSpyInCacheResult = SetTornStatsSpyInCache(playerId, results.spy);
+
+                } catch (err) {
+                    reject(err);
+                }
+            },
+            onerror: (err) => {
+                reject(err);
+            }
+        });
+    });
+}
+
 function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedElem) {
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
@@ -2681,21 +3029,30 @@ function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedEl
             },
             onload: (response) => {
                 try {
-                    button.disabled = false;
+                    if (button != undefined)
+                        button.disabled = false;
+
                     var results = JSON.parse(response.responseText);
+                    var isUI = successElem != undefined;
 
                     if (results == undefined) {
-                        failedElem.style.visibility = "visible";
-                        failedElem.style.display = "block";
-                        failedElem.innerHTML = "Error while calling TornStats";
-                        successElem.style.visibility = "hidden";
+                        LogInfo("Error while calling TornStats");
+                        if (isUI) {
+                            failedElem.style.visibility = "visible";
+                            failedElem.style.display = "block";
+                            failedElem.innerHTML = "Error while calling TornStats";
+                            successElem.style.visibility = "hidden";
+                        }
                         return;
                     }
                     if (results.status === false) {
-                        failedElem.style.visibility = "visible";
-                        failedElem.style.display = "block";
-                        failedElem.innerHTML = results.message;
-                        successElem.style.visibility = "hidden";
+                        LogInfo("Error - TornStats");
+                        if (isUI) {
+                            failedElem.style.visibility = "visible";
+                            failedElem.style.display = "block";
+                            failedElem.innerHTML = results.message;
+                            successElem.style.visibility = "hidden";
+                        }
                         return;
                     }
 
@@ -2721,10 +3078,14 @@ function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedEl
                         }
                     }
 
-                    failedElem.style.visibility = "hidden";
-                    successElem.style.visibility = "visible";
-                    successElem.style.display = "block";
-                    successElem.innerHTML = membersCount + " spies fetched from TornStats. " + newSpiesAdded + " new spies added. " + spyUpdated + " spies updated. " + spyError + " errors";
+                    let textToDisplay = membersCount + " spies fetched from TornStats. " + newSpiesAdded + " new spies added. " + spyUpdated + " spies updated. " + spyError + " errors";
+                    LogInfo(textToDisplay);
+                    if (isUI) {
+                        failedElem.style.visibility = "hidden";
+                        successElem.style.visibility = "visible";
+                        successElem.style.display = "block";
+                        successElem.innerHTML = textToDisplay;
+                    }
                 } catch (err) {
                     reject(err);
                 }
