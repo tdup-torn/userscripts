@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.1
+// @version     8.2
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -192,6 +192,8 @@ var ProfileTargetId = -1;
 var FactionTargetId = -1;
 var divWhereToInject;
 var dictDivPerPlayer = {};
+
+var OnMobile = false;
 
 var PREDICTION_VALIDITY_DAYS = 5;
 
@@ -1083,7 +1085,12 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         mainMarginWhenDisplayingHonorBars = '5px -5px';
     }
     else if (IsPage(PageType.Market) && isShowingHonorBars) {
-        mainMarginWhenDisplayingHonorBars = '-27px 55px';
+        if (OnMobile) {
+            mainMarginWhenDisplayingHonorBars = '8px 0px';
+        }
+        else {
+            mainMarginWhenDisplayingHonorBars = '-27px 55px';
+        }        
     }
     else if (IsPage(PageType.Hospital) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px 6px';
@@ -1129,6 +1136,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             mainMarginWhenDisplayingHonorBars = '10px 0px';
         }
     }
+
 
     let consolidatedData = GetConsolidatedDataForPlayerStats(prediction);
     let localBattleStats = GetLocalBattleStats();
@@ -2428,6 +2436,7 @@ function InjectBSPSettingsButtonInProfile(node) {
         return;
 
     if (node.className.indexOf('mobile') !== -1) {
+        OnMobile = true;
         return;
     }
 
