@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.0
+// @version     8.1
 // @namespace   tdup.battleStatsPredictor
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
@@ -96,6 +96,7 @@ const StorageKey = {
     ColorStatsThreshold: 'tdup.battleStatsPredictor.ColorStatsThreshold_',
     IsShowingBattleStatsScore: 'tdup.battleStatsPredictor.IsShowingBattleStatsScore',
     IsShowingBattleStatsPercentage: 'tdup.battleStatsPredictor.IsShowingBattleStatsPercentage',
+    IsClickingOnProfileStatsAttackPlayer: 'tdup.battleStatsPredictor.IsClickingOnProfileStatsAttackPlayer',
 
     // Cache management
     AutoClearOutdatedCacheLastDate: 'tdup.battleStatsPredictor.AutoClearOutdatedCacheLastDate',
@@ -931,6 +932,16 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
 
     let divStats = document.createElement("div");
 
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsClickingOnProfileStatsAttackPlayer)) {
+        divStats.addEventListener('click', function () {
+            // Define the URL you want to open
+            var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + playerId;
+
+            // Open the URL in a new tab or window
+            window.open(urlAttack, '_blank');
+        });
+    }
+
     if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false)) {
         var referenceNode = divWhereToInject.firstChild.childNodes[1];
         divWhereToInject.firstChild.insertBefore(divStats, referenceNode);
@@ -940,8 +951,8 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     }
 
     let isShowingBScore = GetStorageBool(StorageKey.IsShowingBattleStatsScore);
-
     let statsDivContent = extraIndicator;
+
     statsDivContent += '<table style=width:100%;font-family:initial>';
     if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingStatsHeader, true)) {
         statsDivContent += '<tr style="font-size:small;color:white;background-color:#344556" >';
@@ -1752,6 +1763,9 @@ function BuildOptionMenu_Pages(tabs, menu) {
 
     // Alternative profile display
     AddOption(contentDiv, StorageKey.IsShowingStatsHeader, true, 'Show headers above profile stats?', 'IsShowingHeadersOnProfileStats');
+
+    // Alternative profile display
+    AddOption(contentDiv, StorageKey.IsClickingOnProfileStatsAttackPlayer, false, 'Click on profile stats area to attack?', 'IsClickingOnProfileStatsAttackPlayer');
 
     // Show Percentage instead
     AddOption(contentDiv, StorageKey.IsShowingBattleStatsPercentage, false, 'Display percentage rather than values in little colored squares?', 'IsShowingBattleStatsPercentage');
