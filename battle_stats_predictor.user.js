@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.3
+// @version     8.4
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -99,6 +99,7 @@ const StorageKey = {
     IsShowingBattleStatsScore: 'tdup.battleStatsPredictor.IsShowingBattleStatsScore',
     IsShowingBattleStatsPercentage: 'tdup.battleStatsPredictor.IsShowingBattleStatsPercentage',
     IsClickingOnProfileStatsAttackPlayer: 'tdup.battleStatsPredictor.IsClickingOnProfileStatsAttackPlayer',
+    IsHidingBSPOptionButtonInToolbar: 'tdup.battleStatsPredictor.IsHidingBSPOptionButtonInToolbar',
 
     // Cache management
     AutoClearOutdatedCacheLastDate: 'tdup.battleStatsPredictor.AutoClearOutdatedCacheLastDate',
@@ -1777,6 +1778,9 @@ function BuildOptionMenu_Pages(tabs, menu) {
     // Alternative profile display
     AddOption(contentDiv, StorageKey.IsClickingOnProfileStatsAttackPlayer, false, 'Click on profile stats area to attack?', 'IsClickingOnProfileStatsAttackPlayer');
 
+    // Hide BSP Option button, in toolbar
+    AddOption(contentDiv, StorageKey.IsHidingBSPOptionButtonInToolbar, false, 'Hide BSP Option button in toolbar?', 'IsHidingBSPOptionButtonInToolbar');
+
     // Show Percentage instead
     AddOption(contentDiv, StorageKey.IsShowingBattleStatsPercentage, false, 'Display percentage rather than values in little colored squares?', 'IsShowingBattleStatsPercentage');
 
@@ -2239,7 +2243,7 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
 
     let ForumThread = document.createElement("div");
     ForumThread.className = "TDup_optionsTabContentDiv";
-    ForumThread.innerHTML = 'Read basic setup, Q&A and R+ the script if you like it on the <a href="https://www.torn.com/forums.php#/p=threads&f=67&t=16290324&b=0&a=0&to=22705010"> Forum thread</a>';
+    ForumThread.innerHTML = 'Read basic setup, Q&A and R+ the script if you like it on the <a href="https://www.torn.com/forums.php#/p=threads&f=67&t=16290324&b=0&a=0&to=22705010" target="_blank"> Forum thread</a>';
     contentDiv.appendChild(ForumThread);
 
     let DiscordLink = document.createElement("div");
@@ -2251,7 +2255,7 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
 
     let DiscordLinkImg = document.createElement("div");
     DiscordLinkImg.style.textAlign = "center";
-    DiscordLinkImg.innerHTML = '<a href="https://discord.gg/zgrVX5j6MQ"><img width="64" height="64" title="Discord" src="https://wiki.soldat.pl/images/6/6f/DiscordLogo.png" /> </a>';
+    DiscordLinkImg.innerHTML = '<a href="https://discord.gg/zgrVX5j6MQ" target="_blank"><img width="64" height="64" title="Discord" src="https://wiki.soldat.pl/images/6/6f/DiscordLogo.png" /> </a>';
 
     DiscordLink.appendChild(DiscordLinkImg);
 
@@ -2668,18 +2672,21 @@ function IsBSPEnabledOnCurrentPage() {
 
     InitColors();
 
-    LogInfo("Inject Option Menu...");
+    if (!GetStorageBool(StorageKey.IsHidingBSPOptionButtonInToolbar))
+    {
+        LogInfo("Inject Option Menu...");
 
-    InjectBSPSettingsButtonInProfile(document.querySelector(".container clearfix"));
-    InjectBSPSettingsButtonInProfile(document.querySelector("#sidebar"));
-    LogInfo("Inject Option Menu done.");
-
-    if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
-        InjectImportSpiesButton(document.querySelector(".content-title"));
+        InjectBSPSettingsButtonInProfile(document.querySelector(".container clearfix"));
+        InjectBSPSettingsButtonInProfile(document.querySelector("#sidebar"));
+        LogInfo("Inject Option Menu done.");
     }
 
     if (IsPage(PageType.Profile))
         InjectOptionMenu(document.querySelector(".content-title"));
+
+    if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
+        InjectImportSpiesButton(document.querySelector(".content-title"));
+    }
 
     if (!IsSubscriptionValid()) {
         LogInfo("BSP Subscription invalid");
