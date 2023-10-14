@@ -1,8 +1,10 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.2
+// @version     8.3
 // @namespace   tdup.battleStatsPredictor
+// @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
+// @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
 // @match       https://www.torn.com/halloffame.php*
@@ -1002,11 +1004,11 @@ function FormatRelativeTime(date) {
         var hours = Math.floor(diff / 3600);
         return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
     } else if (diff < 86400 * 24) {
-        var hours = Math.floor(diff / (3600 * 24));
-        return hours + ' day' + (hours > 1 ? 's' : '') + ' ago';
+        var days = Math.floor(diff / (3600 * 24));
+        return days + ' day' + (days > 1 ? 's' : '') + ' ago';
     } else if (diff < 86400 * 24 * 365) {
-        var hours = Math.floor(diff / (3600 * 24 * 365));
-        return hours + ' year' + (hours > 1 ? 's' : '') + ' ago';
+        var years = Math.floor(diff / (3600 * 24 * 365));
+        return years + ' year' + (years > 1 ? 's' : '') + ' ago';
     }
     else {
         return date.toLocaleString();
