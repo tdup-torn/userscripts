@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.4
+// @version     8.5
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -1093,7 +1093,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         }
         else {
             mainMarginWhenDisplayingHonorBars = '-27px 55px';
-        }        
+        }
     }
     else if (IsPage(PageType.Hospital) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px 6px';
@@ -2620,22 +2620,44 @@ function InjectInGenericGridPage(isInit, node) {
     }
     for (let i = 0; i < el.length; ++i) {
         var iter = el[i];
-        var toSplit = iter.innerHTML;
-        var myArray = toSplit.split("[");
-        if (myArray.length < 2)
-            continue;
+        var title = iter.title;
 
-        myArray = myArray[1].split("]");
-        if (myArray.length < 1)
+        var playerId = -1;
+        let myArray = iter.innerHTML.split("[");
+        if (myArray.length >= 2) {
+
+            myArray = myArray[1].split("]");
+            if (myArray.length >= 1) {
+                playerId = parseInt(myArray[0]);
+            }
+        }
+
+        if (playerId == -1) {
+            if (iter.title != undefined) {
+                let myArray2 = iter.title.split("[");
+                if (myArray2.length >= 2) {
+
+                    myArray2 = myArray2[1].split("]");
+                    if (myArray2.length >= 1) {
+                        playerId = parseInt(myArray2[0]);
+                    }
+                }
+            }
+        }
+
+        if (playerId == -1)
             continue;
 
         var parentNode = iter.parentNode;
         var style = window.getComputedStyle(parentNode);
-        if (style.display == "none") {
-            continue;
-        }
+        if (style.display == "none")
+            continue;        
 
-        var playerId = parseInt(myArray[0]);
+        var thisStyle = window.getComputedStyle(iter);
+        if (thisStyle.width == "0px")
+            continue;
+
+       
         if (!(playerId in dictDivPerPlayer)) {
             dictDivPerPlayer[playerId] = new Array();
         }
@@ -2672,8 +2694,7 @@ function IsBSPEnabledOnCurrentPage() {
 
     InitColors();
 
-    if (!GetStorageBool(StorageKey.IsHidingBSPOptionButtonInToolbar))
-    {
+    if (!GetStorageBool(StorageKey.IsHidingBSPOptionButtonInToolbar)) {
         LogInfo("Inject Option Menu...");
 
         InjectBSPSettingsButtonInProfile(document.querySelector(".container clearfix"));
