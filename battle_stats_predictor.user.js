@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.5
+// @version     8.6
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -915,12 +915,12 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
             imgType = "https://www.imgbly.com/ib/jPTzuUgrTM.png";
         }
 
-        extraIndicator = '<img width="18" height="18" style="position:absolute; margin: -10px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/>';
+        extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/>';
     }
 
     if (consolidatedData != undefined) {
         if (consolidatedData.OldSpyStrongerThanPrediction) {
-            extraIndicator = '<img width="18" height="18" style="position:absolute; margin: -10px -10px;z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png"/>';
+            extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png"/>';
             if (consolidatedData.Spy != undefined) {
                 prediction.PredictionDate = new Date(consolidatedData.Spy.timestamp * 1000);
                 if (consolidatedData.Spy.Source == "TornStats") {
@@ -1220,11 +1220,11 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             FFPredicted = Math.max(1, FFPredicted);
             FFPredicted = FFPredicted.toFixed(2);
 
-            extraIndicator = '<img width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />';
+            extraIndicator = '<img style="position:absolute; width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />';
             title = 'title="Data coming from spy (' + consolidatedData.Spy.Source + ') FF : ' + FFPredicted + ' "';
         }
         else if (consolidatedData.OldSpyStrongerThanPrediction) {
-            extraIndicator = '<img width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png" />';
+            extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png" />';
             title = 'title="Old spy (' + consolidatedData.Spy.Source + ' FF Predicted = ' + FFPredicted + ') having greater TBS than prediction -> showing old spy data instead"';
         }
         else if (showScoreInstead) {
