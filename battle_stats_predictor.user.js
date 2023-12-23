@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.6
+// @version     8.7
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -37,7 +37,7 @@
 
 // ##### INSTALLATION README #####
 // ##### YOU SHOULD NOT NEED TO EDIT ANYTHING HERE
-// ##### THE SETUP OF THIS SCRIPT IS DONE THROUGH THE BSP OPTION WINDOW, AVAILABLE ON YOUR PROFILE PAGE, ONCE THIS SCRIPT IS INSTALLED
+// ##### THE SETUP OF THIS SCRIPT IS DONE THROUGH THE BSP OPTION WINDOW, AVAILABLE ON YOUR TORN PROFILE PAGE, ONCE THIS SCRIPT IS INSTALLED
 // ##### MORE INFO HERE : https://www.torn.com/forums.php#/p=threads&f=67&t=16290324&b=0&a=0&to=22705010
 
 // #region LocalStorage
@@ -279,6 +279,8 @@ const PageType = {
     Hospital: 'Hospital',
     Chain: 'Chain',
     FactionControl: 'Faction Control',
+    FactionControlPayday: 'Faction Control Per Day',
+    FactionControlApplications: 'Faction Control Applications',
     Market: 'Market',
     Forum: 'Forum',
     ForumThread: 'ForumThread',
@@ -305,6 +307,8 @@ var mapPageTypeAddress = {
     [PageType.Hospital]: 'https://www.torn.com/hospitalview.php',
     [PageType.Chain]: 'https://www.torn.com/factions.php?step=your#/war/chain',
     [PageType.FactionControl]: 'https://www.torn.com/factions.php?step=your#/tab=controls',
+    [PageType.FactionControlPayday]: 'https://www.torn.com/factions.php?step=your#/tab=controls',
+    [PageType.FactionControlApplications]: 'https://www.torn.com/factions.php?step=your#/tab=controls',
     [PageType.Market]: 'https://www.torn.com/imarket.php',
     [PageType.Forum]: 'https://www.torn.com/forums.php',
     [PageType.ForumThread]: 'https://www.torn.com/forums.php#/p=threads',
@@ -318,6 +322,13 @@ var mapPageTypeAddress = {
     [PageType.ChainReport]: 'https://www.torn.com/war.php?step=chainreport',
     [PageType.RWReport]: 'https://www.torn.com/war.php?step=rankreport',
 }
+
+var mapPageAddressEndWith = {
+    [PageType.FactionControl]: '/tab=controls',
+    [PageType.FactionControlPayday] : 'tab=controls&option=pay-day',
+    [PageType.FactionControlApplications] : 'tab=controls&option=application'
+}
+
 
 function LogInfo(value) {
     var now = new Date();
@@ -367,7 +378,17 @@ function FormatBattleStats(number) {
 }
 
 function IsPage(pageType) {
-    return window.location.href.startsWith(mapPageTypeAddress[pageType]);
+    let endWith = mapPageAddressEndWith[pageType];
+    if (endWith != undefined) {
+
+        return window.location.href.includes(endWith);
+    }
+
+    let startWith = mapPageTypeAddress[pageType];
+    if (startWith != undefined) {
+        return startWith.startsWith(mapPageTypeAddress[pageType]);
+    }
+    return false;   
 }
 
 function IsUrlEndsWith(value) {
@@ -1049,7 +1070,21 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     let spyMargin = '-6px 23px';
     let mainMarginWhenDisplayingHonorBars = "-10px -9px";
 
-    if (IsPage(PageType.Chain) && !isShowingHonorBars) {
+    if (IsPage(PageType.FactionControl)) {
+        if (IsPage(PageType.FactionControlPayday)) {
+            mainMarginWhenDisplayingHonorBars = '-25px 20px';
+            spyMargin = '-3px 12px';
+        }
+        else if (IsPage(PageType.FactionControlApplications)) {
+            mainMarginWhenDisplayingHonorBars = '-10px 0px';
+            spyMargin = '-5px 23px';
+        }
+        else {
+            mainMarginWhenDisplayingHonorBars = '0px';
+            spyMargin = '-5px 23px';
+        }
+    }
+    else if (IsPage(PageType.Chain) && !isShowingHonorBars) {
         spyMargin = '-1px 23px';
     }
     else if (IsPage(PageType.Faction)) {
@@ -1190,7 +1225,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             continue;
         }
 
-        let isWall = IsPage(PageType.Faction) && dictDivPerPlayer[targetId][i].className == "user name ";
+        let isWall = IsPage(PageType.Faction) && !IsPage(PageType.FactionControl) && dictDivPerPlayer[targetId][i].className == "user name ";
         if (isWall) {
             //WALL display
             if (isShowingHonorBars) {
@@ -2744,9 +2779,6 @@ function IsBSPEnabledOnCurrentPage() {
 
     // Start observer, to inject within dynamically loaded content
     var observer = new MutationObserver(function (mutations, observer) {
-        if (IsPage(PageType.FactionControl) && isShowingHonorBars == true) {
-            return; // Temporary disable the controls tab in the faction page, because forever loading on honor bars
-        }
         mutations.forEach(function (mutation) {
             for (const node of mutation.addedNodes) {
                 if (node.querySelector) {
