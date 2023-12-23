@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.7
+// @version     8.8
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -386,7 +386,7 @@ function IsPage(pageType) {
 
     let startWith = mapPageTypeAddress[pageType];
     if (startWith != undefined) {
-        return startWith.startsWith(mapPageTypeAddress[pageType]);
+        return window.location.href.startsWith(mapPageTypeAddress[pageType]);
     }
     return false;   
 }
@@ -1117,7 +1117,8 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         }
     }
     else if (IsPage(PageType.HallOfFame) && isShowingHonorBars) {
-        mainMarginWhenDisplayingHonorBars = '0px';
+        mainMarginWhenDisplayingHonorBars = '-25px 50px';
+        spyMargin = '-30px 75px';
     }
     else if (IsPage(PageType.PointMarket) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '5px -5px';
