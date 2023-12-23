@@ -386,7 +386,7 @@ function IsPage(pageType) {
 
     let startWith = mapPageTypeAddress[pageType];
     if (startWith != undefined) {
-        return window.location.href.startsWith(mapPageTypeAddress[pageType]);
+        return window.location.href.startsWith(startWith);
     }
     return false;   
 }
