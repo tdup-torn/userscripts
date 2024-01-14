@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.8
+// @version     8.9
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -103,6 +103,7 @@ const StorageKey = {
 
     // Cache management
     AutoClearOutdatedCacheLastDate: 'tdup.battleStatsPredictor.AutoClearOutdatedCacheLastDate',
+    TestLocalStorageKey: 'tdup.battleStatsPredictor.TestLocalStorage',
 };
 
 function GetStorage(key) { return localStorage[key]; }
@@ -606,16 +607,19 @@ function GetMostRecentSpyFromCache(playerId) {
 }
 
 const eStorageType = {
-    All: 'All',
+    All_BSP: 'All_BSP',
     Prediction: 'Prediction',
     TornStatsSpies: 'TornStatsSpies',
-    YATASpies: 'YATASpies'
+    YATASpies: 'YATASpies',
+    ALL_ExceptBSP: 'ALL_ExceptBSP',
+    TornChat: 'TornChat'    
 };
 
 function GetPredictionStorage(storageType) {
     let prefix = "";
     switch (storageType) {
-        case eStorageType.All:
+        case eStorageType.All_BSP:
+        case eStorageType.ALL_ExceptBSP:
             {
                 prefix = "tdup.battleStatsPredictor.";
                 break;
@@ -635,6 +639,11 @@ function GetPredictionStorage(storageType) {
                 prefix = StorageKey.YataSpy;
                 break;
             }
+        case eStorageType.TornChat:
+            {
+                prefix = "chat:";
+                break;
+            }
         default:
             return undefined;
     }
@@ -642,7 +651,14 @@ function GetPredictionStorage(storageType) {
     let itemNb = 0;
     let toReturn = "";
     for (let key in localStorage) {
-        if (key.startsWith(prefix)) {
+
+        if (storageType == eStorageType.ALL_ExceptBSP) {
+            if (!key.startsWith(prefix)) {
+                toReturn += localStorage[key] + "\r\n";
+                itemNb++;
+            }
+        }
+        else if (key.startsWith(prefix)) {
             toReturn += localStorage[key] + "\r\n";
             itemNb++;
         }
@@ -655,7 +671,7 @@ function GetPredictionStorage(storageType) {
 function ClearCache(storageType) {
     let prefix = "";
     switch (storageType) {
-        case eStorageType.All:
+        case eStorageType.All_BSP:
             {
                 prefix = "tdup.battleStatsPredictor.";
                 break;
@@ -675,12 +691,22 @@ function ClearCache(storageType) {
                 prefix = StorageKey.YataSpy;
                 break;
             }
+        case eStorageType.TornChat:
+            {
+                prefix = "chat:";
+                break;
+            }
         default:
-            return undefined;
+            return;
     }
 
     for (let key in localStorage) {
-        if (key.startsWith(prefix)) {
+        if (storageType == eStorageType.ALL_ExceptBSP) {
+            if (!key.startsWith(prefix)) {
+                localStorage.removeItem(key);
+            }
+        }
+        else if (key.startsWith(prefix)) {
             localStorage.removeItem(key);
         }
     }
@@ -689,7 +715,7 @@ function ClearCache(storageType) {
 function ExportPredictorStorage() {
     let toReturn = "";
     for (let key in localStorage) {
-        if (key.startsWith('tdup.battleStatsPredictor.')) {
+        if (!key.startsWith('tdup.battleStatsPredictor.')) {
             toReturn += localStorage[key] + "\r\n";
         }
     }
@@ -709,6 +735,24 @@ function ExportPredictorStorage() {
     // Add click event to <a> tag to save file.
     link.click();
     URL.revokeObjectURL(link.href);
+}
+
+function TestLocalStorage() {
+    try {
+        var textToStore = 'This is a test to detect if there is enough space in the localstorage.';
+        textToStore+=     'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
+        textToStore+=     'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
+        textToStore+=     'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
+        textToStore+=     'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
+
+        localStorage[StorageKey.TestLocalStorageKey] = textToStore;
+        localStorage.removeItem(StorageKey.TestLocalStorageKey);
+        return true;
+    }
+    catch (e) {
+        LogInfo("BSP threw an exception in SetStorage method : " + e);
+        return false;
+    }
 }
 
 function ClearOutdatedPredictionInCache() {
@@ -2087,31 +2131,29 @@ function BuildOptionMenu_TornStats(tabs, menu) {
 function BuildOptionMenu_Debug(tabs, menu) {
     let contentDiv = BuildOptionMenu(tabs, menu, "Debug", false);
 
-    let YATAColor = "pink";
-    let TornStatsColor = "green";
-    let PredictionColor = "blue";
-    let BSPColor = "yellow";
-
     // <LocalStorage display>
     let maxStorageSize = 5000000;
-    let storageALLResult = GetPredictionStorage(eStorageType.All);
-    let storageALLSize = storageALLResult[1];
-    let ratioALLFull = parseInt(((storageALLSize / maxStorageSize) * 100));
+
+    let storageALLExceptBSPResult = GetPredictionStorage(eStorageType.ALL_ExceptBSP);
+    let storageALLExceptBSPSize = storageALLExceptBSPResult[1];
+
+    let storageTornChatResult = GetPredictionStorage(eStorageType.TornChat);
+    let storageTornChatSize = storageTornChatResult[1];
+
+    let storageALLBSPResult = GetPredictionStorage(eStorageType.All_BSP);
+    let storageALLBSPSize = storageALLBSPResult[1];
 
     let storagePredictionResult = GetPredictionStorage(eStorageType.Prediction);
-    let storagePredictionNumber = storagePredictionResult[0];
     let storagePredictionSize = storagePredictionResult[1];
-    let ratioPrediction = parseInt(((storagePredictionSize / maxStorageSize) * 100));
+    let storagePredictionNumber = storagePredictionResult[0];
 
     let storageTornStatsResult = GetPredictionStorage(eStorageType.TornStatsSpies);
-    let storageTornStatsNumber = storageTornStatsResult[0];
     let storageTornStatsSize = storageTornStatsResult[1];
-    let ratioTornStats = parseInt(((storageTornStatsSize / maxStorageSize) * 100));
+    let storageTornStatsNumber = storageTornStatsResult[0];
 
     let storageYATAResult = GetPredictionStorage(eStorageType.YATASpies);
-    let storageYATANumber = storageYATAResult[0];
     let storageYATASize = storageYATAResult[1];
-    let ratioYata = parseInt(((storageYATASize / maxStorageSize) * 100));
+    let storageYATANumber = storageYATAResult[0];
 
     let localStorageInfosDiv = document.createElement("div");
     localStorageInfosDiv.className = "TDup_optionsTabContentDiv";
@@ -2119,47 +2161,17 @@ function BuildOptionMenu_Debug(tabs, menu) {
     let localStorageProgressBar = document.createElement("div");
     localStorageProgressBar.className = "TDup_optionsTabContentDiv";
 
-    localStorageProgressBar.innerHTML = "LocalStorage space : " + ratioALLFull + "% full (" + storageALLSize.toLocaleString('en-US') + " / " + maxStorageSize.toLocaleString('en-US') + ")";
+    localStorageProgressBar.innerHTML = "LocalStorage space is different from browser to browser.<br/> For reference, Chrome has a 5mb limit.<br/>";
+
+    localStorageProgressBar.innerHTML += "<br/> Used = " + (storageALLBSPSize + storageALLExceptBSPSize).toLocaleString('en-US') + "b";
+    localStorageProgressBar.innerHTML += "<br/> Used by BSP Total = " + storageALLBSPSize.toLocaleString('en-US') + "b";
+    localStorageProgressBar.innerHTML += "<br/> Used by BSP Predictions : " + storagePredictionSize.toLocaleString('en-US') + "b (Number : " + storagePredictionNumber + ")";
+    localStorageProgressBar.innerHTML += "<br/> Used by BSP TornStats spies : " + storageTornStatsSize.toLocaleString('en-US') + "b (Number : " + storageTornStatsNumber + ")";
+    localStorageProgressBar.innerHTML += "<br/> Used by BSP YATA spies : " + storageYATASize.toLocaleString('en-US') + "b (Number : " + storageYATANumber + ")";
+
+    localStorageProgressBar.innerHTML += "<br/> Used by others = " + storageALLExceptBSPSize.toLocaleString('en-US') + "b (Torn chat = " + storageTornChatSize.toLocaleString('en-US')+"b)";
+
     localStorageInfosDiv.appendChild(localStorageProgressBar);
-
-    var progressBar = document.createElement("div");
-    progressBar.style.width = "200px";
-    progressBar.style.height = "30px";
-    progressBar.style.backgroundColor = "gray";
-
-    const predictionsProgress = document.createElement("div");
-    predictionsProgress.style.width = ratioPrediction + "%";
-    predictionsProgress.style.height = "100%";
-    predictionsProgress.style.backgroundColor = PredictionColor;
-    predictionsProgress.style.float = "left";
-    predictionsProgress.title = "Predictions (" + storagePredictionNumber + " items)";
-
-    const TornStatsProgress = document.createElement("div");
-    TornStatsProgress.style.width = ratioTornStats + "%";
-    TornStatsProgress.style.height = "100%";
-    TornStatsProgress.style.backgroundColor = TornStatsColor;
-    TornStatsProgress.style.float = "left";
-    TornStatsProgress.title = "TornStats spies (" + storageTornStatsNumber + " items)";
-
-    const YATAProgress = document.createElement("div");
-    YATAProgress.style.width = ratioYata + "%";
-    YATAProgress.style.height = "100%";
-    YATAProgress.style.backgroundColor = YATAColor;
-    YATAProgress.style.float = "left";
-    YATAProgress.title = "YATA spies (" + storageYATANumber + " items)";
-
-    const ALLProgress = document.createElement("div");
-    ALLProgress.style.width = ratioALLFull + "%";
-    ALLProgress.style.height = "100%";
-    ALLProgress.style.backgroundColor = BSPColor;
-    ALLProgress.title = "BSP";
-
-    progressBar.appendChild(predictionsProgress);
-    progressBar.appendChild(TornStatsProgress);
-    progressBar.appendChild(YATAProgress);
-    progressBar.appendChild(ALLProgress);
-
-    localStorageInfosDiv.appendChild(progressBar);
     contentDiv.appendChild(localStorageInfosDiv);
     // </LocalStorage display>
 
@@ -2181,7 +2193,26 @@ function BuildOptionMenu_Debug(tabs, menu) {
     contentDiv.appendChild(divbuttonExportLocalCache);
     // </Export local storage>
 
-    // <Clear Predictions>
+    // <Test localStorage space>
+    var divbuttonTestLocalStorageSpace = document.createElement("div");
+    divbuttonTestLocalStorageSpace.className = "TDup_optionsTabContentDiv";
+    var buttonTestLocalStorageSpace = document.createElement("input");
+    buttonTestLocalStorageSpace.type = "button";
+    buttonTestLocalStorageSpace.value = "Test Local Storage space";
+    buttonTestLocalStorageSpace.className = "TDup_buttonInOptionMenu";
+
+    buttonTestLocalStorageSpace.addEventListener("click", () => {
+        buttonTestLocalStorageSpace.disabled = true;
+        let result = TestLocalStorage();
+        buttonTestLocalStorageSpace.disabled = false;
+        buttonTestLocalStorageSpace.value = result == true ? "Success! You seem to have space left in your localstorage" : "Failure, clear your cache. Check discord for more info";
+    });
+
+    divbuttonTestLocalStorageSpace.appendChild(buttonTestLocalStorageSpace);
+    contentDiv.appendChild(divbuttonTestLocalStorageSpace);
+    // </Export local storage>
+
+    // <Test localStorage space>
     var divbuttonClearPredictions = document.createElement("div");
     divbuttonClearPredictions.className = "TDup_optionsTabContentDiv";
     let btnClearPredictions = document.createElement("input");
@@ -2246,6 +2277,28 @@ function BuildOptionMenu_Debug(tabs, menu) {
     divbuttonClearYATASpies.appendChild(btnClearYATASpies);
     contentDiv.appendChild(divbuttonClearYATASpies);
     // </Clear YATA spies>
+
+    // <Clear Chat Entries>
+    var divbuttonClearChat = document.createElement("div");
+    divbuttonClearChat.className = "TDup_optionsTabContentDiv";
+    let btnClearTornChat = document.createElement("input");
+    btnClearTornChat.type = "button";
+    btnClearTornChat.value = "Clear Chat entries (not super efficient as it will be written again)";
+    btnClearTornChat.title = "Clear Chat entries from Local Storage";
+    btnClearTornChat.className = "TDup_buttonInOptionMenu";
+
+    btnClearTornChat.addEventListener("click", () => {
+        btnClearTornChat.disabled = true;
+        if (confirm("BSP - IMPORTANT \r\n \r\nAre you sure you want to clear Torn Chat entries your localstorage?") == true) {
+            ClearCache(eStorageType.TornChat);
+            window.location.reload();
+        }
+        btnClearTornChat.disabled = false;
+    });
+
+    divbuttonClearChat.appendChild(btnClearTornChat);
+    contentDiv.appendChild(divbuttonClearChat);
+    // </Clear Chat Entries>
 
     var divbuttonClearLocalCache = document.createElement("div");
     divbuttonClearLocalCache.className = "TDup_optionsTabContentDiv";
