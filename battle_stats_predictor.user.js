@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.9.1
+// @version     8.9.2
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -1468,6 +1468,18 @@ function BuildOptionMenu_Global(tabs, menu) {
         apiRegister.style.display = "none";
         subscriptionEndText.innerHTML = '<div style="color:' + GetColorTheme() + '">Fetching subscription infos from BSP server, it should not be long... </div>';
     }
+    contentDiv.appendChild(subscriptionEndText);
+
+    // Test free localstorage
+    let result = TestLocalStorage();
+    if (result == false) {
+        let localStorageTest = document.createElement("div");
+        localStorageTest.className = "TDup_optionsTabContentDiv";
+        localStorageTest.style.color = 'red';
+        localStorageTest.innerHTML = 'Your localstorage seems to be full, preventing BSP to work properly. This issue is usually caused by Chat2.0 using all the space (currently under investigation). Clear your localstorage using tools available in Debug tab ("Clear Chat entries"), or ask more info in <a href="https://discord.gg/zgrVX5j6MQ">Discord</a>.';
+        contentDiv.appendChild(localStorageTest);
+    }  
+
     contentDiv.appendChild(subscriptionEndText);
 }
 
