@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.9
+// @version     8.9.1
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -2161,15 +2161,14 @@ function BuildOptionMenu_Debug(tabs, menu) {
     let localStorageProgressBar = document.createElement("div");
     localStorageProgressBar.className = "TDup_optionsTabContentDiv";
 
-    localStorageProgressBar.innerHTML = "LocalStorage space is different from browser to browser.<br/> For reference, Chrome has a 5mb limit.<br/>";
+    localStorageProgressBar.innerHTML = "LocalStorage space is different <br/>from browser to browser.<br/> For reference, Chrome has a 5mb limit.<br/>";
 
-    localStorageProgressBar.innerHTML += "<br/> Used = " + (storageALLBSPSize + storageALLExceptBSPSize).toLocaleString('en-US') + "b";
-    localStorageProgressBar.innerHTML += "<br/> Used by BSP Total = " + storageALLBSPSize.toLocaleString('en-US') + "b";
-    localStorageProgressBar.innerHTML += "<br/> Used by BSP Predictions : " + storagePredictionSize.toLocaleString('en-US') + "b (Number : " + storagePredictionNumber + ")";
-    localStorageProgressBar.innerHTML += "<br/> Used by BSP TornStats spies : " + storageTornStatsSize.toLocaleString('en-US') + "b (Number : " + storageTornStatsNumber + ")";
-    localStorageProgressBar.innerHTML += "<br/> Used by BSP YATA spies : " + storageYATASize.toLocaleString('en-US') + "b (Number : " + storageYATANumber + ")";
-
-    localStorageProgressBar.innerHTML += "<br/> Used by others = " + storageALLExceptBSPSize.toLocaleString('en-US') + "b (Torn chat = " + storageTornChatSize.toLocaleString('en-US')+"b)";
+    localStorageProgressBar.innerHTML += "<br/> Used by everything <br/>" + (storageALLBSPSize + storageALLExceptBSPSize).toLocaleString('en-US') + "b";
+    localStorageProgressBar.innerHTML += "<br/><br/> Used by BSP Total <br/> " + storageALLBSPSize.toLocaleString('en-US') + "b";
+    localStorageProgressBar.innerHTML += "<br/><br/> Used by BSP Predictions <br/> " + storagePredictionSize.toLocaleString('en-US') + "b (Number : " + storagePredictionNumber + ")";
+    localStorageProgressBar.innerHTML += "<br/><br/> Used by BSP TornStats spies <br/> " + storageTornStatsSize.toLocaleString('en-US') + "b (Number : " + storageTornStatsNumber + ")";
+    localStorageProgressBar.innerHTML += "<br/><br/> Used by BSP YATA spies <br/> " + storageYATASize.toLocaleString('en-US') + "b (Number : " + storageYATANumber + ")";
+    localStorageProgressBar.innerHTML += "<br/><br/> Used by others = " + storageALLExceptBSPSize.toLocaleString('en-US') + "b <br/>(Torn chat = " + storageTornChatSize.toLocaleString('en-US')+"b)";
 
     localStorageInfosDiv.appendChild(localStorageProgressBar);
     contentDiv.appendChild(localStorageInfosDiv);
@@ -2205,7 +2204,7 @@ function BuildOptionMenu_Debug(tabs, menu) {
         buttonTestLocalStorageSpace.disabled = true;
         let result = TestLocalStorage();
         buttonTestLocalStorageSpace.disabled = false;
-        buttonTestLocalStorageSpace.value = result == true ? "Success! You seem to have space left in your localstorage" : "Failure, clear your cache. Check discord for more info";
+        buttonTestLocalStorageSpace.value = result == true ? "Success!" : "Failure, clear your cache";
     });
 
     divbuttonTestLocalStorageSpace.appendChild(buttonTestLocalStorageSpace);
@@ -2283,7 +2282,7 @@ function BuildOptionMenu_Debug(tabs, menu) {
     divbuttonClearChat.className = "TDup_optionsTabContentDiv";
     let btnClearTornChat = document.createElement("input");
     btnClearTornChat.type = "button";
-    btnClearTornChat.value = "Clear Chat entries (not super efficient as it will be written again)";
+    btnClearTornChat.value = "Clear Chat entries";
     btnClearTornChat.title = "Clear Chat entries from Local Storage";
     btnClearTornChat.className = "TDup_buttonInOptionMenu";
 
