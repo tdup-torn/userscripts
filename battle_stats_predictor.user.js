@@ -1478,9 +1478,7 @@ function BuildOptionMenu_Global(tabs, menu) {
         localStorageTest.style.color = 'red';
         localStorageTest.innerHTML = 'Your localstorage seems to be full, preventing BSP to work properly. This issue is usually caused by Chat2.0 using all the space (currently under investigation). Clear your localstorage using tools available in Debug tab ("Clear Chat entries"), or ask more info in <a href="https://discord.gg/zgrVX5j6MQ">Discord</a>.';
         contentDiv.appendChild(localStorageTest);
-    }  
-
-    contentDiv.appendChild(subscriptionEndText);
+    }
 }
 
 function ReComputeStats(str, def, spd, dex) {
