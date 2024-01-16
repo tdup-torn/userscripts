@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.9.2
+// @version     8.9.3
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -715,7 +715,7 @@ function ClearCache(storageType) {
 function ExportPredictorStorage() {
     let toReturn = "";
     for (let key in localStorage) {
-        if (!key.startsWith('tdup.battleStatsPredictor.')) {
+        if (key.startsWith('tdup.battleStatsPredictor.')) {
             toReturn += localStorage[key] + "\r\n";
         }
     }
