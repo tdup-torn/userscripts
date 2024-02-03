@@ -1,8 +1,10 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.1
+// @version     8.9.4
 // @namespace   tdup.battleStatsPredictor
+// @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor_tornPDA.js
+// @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor_tornPDA.js
 // @match       https://www.torn.com/profiles.php*
 // @match       https://www.torn.com/bringafriend.php*
 // @match       https://www.torn.com/halloffame.php*
@@ -15,12 +17,12 @@
 // @match       https://www.torn.com/hospitalview.php*
 // @match       https://www.torn.com/imarket.php*
 // @match       https://www.torn.com/forums.php*
-// @match       https://www.torn.com/loader.php*
 // @match       https://www.torn.com/blacklist.php*
 // @match       https://www.torn.com/friendlist.php*
 // @match       https://www.torn.com/pmarket.php*
 // @match       https://www.torn.com/properties.php*
 // @match       https://www.torn.com/war.php*
+// @match       https://www.torn.com/preferences.php*
 // @run-at      document-end
 // @grant       GM.xmlHttpRequest
 // @grant       GM_setValue
@@ -33,6 +35,11 @@
 // @author      TDup
 // ==/UserScript==
 
+// ##### INSTALLATION README #####
+// ##### YOU SHOULD NOT NEED TO EDIT ANYTHING HERE
+// ##### THE SETUP OF THIS SCRIPT IS DONE THROUGH THE BSP OPTION WINDOW, AVAILABLE ON YOUR TORN PROFILE PAGE, ONCE THIS SCRIPT IS INSTALLED
+// ##### MORE INFO HERE : https://www.torn.com/forums.php#/p=threads&f=67&t=16290324&b=0&a=0&to=22705010
+
 // #region LocalStorage
 
 const StorageKey = {
@@ -40,6 +47,10 @@ const StorageKey = {
     // This is the only key sent to the BSP backend.
     PrimaryAPIKey: 'tdup.battleStatsPredictor.PrimaryAPIKey',
     IsPrimaryAPIKeyValid: 'tdup.battleStatsPredictor.IsPrimaryAPIKeyValid',
+
+    // To avoid showing prediction on own profile
+    PlayerId: 'tdup.battleStatsPredictor.PlayerId',
+    IsEnabledOnOwnProfile: 'tdup.battleStatsPredictor.IsEnabledOnOwnProfile',
 
     // Used only on the client side, to import user battlestats. This is not required but useful to have your stats up to date locally, for accurate color code.
     // You can fill manually your stats, or not fill your stat at all, and don't use the color code system.
@@ -60,6 +71,9 @@ const StorageKey = {
     IsTornStatsAPIKeyValid: 'tdup.battleStatsPredictor.IsTornStatsApiKeyValid',
     OldTornStatsSpy: 'tdup.battleStatsPredictor.cache.spy.tornstats_', //TDTODO : to remove in a couple of versions (I keep it so it gets cleared)
     TornStatsSpy: 'tdup.battleStatsPredictor.cache.spy_v2.tornstats_',
+    IsAutoImportTornStatsSpies: 'tdup.battleStatsPredictor.tornstats_isAutoImportSpies',
+    AutoImportLastDatePlayer: 'tdup.battleStatsPredictor.tornstats_AutoImportLastDatePlayer_',
+    AutoImportLastDateFaction: 'tdup.battleStatsPredictor.tornstats_AutoImportLastDateFaction_',
 
     YataAPIKey: 'tdup.battleStatsPredictor.YataApiKey',
     IsYataAPIKeyValid: 'tdup.battleStatsPredictor.IsYataApiKeyValid',
@@ -79,13 +93,17 @@ const StorageKey = {
 
     // Display choice
     IsShowingHonorBars: 'tdup.battleStatsPredictor.isShowingHonorBars',
-    BSPColorTheme: 'tdup.battleStatsPredictor.BspColorTheme', //TDTODO : allow users to tweak this
+    IsShowingAlternativeProfileDisplay: 'tdup.battleStatsPredictor.isShowingAlternativeProfileDisplay',
+    BSPColorTheme: 'tdup.battleStatsPredictor.BspColorTheme',
     ColorStatsThreshold: 'tdup.battleStatsPredictor.ColorStatsThreshold_',
     IsShowingBattleStatsScore: 'tdup.battleStatsPredictor.IsShowingBattleStatsScore',
     IsShowingBattleStatsPercentage: 'tdup.battleStatsPredictor.IsShowingBattleStatsPercentage',
+    IsClickingOnProfileStatsAttackPlayer: 'tdup.battleStatsPredictor.IsClickingOnProfileStatsAttackPlayer',
+    IsHidingBSPOptionButtonInToolbar: 'tdup.battleStatsPredictor.IsHidingBSPOptionButtonInToolbar',
 
     // Cache management
     AutoClearOutdatedCacheLastDate: 'tdup.battleStatsPredictor.AutoClearOutdatedCacheLastDate',
+    TestLocalStorageKey: 'tdup.battleStatsPredictor.TestLocalStorage',
 };
 
 function GetStorage(key) { return localStorage[key]; }
@@ -99,7 +117,6 @@ function GetStorageBoolWithDefaultValue(key, defaultValueIfUnset) {
         return defaultValueIfUnset;
     }
 }
-
 function SetStorage(key, value) {
     try {
         localStorage[key] = value;
@@ -176,21 +193,24 @@ var TDup_PredictorOptionsMenuArea;
 var TDup_PredictorOptionsContentArea;
 
 var ProfileTargetId = -1;
+var FactionTargetId = -1;
 var divWhereToInject;
 var dictDivPerPlayer = {};
+
+var OnMobile = false;
+
+var PREDICTION_VALIDITY_DAYS = 5;
+
+var mainColor = "#344556";
+var mainBSPIcon = "https://i.postimg.cc/K8cNpzCS/BSPLogo11low.png";
 
 // #endregion
 
 // #region Styles
 
-//var mainColor = "cadetblue";
-
 var styleToAdd = document.createElement('style');
 
 styleToAdd.innerHTML += '.iconStats {height: 20px; width: 32px; position: relative; text-align: center; font-size: 12px; font-weight:bold; color: black; box-sizing: border-box; border: 1px solid black;line-height: 18px;font-family: initial;}';
-
-//styleToAdd.innerHTML += '.TDup_optionsTabContent {all : initial;}';
-//styleToAdd.innerHTML += '.TDup_optionsTabContent * { all: unset;}';
 
 /* Style the tab */
 styleToAdd.innerHTML += '.TDup_optionsMenu {border: 1px solid #ccc;background-color: #f1f1f1;}';
@@ -216,7 +236,7 @@ styleToAdd.innerHTML += 'font-size: 12px; margin: 5px; max-width: none; outline:
 
 /* Style the tab content */
 
-styleToAdd.innerHTML += '.TDup_optionsTabContentDiv { padding: 10px 10px;}';
+styleToAdd.innerHTML += '.TDup_optionsTabContentDiv { padding: 10px 6px;}';
 styleToAdd.innerHTML += '.TDup_optionsTabContentDiv a { display: initial !important;}';
 
 styleToAdd.innerHTML += '.TDup_optionsTabContentDivSmall { padding: 5px 5px;}';
@@ -226,19 +246,17 @@ styleToAdd.innerHTML += '.TDup_optionsTabContent label { margin:10px 0px; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent p { margin:10px 0px; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent a { color:black !important;}';
 
+styleToAdd.innerHTML += '.TDup_ColoredStatsInjectionDiv { position:absolute;}';
+
 styleToAdd.innerHTML += '.TDup_optionsTabContent input { margin:0px 10px !important; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent input[type = button] { margin:0px 10px 0px 0px !important; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent input:disabled[type = button] { background-color: #AAAAAA; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent input[type = number] { text-align: right; }';
 
-/*styleToAdd.innerHTML += '.TDup_optionsTabContent div { margin:10px 0px !important; }';*/
-
 styleToAdd.innerHTML += '.TDup_button {  background-color: ' + GetColorTheme() + '; border-radius: 4px; border-style: none; box-sizing: border-box; color: #fff;cursor: pointer;display: inline-block; font-family: "Farfetch Basis", "Helvetica Neue", Arial, sans-serif;';
 styleToAdd.innerHTML += 'font-size: 12px;font-weight: 100; line-height: 1;  margin: 0; max-width: none; min-width: 10px;  outline: none;overflow: hidden;  padding: 5px 5px; position: relative;  text-align: center;';
 styleToAdd.innerHTML += 'text-transform: none;  user-select: none; -webkit-user-select: none;  touch-action: manipulation; width: 100%;}';
 styleToAdd.innerHTML += '.TDup_button: hover, .TDup_button:focus { opacity: .75;}'
-/*styleToAdd.innerHTML += '.TDup_button:disabled { background-color: #AAAAAA; }';*/
-
 
 // Get the first script tag
 var ref = document.querySelector('script');
@@ -262,6 +280,8 @@ const PageType = {
     Hospital: 'Hospital',
     Chain: 'Chain',
     FactionControl: 'Faction Control',
+    FactionControlPayday: 'Faction Control Per Day',
+    FactionControlApplications: 'Faction Control Applications',
     Market: 'Market',
     Forum: 'Forum',
     ForumThread: 'ForumThread',
@@ -272,6 +292,8 @@ const PageType = {
     PointMarket: 'Point Market',
     Properties: 'Properties',
     War: 'War',
+    ChainReport: 'ChainReport',
+    RWReport: 'RWReport',
 };
 
 var mapPageTypeAddress = {
@@ -286,6 +308,8 @@ var mapPageTypeAddress = {
     [PageType.Hospital]: 'https://www.torn.com/hospitalview.php',
     [PageType.Chain]: 'https://www.torn.com/factions.php?step=your#/war/chain',
     [PageType.FactionControl]: 'https://www.torn.com/factions.php?step=your#/tab=controls',
+    [PageType.FactionControlPayday]: 'https://www.torn.com/factions.php?step=your#/tab=controls',
+    [PageType.FactionControlApplications]: 'https://www.torn.com/factions.php?step=your#/tab=controls',
     [PageType.Market]: 'https://www.torn.com/imarket.php',
     [PageType.Forum]: 'https://www.torn.com/forums.php',
     [PageType.ForumThread]: 'https://www.torn.com/forums.php#/p=threads',
@@ -296,11 +320,20 @@ var mapPageTypeAddress = {
     [PageType.PointMarket]: 'https://www.torn.com/pmarket.php',
     [PageType.Properties]: 'https://www.torn.com/properties.php',
     [PageType.War]: 'https://www.torn.com/war.php',
+    [PageType.ChainReport]: 'https://www.torn.com/war.php?step=chainreport',
+    [PageType.RWReport]: 'https://www.torn.com/war.php?step=rankreport',
 }
+
+var mapPageAddressEndWith = {
+    [PageType.FactionControl]: '/tab=controls',
+    [PageType.FactionControlPayday] : 'tab=controls&option=pay-day',
+    [PageType.FactionControlApplications] : 'tab=controls&option=application'
+}
+
 
 function LogInfo(value) {
     var now = new Date();
-    console.error(now.toISOString() + ": " + value);
+    console.log(": [** BSP **] " + now.toISOString() + " - " + value);
 }
 
 function JSONparse(str) {
@@ -346,7 +379,17 @@ function FormatBattleStats(number) {
 }
 
 function IsPage(pageType) {
-    return window.location.href.startsWith(mapPageTypeAddress[pageType]);
+    let endWith = mapPageAddressEndWith[pageType];
+    if (endWith != undefined) {
+
+        return window.location.href.includes(endWith);
+    }
+
+    let startWith = mapPageTypeAddress[pageType];
+    if (startWith != undefined) {
+        return window.location.href.startsWith(startWith);
+    }
+    return false;   
 }
 
 function IsUrlEndsWith(value) {
@@ -388,8 +431,9 @@ function IsSubscriptionValid() {
 function GetColorTheme() {
     let color = GetStorage(StorageKey.BSPColorTheme);
     if (color == undefined) {
-        return "cadetblue";
+        return mainColor;
     }
+    return JSON.parse(color);
 }
 
 function IsNPC(targetID) {
@@ -563,16 +607,19 @@ function GetMostRecentSpyFromCache(playerId) {
 }
 
 const eStorageType = {
-    All: 'All',
+    All_BSP: 'All_BSP',
     Prediction: 'Prediction',
     TornStatsSpies: 'TornStatsSpies',
-    YATASpies: 'YATASpies'
+    YATASpies: 'YATASpies',
+    ALL_ExceptBSP: 'ALL_ExceptBSP',
+    TornChat: 'TornChat'    
 };
 
 function GetPredictionStorage(storageType) {
     let prefix = "";
     switch (storageType) {
-        case eStorageType.All:
+        case eStorageType.All_BSP:
+        case eStorageType.ALL_ExceptBSP:
             {
                 prefix = "tdup.battleStatsPredictor.";
                 break;
@@ -592,6 +639,11 @@ function GetPredictionStorage(storageType) {
                 prefix = StorageKey.YataSpy;
                 break;
             }
+        case eStorageType.TornChat:
+            {
+                prefix = "chat:";
+                break;
+            }
         default:
             return undefined;
     }
@@ -599,7 +651,14 @@ function GetPredictionStorage(storageType) {
     let itemNb = 0;
     let toReturn = "";
     for (let key in localStorage) {
-        if (key.startsWith(prefix)) {
+
+        if (storageType == eStorageType.ALL_ExceptBSP) {
+            if (!key.startsWith(prefix)) {
+                toReturn += localStorage[key] + "\r\n";
+                itemNb++;
+            }
+        }
+        else if (key.startsWith(prefix)) {
             toReturn += localStorage[key] + "\r\n";
             itemNb++;
         }
@@ -612,7 +671,7 @@ function GetPredictionStorage(storageType) {
 function ClearCache(storageType) {
     let prefix = "";
     switch (storageType) {
-        case eStorageType.All:
+        case eStorageType.All_BSP:
             {
                 prefix = "tdup.battleStatsPredictor.";
                 break;
@@ -632,12 +691,22 @@ function ClearCache(storageType) {
                 prefix = StorageKey.YataSpy;
                 break;
             }
+        case eStorageType.TornChat:
+            {
+                prefix = "chat:";
+                break;
+            }
         default:
-            return undefined;
+            return;
     }
 
     for (let key in localStorage) {
-        if (key.startsWith(prefix)) {
+        if (storageType == eStorageType.ALL_ExceptBSP) {
+            if (!key.startsWith(prefix)) {
+                localStorage.removeItem(key);
+            }
+        }
+        else if (key.startsWith(prefix)) {
             localStorage.removeItem(key);
         }
     }
@@ -668,11 +737,29 @@ function ExportPredictorStorage() {
     URL.revokeObjectURL(link.href);
 }
 
+function TestLocalStorage() {
+    try {
+        var textToStore = 'This is a test to detect if there is enough space in the localstorage.';
+        textToStore+=     'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
+        textToStore+=     'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
+        textToStore+=     'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
+        textToStore+=     'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
+
+        localStorage[StorageKey.TestLocalStorageKey] = textToStore;
+        localStorage.removeItem(StorageKey.TestLocalStorageKey);
+        return true;
+    }
+    catch (e) {
+        LogInfo("BSP threw an exception in SetStorage method : " + e);
+        return false;
+    }
+}
+
 function ClearOutdatedPredictionInCache() {
     let lastDateAutoClearOutdatedCache = GetStorage(StorageKey.AutoClearOutdatedCacheLastDate);
     if (lastDateAutoClearOutdatedCache != undefined) {
         let dateConsideredTooOld = new Date();
-        dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 1);
+        dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - PREDICTION_VALIDITY_DAYS);
         if (new Date(lastDateAutoClearOutdatedCache) > dateConsideredTooOld) {
             return;
         }
@@ -694,7 +781,7 @@ function ClearOutdatedPredictionInCache() {
             let prediction = JSON.parse(localStorage[key]);
             if (prediction != undefined) {
                 var expirationDate = new Date();
-                expirationDate.setDate(expirationDate.getDate() - 2);
+                expirationDate.setDate(expirationDate.getDate() - PREDICTION_VALIDITY_DAYS);
                 var predictionDate = new Date(prediction.PredictionDate);
                 if (predictionDate < expirationDate) {
                     localStorage.removeItem(key);
@@ -733,7 +820,7 @@ function AutoImportStats() {
 
 // #region Get Data for Player
 
-function GetPredictionForPlayer(targetId, callback) {
+async function GetPredictionForPlayer(targetId, callback) {
     if (targetId == undefined || targetId < 1) return;
     if (IsNPC(targetId) == true) return;
 
@@ -753,7 +840,7 @@ function GetPredictionForPlayer(targetId, callback) {
     if (prediction != undefined) {
         var isPredictionValid = true;
         var expirationDate = new Date();
-        expirationDate.setDate(expirationDate.getDate() - 1);
+        expirationDate.setDate(expirationDate.getDate() - PREDICTION_VALIDITY_DAYS);
         var predictionDate = new Date(prediction.PredictionDate);
         if (predictionDate < expirationDate) {
             var key = StorageKey.BSPPrediction + targetId;
@@ -774,7 +861,7 @@ function GetPredictionForPlayer(targetId, callback) {
     }
 
     LogInfo("Prediction for target " + targetId + " not found in the cache, querying BSP server..");
-    /*const newPrediction = await FetchScoreAndTBS(targetId);
+    const newPrediction = await FetchScoreAndTBS(targetId);
     LogInfo("Prediction for target " + targetId + " not found in the cache, value retrieved from BSP server!");
     if (newPrediction != undefined) {
         SetPredictionInCache(targetId, newPrediction);
@@ -783,7 +870,7 @@ function GetPredictionForPlayer(targetId, callback) {
     if (targetSpy != undefined) {
         newPrediction.attachedSpy = targetSpy;
     }
-    callback(targetId, newPrediction);*/
+    callback(targetId, newPrediction);
 }
 
 // #endregion
@@ -847,10 +934,10 @@ function GetConsolidatedDataForPlayerStats(prediction) {
     return objectToReturn;
 }
 
+
 function OnProfilePlayerStatsRetrieved(playerId, prediction) {
-    if (prediction == undefined) {
+    if (prediction == undefined)
         return;
-    }
 
     let localBattleStats = GetLocalBattleStats();
     let localTBS = localBattleStats.TBS;
@@ -859,45 +946,166 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     let tbsRatio = 100 * consolidatedData.TargetTBS / localTBS;
     let colorComparedToUs = GetColorMaxValueDifference(tbsRatio);
 
-    let ratioFormatted = parseInt(tbsRatio.toFixed(0));
-    ratioFormatted = ratioFormatted.toLocaleString('en-US');
+    let ScoreRatio = 0;
 
-    let iconToUse = "https://i.postimg.cc/G26PdvYL/weight-lifting-up.png";
-    let formattedBattleStats = FormatBattleStats(consolidatedData.TargetTBS);
-    if (consolidatedData.Success == FAIL) {
-        colorComparedToUs = "pink";
-        formattedBattleStats = "Wait";
-    } else if (consolidatedData.Success == MODEL_ERROR) {
-        colorComparedToUs = "pink";
-        formattedBattleStats = "Error";
-    }
-    else if (GetStorageBool(StorageKey.IsShowingBattleStatsScore) == true) {
+    if (consolidatedData.Success != FAIL && consolidatedData.Success != MODEL_ERROR && GetStorageBool(StorageKey.IsShowingBattleStatsScore) == true) {
         formattedBattleStats = FormatBattleStats(consolidatedData.Score);
 
-        let ScoreRatio = 100 * consolidatedData.Score / localBattleStats.Score;
+        ScoreRatio = 100 * consolidatedData.Score / localBattleStats.Score;
         colorComparedToUs = GetColorScoreDifference(ScoreRatio);
-
-        ratioFormatted = parseInt(ScoreRatio.toFixed(0));
-        ratioFormatted = ratioFormatted.toLocaleString('en-US');
-
-        iconToUse = "https://i.postimg.cc/P5KmNgZF/sword-clash.png";
     }
 
-    let extraIndicator = '';
-    let FFToDisplay = '';
-    if (consolidatedData.IsUsingSpy) {
-        extraIndicator = '<img title="Data coming from spy (' + consolidatedData.Spy.Source + ')" width="13" height="13" style="position:absolute; margin: 5px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/>';
-        let FFPredicted = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
-        FFPredicted = Math.max(1, FFPredicted);
-        FFPredicted = FFPredicted.toFixed(2);
-        FFToDisplay = "FF: " + FFPredicted;
-    }
-    else if (consolidatedData.OldSpyStrongerThanPrediction) {
-        extraIndicator = '<img title="Old spy (' + consolidatedData.Spy.Source + ') having greater TBS than prediction, showing old spy data" width="18" height="18" style="position:absolute; margin: 0px -20px; z-index: 102;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png"/>';
+    let FFPredicted2 = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
+    FFPredicted2 = Math.max(1, FFPredicted2);
+    FFPredicted2 = FFPredicted2.toFixed(2);
+
+    let imgType = mainBSPIcon;
+    let extraIndicator = "";
+
+    if (prediction.PredictionDate != undefined) {
+        if (!(prediction.PredictionDate instanceof Date)) {
+            if (!prediction.PredictionDate.endsWith("Z")) {
+                prediction.PredictionDate += "Z";
+            }
+            prediction.PredictionDate = new Date(prediction.PredictionDate);
+        }
     }
 
-    divWhereToInject.innerHTML = '<div style="font-size: 18px; text-align: center; margin-top:7px">' + extraIndicator + '<img src="' + iconToUse + '" width="18" height="18" style="margin-right:5px;"/>' +
-        formattedBattleStats + ' <label style = "color:' + colorComparedToUs + '"; "> (' + ratioFormatted + '%) ' + FFToDisplay + ' </label></div >';
+    if (prediction.IsSpy) {
+        prediction.PredictionDate = new Date(prediction.timestamp * 1000);
+        if (prediction.Source == "TornStats") {
+            imgType = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
+        }
+        else if (prediction.Source == "YATA") {
+            imgType = "https://www.imgbly.com/ib/jPTzuUgrTM.png";
+        }
+
+        extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/>';
+    }
+
+    if (consolidatedData != undefined) {
+        if (consolidatedData.OldSpyStrongerThanPrediction) {
+            extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png"/>';
+            if (consolidatedData.Spy != undefined) {
+                prediction.PredictionDate = new Date(consolidatedData.Spy.timestamp * 1000);
+                if (consolidatedData.Spy.Source == "TornStats") {
+                    imgType = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
+                }
+                else if (consolidatedData.Spy.Source == "YATA") {
+                    imgType = "https://www.imgbly.com/ib/jPTzuUgrTM.png";
+                }
+            }
+        }
+    }
+
+    var relativeTime = FormatRelativeTime(prediction.PredictionDate);
+
+    let divStats = document.createElement("div");
+
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsClickingOnProfileStatsAttackPlayer)) {
+        divStats.addEventListener('click', function () {
+            // Define the URL you want to open
+            var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + playerId;
+
+            // Open the URL in a new tab or window
+            window.open(urlAttack, '_blank');
+        });
+    }
+
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false)) {
+        var referenceNode = divWhereToInject.firstChild.childNodes[1];
+        divWhereToInject.firstChild.insertBefore(divStats, referenceNode);
+    }
+    else {
+        divWhereToInject.insertBefore(divStats, divWhereToInject.firstChild);
+    }
+
+    let isShowingBScore = GetStorageBool(StorageKey.IsShowingBattleStatsScore);
+    let statsDivContent = extraIndicator;
+
+    statsDivContent += '<table style=width:100%;font-family:initial>';
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingStatsHeader, true)) {
+        statsDivContent += '<tr style="font-size:small;color:white;background-color:#344556" >';
+        statsDivContent += '<th style="border: 1px solid gray;">' + (isShowingBScore ? "BScore" : "TBS") + '</th>';
+
+        statsDivContent += '<th style="border: 1px solid gray;"> % You</th>' +
+            '<th style="border: 1px solid gray;"> FF</th>' +
+            '<th style="border: 1px solid gray;"> Source</th>' +
+            '<th style="border: 1px solid gray;"> Date </th>' +
+            '</tr>';
+    }
+    statsDivContent += '<tr style="font-size:x-large;background-color: ' + colorComparedToUs + '"> ';
+    statsDivContent += '<td style="vertical-align: middle;font-weight: 600;text-align:center;border: 1px solid gray;">' + FormatBattleStats(isShowingBScore ? consolidatedData.Score : consolidatedData.TargetTBS) + '</td>';
+    statsDivContent += '<td style="vertical-align: middle;font-weight: 600;text-align:center;border: 1px solid gray;">' + parseInt(isShowingBScore ? ScoreRatio : tbsRatio) + '%</td>' +
+        '<td style="vertical-align: middle;font-weight: 600;text-align:center;border: 1px solid gray;">' + FFPredicted2 + ' </td>' +
+        '<td style="vertical-align: middle;border: 1px solid gray;text-align:center;background-color:#344556;"> <img src="' + imgType + '" style="max-width: 100px;max-height:30px"/> </td>' +
+        '<td style="vertical-align: middle;text-align:center;border: 1px solid gray;font-size: medium;background-color:#344556;color:white;">' + relativeTime + ' </td>' +
+        '</tr>' +
+        '</table> ';
+
+    divStats.innerHTML = statsDivContent;
+}
+
+function ConvertLocalDateToUTCIgnoringTimezone(date) {
+    return new Date(date.getUTCFullYear(), date.getUTCMonth(),
+        date.getUTCDate(), date.getUTCHours(),
+        date.getUTCMinutes(), date.getUTCSeconds());
+}
+
+function DateUTCNow() {
+    let now = new Date();
+    return ConvertLocalDateToUTCIgnoringTimezone(now);
+}
+
+function FormatRelativeTime(date) {
+    let dateNow = new Date();
+    let diff = Math.round((dateNow - date) / 1000);
+
+    if (diff < 60) {
+        return diff + ' second' + (diff > 1 ? 's' : '') + ' ago';
+    } else if (diff < 3600) {
+        var minutes = Math.floor(diff / 60);
+        return minutes + ' minute' + (minutes > 1 ? 's' : '') + ' ago';
+    } else if (diff < 86400) {
+        var hours = Math.floor(diff / 3600);
+        return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
+    } else if (diff < 86400 * 24) {
+        var days = Math.floor(diff / (3600 * 24));
+        return days + ' day' + (days > 1 ? 's' : '') + ' ago';
+    } else if (diff < 86400 * 24 * 365) {
+        var years = Math.floor(diff / (3600 * 24 * 365));
+        return years + ' year' + (years > 1 ? 's' : '') + ' ago';
+    }
+    else {
+        return date.toLocaleString();
+    }
+}
+
+function IsThereMyNodeAlready(node, urlAttack) {
+    // Base case: if the node is null, stop the recursion
+    if (!node) {
+        return false;
+    }
+
+    // Check if the current node has the specified class name
+    if (node.className === "TDup_ColoredStatsInjectionDiv") {
+        return true;
+    }
+
+    // Check if the inner HTML of the current node starts with the specified URL
+    if (node.href != undefined && node.href.startsWith(urlAttack)) {
+        return true;
+    }
+
+    // Recursively process child nodes
+    for (let i = 0; i < node.childNodes.length; i++) {
+        const childNode = node.childNodes[i];
+        let result = IsThereMyNodeAlready(childNode, urlAttack);
+        if (result) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
@@ -906,7 +1114,21 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     let spyMargin = '-6px 23px';
     let mainMarginWhenDisplayingHonorBars = "-10px -9px";
 
-    if (IsPage(PageType.Chain) && !isShowingHonorBars) {
+    if (IsPage(PageType.FactionControl)) {
+        if (IsPage(PageType.FactionControlPayday)) {
+            mainMarginWhenDisplayingHonorBars = '-25px 20px';
+            spyMargin = '-3px 12px';
+        }
+        else if (IsPage(PageType.FactionControlApplications)) {
+            mainMarginWhenDisplayingHonorBars = '-10px 0px';
+            spyMargin = '-5px 23px';
+        }
+        else {
+            mainMarginWhenDisplayingHonorBars = '0px';
+            spyMargin = '-5px 23px';
+        }
+    }
+    else if (IsPage(PageType.Chain) && !isShowingHonorBars) {
         spyMargin = '-1px 23px';
     }
     else if (IsPage(PageType.Faction)) {
@@ -939,13 +1161,19 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         }
     }
     else if (IsPage(PageType.HallOfFame) && isShowingHonorBars) {
-        mainMarginWhenDisplayingHonorBars = '0px';
+        mainMarginWhenDisplayingHonorBars = '-25px 50px';
+        spyMargin = '-30px 75px';
     }
     else if (IsPage(PageType.PointMarket) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '5px -5px';
     }
     else if (IsPage(PageType.Market) && isShowingHonorBars) {
-        mainMarginWhenDisplayingHonorBars = '-27px 55px';
+        if (OnMobile) {
+            mainMarginWhenDisplayingHonorBars = '8px 0px';
+        }
+        else {
+            mainMarginWhenDisplayingHonorBars = '-27px 55px';
+        }
     }
     else if (IsPage(PageType.Hospital) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px 6px';
@@ -982,6 +1210,16 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     else if (IsPage(PageType.War)) {
         spyMargin = isShowingHonorBars ? '-16px 15px' : '-4px 24px';
     }
+    else if (IsPage(PageType.Competition) && isShowingHonorBars) {
+
+        if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=revenge")) {
+            mainMarginWhenDisplayingHonorBars = '0px 0px';
+        }
+        else {
+            mainMarginWhenDisplayingHonorBars = '10px 0px';
+        }
+    }
+
 
     let consolidatedData = GetConsolidatedDataForPlayerStats(prediction);
     let localBattleStats = GetLocalBattleStats();
@@ -1027,11 +1265,12 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     }
 
     for (let i = 0; i < dictDivPerPlayer[targetId].length; i++) {
-        if (dictDivPerPlayer[targetId][i].innerHTML.startsWith('<a href="https://www.torn.com/loader2.php?sid=getInAttack')) {
+
+        if (IsThereMyNodeAlready(dictDivPerPlayer[targetId][i], urlAttack)) {
             continue;
         }
 
-        let isWall = IsPage(PageType.Faction) && dictDivPerPlayer[targetId][i].className == "user name ";
+        let isWall = IsPage(PageType.Faction) && !IsPage(PageType.FactionControl) && dictDivPerPlayer[targetId][i].className == "user name ";
         if (isWall) {
             //WALL display
             if (isShowingHonorBars) {
@@ -1043,6 +1282,17 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             }
         }
 
+        if (IsPage(PageType.Competition) && isShowingHonorBars) {
+            if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=recent")) {
+                if (HasParentWithClass(dictDivPerPlayer[targetId][i], "name lost")) {
+                    mainMarginWhenDisplayingHonorBars = "12px 0px";
+                }
+                else if (HasParentWithClass(dictDivPerPlayer[targetId][i], "name right")) {
+                    mainMarginWhenDisplayingHonorBars = "0px 0px";
+                }
+            }
+        }
+
         let extraIndicator = '';
         let title = '';
         if (consolidatedData.IsUsingSpy) {
@@ -1050,27 +1300,55 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             FFPredicted = Math.max(1, FFPredicted);
             FFPredicted = FFPredicted.toFixed(2);
 
-            extraIndicator = '<img width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />';
+            extraIndicator = '<img style="position:absolute; width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />';
             title = 'title="Data coming from spy (' + consolidatedData.Spy.Source + ') FF : ' + FFPredicted + ' "';
         }
         else if (consolidatedData.OldSpyStrongerThanPrediction) {
-            extraIndicator = '<img width="13" height="13" style="position:absolute; margin:' + spyMargin + ';z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png" />';
+            extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png" />';
             title = 'title="Old spy (' + consolidatedData.Spy.Source + ' FF Predicted = ' + FFPredicted + ') having greater TBS than prediction -> showing old spy data instead"';
         }
         else if (showScoreInstead) {
             title = 'title="FF Predicted = ' + FFPredicted + '"';
         }
 
-
         let toInject = '';
-        if (isShowingHonorBars)
+        if (isShowingHonorBars) {
             toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
-        else
+        }
+        else {
             toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
 
+            if (IsPage(PageType.War) && !IsPage(PageType.ChainReport) && !IsPage(PageType.RWReport)) {
+                dictDivPerPlayer[targetId][i].style.position = "absolute";
+            }
+        }
 
-        dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+        if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true) && !IsPage(PageType.Bounty)) {
+            let coloredStatsInjectionDiv = document.createElement("div");
+            coloredStatsInjectionDiv.className = "TDup_ColoredStatsInjectionDiv";
+            coloredStatsInjectionDiv.innerHTML = toInject;
+
+            // Get the first child element of the parent (or null if there are no child elements)
+            var firstChild = dictDivPerPlayer[targetId][i].firstChild;
+            dictDivPerPlayer[targetId][i].insertBefore(coloredStatsInjectionDiv, firstChild);
+        }
+        else {
+            dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+        }
     }
+}
+
+function HasParentWithClass(element, className) {
+    let parent = element.parentElement;
+
+    while (parent) {
+        if (parent.classList.value.startsWith(className)) {
+            return true;
+        }
+        parent = parent.parentElement;
+    }
+
+    return false;
 }
 
 // #endregion
@@ -1118,7 +1396,7 @@ function BuildOptionMenu(menuArea, contentArea, name, shouldBeHiddenWhenInactive
 }
 
 function BuildOptionMenu_Global(tabs, menu) {
-    let contentDiv = BuildOptionMenu(tabs, menu, "Global", false, true);
+    let contentDiv = BuildOptionMenu(tabs, menu, "Profile", false, true);
 
     // API Key
     let mainAPIKeyLabel = document.createElement("label");
@@ -1145,7 +1423,7 @@ function BuildOptionMenu_Global(tabs, menu) {
             errorValidatemainAPIKey.style.visibility = "visible";
             apiRegister.style.display = "block";
             errorValidatemainAPIKey.innerHTML = reason;
-            subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Please fill a valid API Key, and press on validate to get your subscription details</div>';
+            subscriptionEndText.innerHTML = '<div style="color:red">Please fill a valid API Key, and press on validate to get your subscription details</div>';
         }
     }
 
@@ -1184,13 +1462,23 @@ function BuildOptionMenu_Global(tabs, menu) {
     // Subscription info
     subscriptionEndText = document.createElement("div");
     subscriptionEndText.className = "TDup_optionsTabContentDiv";
-    subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Please fill a valid API Key, and press on validate to get your subscription details</div>';
+    subscriptionEndText.innerHTML = '<div style="color:' + GetColorTheme() + '">Please fill a valid API Key, and press on validate to get your subscription details</div>';
 
     if (GetStorageBoolWithDefaultValue(StorageKey.IsPrimaryAPIKeyValid, false) == true) {
         apiRegister.style.display = "none";
-        subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Fetching subscription infos from BSP server, it should not be long... </div>';
+        subscriptionEndText.innerHTML = '<div style="color:' + GetColorTheme() + '">Fetching subscription infos from BSP server, it should not be long... </div>';
     }
     contentDiv.appendChild(subscriptionEndText);
+
+    // Test free localstorage
+    let result = TestLocalStorage();
+    if (result == false) {
+        let localStorageTest = document.createElement("div");
+        localStorageTest.className = "TDup_optionsTabContentDiv";
+        localStorageTest.style.color = 'red';
+        localStorageTest.innerHTML = 'Your localstorage seems to be full, preventing BSP to work properly. This issue is usually caused by Chat2.0 using all the space (currently under investigation). Clear your localstorage using tools available in Debug tab ("Clear Chat entries"), or ask more info in <a href="https://discord.gg/zgrVX5j6MQ">Discord</a>.';
+        contentDiv.appendChild(localStorageTest);
+    }
 }
 
 function ReComputeStats(str, def, spd, dex) {
@@ -1229,7 +1517,7 @@ function OnPlayerStatsFromTornAPI(success, reason) {
 }
 
 function BuildOptionMenu_Colors(tabs, menu) {
-    let contentDiv = BuildOptionMenu(tabs, menu, "Colors", true);
+    let contentDiv = BuildOptionMenu(tabs, menu, "Settings", true);
 
     let localBattleStats = GetLocalBattleStats();
 
@@ -1419,30 +1707,6 @@ function BuildOptionMenu_Colors(tabs, menu) {
     let colorSettingsNode = document.createElement("div");
     colorSettingsNode.className = "TDup_optionsTabContentDiv";
 
-    // Show Percentage instead
-    let isShowingBattleStatsPercentageDiv = document.createElement("div");
-    isShowingBattleStatsPercentageDiv.className = "TDup_optionsTabContentDiv";
-    let isShowingBattleStatsPercentage = GetStorageBoolWithDefaultValue(StorageKey.IsShowingBattleStatsPercentage, false);
-
-    let checkboxisShowingBattleStatsPercentage = document.createElement('input');
-    checkboxisShowingBattleStatsPercentage.type = "checkbox";
-    checkboxisShowingBattleStatsPercentage.name = "name";
-    checkboxisShowingBattleStatsPercentage.value = "value";
-    checkboxisShowingBattleStatsPercentage.id = "idIsShowingBattleStatsPercentage";
-    checkboxisShowingBattleStatsPercentage.checked = isShowingBattleStatsPercentage;
-
-    checkboxisShowingBattleStatsPercentage.addEventListener("change", () => {
-        let isShowingBattleStatsPercentage = checkboxisShowingBattleStatsPercentage.checked;
-        SetStorage(StorageKey.IsShowingBattleStatsPercentage, isShowingBattleStatsPercentage);
-    });
-
-    var isShowingBattleStatsPercentageLabel = document.createElement('label')
-    isShowingBattleStatsPercentageLabel.htmlFor = "idIsShowingBattleStatsPercentage";
-    isShowingBattleStatsPercentageLabel.innerHTML = 'Display percentage rather than values in grid format';
-    isShowingBattleStatsPercentageDiv.appendChild(isShowingBattleStatsPercentageLabel);
-    isShowingBattleStatsPercentageDiv.appendChild(checkboxisShowingBattleStatsPercentage);
-    contentDiv.appendChild(isShowingBattleStatsPercentageDiv);
-
     // Show Score instead
     let isShowingBattleStatsScoreDiv = document.createElement("div");
     isShowingBattleStatsScoreDiv.className = "TDup_optionsTabContentDiv";
@@ -1560,32 +1824,55 @@ function AddColorPanel(isBSScoreMode, colorSettingsNode, colorItem, id) {
     colorSettingsNode.appendChild(divColor);
 }
 
+function AddOption(contentDiv, StorageKeyValue, defaultValue, textToDisplay, name) {
+    // Alternative profile display
+    let optionNode = document.createElement("div");
+    optionNode.className = "TDup_optionsTabContentDiv";
+    let isShowingAlternativeProfileDisplay = GetStorageBoolWithDefaultValue(StorageKeyValue, defaultValue);
+
+    let optionCheckbox = document.createElement('input');
+    optionCheckbox.type = "checkbox";
+    optionCheckbox.name = "name";
+    optionCheckbox.value = "value";
+    optionCheckbox.id = "id" + name;
+    optionCheckbox.checked = isShowingAlternativeProfileDisplay;
+
+    optionCheckbox.addEventListener("change", () => {
+        let isOptionValue = optionCheckbox.checked;
+        SetStorage(StorageKeyValue, isOptionValue);
+    });
+
+    var optionLabel = document.createElement('label')
+    optionLabel.htmlFor = "id" + name;
+    optionLabel.appendChild(document.createTextNode(textToDisplay));
+    optionNode.appendChild(optionLabel);
+    optionNode.appendChild(optionCheckbox);
+    contentDiv.appendChild(optionNode);
+}
+
 function BuildOptionMenu_Pages(tabs, menu) {
     let contentDiv = BuildOptionMenu(tabs, menu, "Pages", true);
 
     // Displaying Honor bars
-    let isShowingHonorBarsNode = document.createElement("div");
-    isShowingHonorBarsNode.className = "TDup_optionsTabContentDiv";
-    let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
+    AddOption(contentDiv, StorageKey.IsShowingHonorBars, true, 'Are you displaying honor bars?', 'isShowingHonorBars');
 
-    let checkboxIsShowingHonorBars = document.createElement('input');
-    checkboxIsShowingHonorBars.type = "checkbox";
-    checkboxIsShowingHonorBars.name = "name";
-    checkboxIsShowingHonorBars.value = "value";
-    checkboxIsShowingHonorBars.id = "idIsShowingHonorBars";
-    checkboxIsShowingHonorBars.checked = isShowingHonorBars;
+    // Enable on own profile
+    AddOption(contentDiv, StorageKey.IsEnabledOnOwnProfile, false, 'Show stats on your own profile page?', 'IsEnabledOnOwnProfile');
 
-    checkboxIsShowingHonorBars.addEventListener("change", () => {
-        let isShowingHonorBarsNew = checkboxIsShowingHonorBars.checked;
-        SetStorage(StorageKey.IsShowingHonorBars, isShowingHonorBarsNew);
-    });
+    // Alternative profile display
+    AddOption(contentDiv, StorageKey.IsShowingAlternativeProfileDisplay, false, 'Use alternative profile stats location?', 'IsShowingAlternativeProfileDisplay');
 
-    var isShowingHonorBarsLabel = document.createElement('label')
-    isShowingHonorBarsLabel.htmlFor = "idIsShowingHonorBars";
-    isShowingHonorBarsLabel.appendChild(document.createTextNode('Are you displaying honor bars?'));
-    isShowingHonorBarsNode.appendChild(isShowingHonorBarsLabel);
-    isShowingHonorBarsNode.appendChild(checkboxIsShowingHonorBars);
-    contentDiv.appendChild(isShowingHonorBarsNode);
+    // Alternative profile display
+    AddOption(contentDiv, StorageKey.IsShowingStatsHeader, true, 'Show headers above profile stats?', 'IsShowingHeadersOnProfileStats');
+
+    // Alternative profile display
+    AddOption(contentDiv, StorageKey.IsClickingOnProfileStatsAttackPlayer, false, 'Click on profile stats area to attack?', 'IsClickingOnProfileStatsAttackPlayer');
+
+    // Hide BSP Option button, in toolbar
+    AddOption(contentDiv, StorageKey.IsHidingBSPOptionButtonInToolbar, false, 'Hide BSP Option button in toolbar?', 'IsHidingBSPOptionButtonInToolbar');
+
+    // Show Percentage instead
+    AddOption(contentDiv, StorageKey.IsShowingBattleStatsPercentage, false, 'Display percentage rather than values in little colored squares?', 'IsShowingBattleStatsPercentage');
 
     // Spy
     let spyNumberOfDaysDiv = document.createElement("div");
@@ -1613,6 +1900,26 @@ function BuildOptionMenu_Pages(tabs, menu) {
     spyNumberOfDaysDiv.appendChild(tornStatsNumberOfDaysInput);
     spyNumberOfDaysDiv.appendChild(spyNumberOfDaysDivLabelPart2);
     contentDiv.appendChild(spyNumberOfDaysDiv);
+
+    // BSP Color schema
+    let colorSchemaDiv = document.createElement("div");
+    colorSchemaDiv.className = "TDup_optionsTabContentDiv";
+
+    let colorPickerInput = document.createElement("input");
+    colorPickerInput.type = "color";
+    colorPickerInput.value = GetColorTheme();
+
+    colorPickerInput.addEventListener("change", () => {
+        let color = colorPickerInput.value;
+        SetStorage(StorageKey.BSPColorTheme, JSON.stringify(color));
+    });
+
+    let colorThemeLabel = document.createElement("label");
+    colorThemeLabel.innerHTML = 'BSP Theme color ';
+
+    colorSchemaDiv.appendChild(colorThemeLabel);
+    colorSchemaDiv.appendChild(colorPickerInput);
+    contentDiv.appendChild(colorSchemaDiv);
 
     // Pages
     let textExplanation = document.createElement("div");
@@ -1798,8 +2105,35 @@ function BuildOptionMenu_TornStats(tabs, menu) {
 
     let tornStatsImportTipsDiv = document.createElement("div");
     tornStatsImportTipsDiv.className = "TDup_optionsTabContentDiv";
-    tornStatsImportTipsDiv.innerHTML = 'To import TornStats spies, go on a specific faction page, and click on the [BSP IMPORT SPIES] button at the top of the page.';
+    tornStatsImportTipsDiv.innerHTML = 'To import TornStats spies, go on a specific faction page, and click on the [BSP IMPORT SPIES] button at the top of the page. Or enable the Auto Import feature below!';
     tornStatsNode.appendChild(tornStatsImportTipsDiv);
+
+    //
+
+    let isAutoImportTornStatsSpiesNode = document.createElement("div");
+    isAutoImportTornStatsSpiesNode.className = "TDup_optionsTabContentDiv";
+    let isAutoImportTornStatsSpies = GetStorageBoolWithDefaultValue(StorageKey.IsAutoImportTornStatsSpies, false);
+
+    let checkboxisAutoImportTornStatsSpies = document.createElement('input');
+    checkboxisAutoImportTornStatsSpies.type = "checkbox";
+    checkboxisAutoImportTornStatsSpies.name = "name";
+    checkboxisAutoImportTornStatsSpies.value = "value";
+    checkboxisAutoImportTornStatsSpies.id = "idIsAutoImportTornStatsSpies";
+    checkboxisAutoImportTornStatsSpies.checked = isAutoImportTornStatsSpies;
+
+    checkboxisAutoImportTornStatsSpies.addEventListener("change", () => {
+        let isAutoImportTornStatsSpies = checkboxisAutoImportTornStatsSpies.checked;
+        SetStorage(StorageKey.IsAutoImportTornStatsSpies, isAutoImportTornStatsSpies);
+    });
+
+    var isAutoImportTornStatsSpiesLabel = document.createElement('label')
+    isAutoImportTornStatsSpiesLabel.htmlFor = "idIsAutoImportTornStatsSpies";
+    isAutoImportTornStatsSpiesLabel.appendChild(document.createTextNode('Auto Import TornStats spies? (will auto query TornStats on profile or faction page)'));
+    isAutoImportTornStatsSpiesNode.appendChild(isAutoImportTornStatsSpiesLabel);
+    isAutoImportTornStatsSpiesNode.appendChild(checkboxisAutoImportTornStatsSpies);
+    tornStatsNode.appendChild(isAutoImportTornStatsSpiesNode);
+
+    //
 
     contentDiv.appendChild(tornStatsNode);
 }
@@ -1807,31 +2141,29 @@ function BuildOptionMenu_TornStats(tabs, menu) {
 function BuildOptionMenu_Debug(tabs, menu) {
     let contentDiv = BuildOptionMenu(tabs, menu, "Debug", false);
 
-    let YATAColor = "pink";
-    let TornStatsColor = "green";
-    let PredictionColor = "blue";
-    let BSPColor = "yellow";
-
     // <LocalStorage display>
     let maxStorageSize = 5000000;
-    let storageALLResult = GetPredictionStorage(eStorageType.All);
-    let storageALLSize = storageALLResult[1];
-    let ratioALLFull = parseInt(((storageALLSize / maxStorageSize) * 100));
+
+    let storageALLExceptBSPResult = GetPredictionStorage(eStorageType.ALL_ExceptBSP);
+    let storageALLExceptBSPSize = storageALLExceptBSPResult[1];
+
+    let storageTornChatResult = GetPredictionStorage(eStorageType.TornChat);
+    let storageTornChatSize = storageTornChatResult[1];
+
+    let storageALLBSPResult = GetPredictionStorage(eStorageType.All_BSP);
+    let storageALLBSPSize = storageALLBSPResult[1];
 
     let storagePredictionResult = GetPredictionStorage(eStorageType.Prediction);
-    let storagePredictionNumber = storagePredictionResult[0];
     let storagePredictionSize = storagePredictionResult[1];
-    let ratioPrediction = parseInt(((storagePredictionSize / maxStorageSize) * 100));
+    let storagePredictionNumber = storagePredictionResult[0];
 
     let storageTornStatsResult = GetPredictionStorage(eStorageType.TornStatsSpies);
-    let storageTornStatsNumber = storageTornStatsResult[0];
     let storageTornStatsSize = storageTornStatsResult[1];
-    let ratioTornStats = parseInt(((storageTornStatsSize / maxStorageSize) * 100));
+    let storageTornStatsNumber = storageTornStatsResult[0];
 
     let storageYATAResult = GetPredictionStorage(eStorageType.YATASpies);
-    let storageYATANumber = storageYATAResult[0];
     let storageYATASize = storageYATAResult[1];
-    let ratioYata = parseInt(((storageYATASize / maxStorageSize) * 100));
+    let storageYATANumber = storageYATAResult[0];
 
     let localStorageInfosDiv = document.createElement("div");
     localStorageInfosDiv.className = "TDup_optionsTabContentDiv";
@@ -1839,47 +2171,16 @@ function BuildOptionMenu_Debug(tabs, menu) {
     let localStorageProgressBar = document.createElement("div");
     localStorageProgressBar.className = "TDup_optionsTabContentDiv";
 
-    localStorageProgressBar.innerHTML = "LocalStorage space : " + ratioALLFull + "% full (" + storageALLSize.toLocaleString('en-US') + " / " + maxStorageSize.toLocaleString('en-US') + ")";
+    localStorageProgressBar.innerHTML = "LocalStorage space is different <br/>from browser to browser.<br/> For reference, Chrome has a 5mb limit.<br/>";
+
+    localStorageProgressBar.innerHTML += "<br/> Used by everything <br/>" + (storageALLBSPSize + storageALLExceptBSPSize).toLocaleString('en-US') + "b";
+    localStorageProgressBar.innerHTML += "<br/><br/> Used by BSP Total <br/> " + storageALLBSPSize.toLocaleString('en-US') + "b";
+    localStorageProgressBar.innerHTML += "<br/><br/> Used by BSP Predictions <br/> " + storagePredictionSize.toLocaleString('en-US') + "b (Number : " + storagePredictionNumber + ")";
+    localStorageProgressBar.innerHTML += "<br/><br/> Used by BSP TornStats spies <br/> " + storageTornStatsSize.toLocaleString('en-US') + "b (Number : " + storageTornStatsNumber + ")";
+    localStorageProgressBar.innerHTML += "<br/><br/> Used by BSP YATA spies <br/> " + storageYATASize.toLocaleString('en-US') + "b (Number : " + storageYATANumber + ")";
+    localStorageProgressBar.innerHTML += "<br/><br/> Used by others = " + storageALLExceptBSPSize.toLocaleString('en-US') + "b <br/>(Torn chat = " + storageTornChatSize.toLocaleString('en-US')+"b)";
+
     localStorageInfosDiv.appendChild(localStorageProgressBar);
-
-    var progressBar = document.createElement("div");
-    progressBar.style.width = "200px";
-    progressBar.style.height = "30px";
-    progressBar.style.backgroundColor = "gray";
-
-    const predictionsProgress = document.createElement("div");
-    predictionsProgress.style.width = ratioPrediction + "%";
-    predictionsProgress.style.height = "100%";
-    predictionsProgress.style.backgroundColor = PredictionColor;
-    predictionsProgress.style.float = "left";
-    predictionsProgress.title = "Predictions (" + storagePredictionNumber + " items)";
-
-    const TornStatsProgress = document.createElement("div");
-    TornStatsProgress.style.width = ratioTornStats + "%";
-    TornStatsProgress.style.height = "100%";
-    TornStatsProgress.style.backgroundColor = TornStatsColor;
-    TornStatsProgress.style.float = "left";
-    TornStatsProgress.title = "TornStats spies (" + storageTornStatsNumber + " items)";
-
-    const YATAProgress = document.createElement("div");
-    YATAProgress.style.width = ratioYata + "%";
-    YATAProgress.style.height = "100%";
-    YATAProgress.style.backgroundColor = YATAColor;
-    YATAProgress.style.float = "left";
-    YATAProgress.title = "YATA spies (" + storageYATANumber + " items)";
-
-    const ALLProgress = document.createElement("div");
-    ALLProgress.style.width = ratioALLFull + "%";
-    ALLProgress.style.height = "100%";
-    ALLProgress.style.backgroundColor = BSPColor;
-    ALLProgress.title = "BSP";
-
-    progressBar.appendChild(predictionsProgress);
-    progressBar.appendChild(TornStatsProgress);
-    progressBar.appendChild(YATAProgress);
-    progressBar.appendChild(ALLProgress);
-
-    localStorageInfosDiv.appendChild(progressBar);
     contentDiv.appendChild(localStorageInfosDiv);
     // </LocalStorage display>
 
@@ -1901,7 +2202,26 @@ function BuildOptionMenu_Debug(tabs, menu) {
     contentDiv.appendChild(divbuttonExportLocalCache);
     // </Export local storage>
 
-    // <Clear Predictions>
+    // <Test localStorage space>
+    var divbuttonTestLocalStorageSpace = document.createElement("div");
+    divbuttonTestLocalStorageSpace.className = "TDup_optionsTabContentDiv";
+    var buttonTestLocalStorageSpace = document.createElement("input");
+    buttonTestLocalStorageSpace.type = "button";
+    buttonTestLocalStorageSpace.value = "Test Local Storage space";
+    buttonTestLocalStorageSpace.className = "TDup_buttonInOptionMenu";
+
+    buttonTestLocalStorageSpace.addEventListener("click", () => {
+        buttonTestLocalStorageSpace.disabled = true;
+        let result = TestLocalStorage();
+        buttonTestLocalStorageSpace.disabled = false;
+        buttonTestLocalStorageSpace.value = result == true ? "Success!" : "Failure, clear your cache";
+    });
+
+    divbuttonTestLocalStorageSpace.appendChild(buttonTestLocalStorageSpace);
+    contentDiv.appendChild(divbuttonTestLocalStorageSpace);
+    // </Export local storage>
+
+    // <Test localStorage space>
     var divbuttonClearPredictions = document.createElement("div");
     divbuttonClearPredictions.className = "TDup_optionsTabContentDiv";
     let btnClearPredictions = document.createElement("input");
@@ -1967,6 +2287,28 @@ function BuildOptionMenu_Debug(tabs, menu) {
     contentDiv.appendChild(divbuttonClearYATASpies);
     // </Clear YATA spies>
 
+    // <Clear Chat Entries>
+    var divbuttonClearChat = document.createElement("div");
+    divbuttonClearChat.className = "TDup_optionsTabContentDiv";
+    let btnClearTornChat = document.createElement("input");
+    btnClearTornChat.type = "button";
+    btnClearTornChat.value = "Clear Chat entries";
+    btnClearTornChat.title = "Clear Chat entries from Local Storage";
+    btnClearTornChat.className = "TDup_buttonInOptionMenu";
+
+    btnClearTornChat.addEventListener("click", () => {
+        btnClearTornChat.disabled = true;
+        if (confirm("BSP - IMPORTANT \r\n \r\nAre you sure you want to clear Torn Chat entries your localstorage?") == true) {
+            ClearCache(eStorageType.TornChat);
+            window.location.reload();
+        }
+        btnClearTornChat.disabled = false;
+    });
+
+    divbuttonClearChat.appendChild(btnClearTornChat);
+    contentDiv.appendChild(divbuttonClearChat);
+    // </Clear Chat Entries>
+
     var divbuttonClearLocalCache = document.createElement("div");
     divbuttonClearLocalCache.className = "TDup_optionsTabContentDiv";
     var buttonClearLocalCache = document.createElement("input");
@@ -1999,7 +2341,7 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
 
     let ForumThread = document.createElement("div");
     ForumThread.className = "TDup_optionsTabContentDiv";
-    ForumThread.innerHTML = 'Read basic setup, Q&A and R+ the script if you like it on the <a href="https://www.torn.com/forums.php#/p=threads&f=67&t=16290324&b=0&a=0&to=22705010"> Forum thread</a>';
+    ForumThread.innerHTML = 'Read basic setup, Q&A and R+ the script if you like it on the <a href="https://www.torn.com/forums.php#/p=threads&f=67&t=16290324&b=0&a=0&to=22705010" target="_blank"> Forum thread</a>';
     contentDiv.appendChild(ForumThread);
 
     let DiscordLink = document.createElement("div");
@@ -2011,7 +2353,7 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
 
     let DiscordLinkImg = document.createElement("div");
     DiscordLinkImg.style.textAlign = "center";
-    DiscordLinkImg.innerHTML = '<a href="https://discord.gg/zgrVX5j6MQ"><img width="64" height="64" title="Discord" src="https://wiki.soldat.pl/images/6/6f/DiscordLogo.png" /> </a>';
+    DiscordLinkImg.innerHTML = '<a href="https://discord.gg/zgrVX5j6MQ" target="_blank"><img width="64" height="64" title="Discord" src="https://wiki.soldat.pl/images/6/6f/DiscordLogo.png" /> </a>';
 
     DiscordLink.appendChild(DiscordLinkImg);
 
@@ -2046,8 +2388,11 @@ function BuildSettingsMenu(node) {
     let th = document.createElement("th");
     th.className = "TDup_optionsCellHeader";
     th.colSpan = 2;
-    let text = document.createTextNode("BSP Settings");
-    th.appendChild(text);
+
+    let imgDivTDup_PredictorOptionsDiv = document.createElement("div");
+    imgDivTDup_PredictorOptionsDiv.innerHTML = '<img src="' + mainBSPIcon + '" style="max-width:150px;max-height:100px;vertical-align:middle;" /> Settings';
+    th.appendChild(imgDivTDup_PredictorOptionsDiv);
+
     rowHeader.appendChild(th);
 
     let raw = table.insertRow();
@@ -2081,39 +2426,6 @@ function BuildSettingsMenu(node) {
 
 // #region Inject into pages
 
-function InjectOptionMenu(node) {
-    if (!node) return;
-
-    mainNode = node;
-    var topPageLinksList = node.querySelector("#top-page-links-list");
-    if (topPageLinksList == undefined)
-        return;
-
-    node.style.position = "relative";
-
-    let btnOpenSettings = document.createElement("a");
-    btnOpenSettings.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
-    btnOpenSettings.innerHTML = '<div class="TDup_button">BSP Settings</div>';
-
-    btnOpenSettings.addEventListener("click", () => {
-        if (TDup_PredictorOptionsDiv == undefined) {
-            BuildSettingsMenu(node);
-        }
-
-        if (TDup_PredictorOptionsDiv.style.display == "block") {
-            TDup_PredictorOptionsDiv.style.display = "none";
-        }
-        else {
-            TDup_PredictorOptionsDiv.style.display = "block";
-            if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
-                FetchUserDataFromBSPServer();
-            }
-        }
-    });
-
-    topPageLinksList.appendChild(btnOpenSettings);
-}
-
 function InjectImportSpiesButton(node) {
     if (!node) return;
 
@@ -2129,11 +2441,6 @@ function InjectImportSpiesButton(node) {
     let btnImportTornStatsSpies = document.createElement("a");
     btnImportTornStatsSpies.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
     btnImportTornStatsSpies.innerHTML = '<div class="TDup_button">BSP Import Spies</div>';
-
-    //btnValidatemainAPIKey = document.createElement("input");
-    //btnValidatemainAPIKey.type = "button";
-    //btnValidatemainAPIKey.value = "Validate";
-    //btnValidatemainAPIKey.className = "TDup_buttonInOptionMenu";
 
     let successImportTornStatsSpiesForFaction = document.createElement("label");
     successImportTornStatsSpiesForFaction.innerHTML = 'Spies imported!';
@@ -2165,12 +2472,22 @@ function InjectImportSpiesButton(node) {
 
     }
 
-    let factionId = parseInt(factionIdStr);
+    el = document.querySelector('.view-wars');
+    if (el != undefined) {
 
-    if (factionId > 0) {
+        let url = el.href;
+        let hrefArray2 = url.split("ranked/");
+        if (hrefArray2.length == 2) {
+            factionIdStr = hrefArray2[1];
+        }
+    }
+
+    FactionTargetId = parseInt(factionIdStr);
+
+    if (FactionTargetId > 0) {
         btnImportTornStatsSpies.addEventListener("click", () => {
             btnImportTornStatsSpies.disabled = true;
-            FetchFactionSpiesFromTornStats(factionId, btnImportTornStatsSpies, successImportTornStatsSpiesForFaction, errorImportTornStatsSpiesForFaction);
+            FetchFactionSpiesFromTornStats(FactionTargetId, btnImportTornStatsSpies, successImportTornStatsSpiesForFaction, errorImportTornStatsSpiesForFaction);
         });
 
         topPageLinksList.appendChild(btnImportTornStatsSpies);
@@ -2179,28 +2496,132 @@ function InjectImportSpiesButton(node) {
     }
 }
 
+var isBSPOptionDisplay = false;
+function InjectOptionMenu(node) {
+    if (!node)
+        node = document;
+
+    if (isBSPOptionDisplay)
+        return;
+
+    mainNode = node;
+    var topPageLinksList = node.querySelector("#top-page-links-list");
+    if (topPageLinksList == undefined)
+        return;
+
+    //node.style.position = "relative";
+
+    let btnOpenSettings = document.createElement("a");
+    btnOpenSettings.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
+    btnOpenSettings.innerHTML = '<div class="TDup_button" style="font-size:x-small"><img src="' + mainBSPIcon + '" style="max-width:100px;max-height:16px;vertical-align:middle;"/>Settings</div>';
+
+    btnOpenSettings.addEventListener("click", () => {
+        if (TDup_PredictorOptionsDiv == undefined) {
+            BuildSettingsMenu(document.querySelector(".content-title"));
+        }
+
+        if (TDup_PredictorOptionsDiv.style.display == "block") {
+            TDup_PredictorOptionsDiv.style.display = "none";
+        }
+        else {
+            TDup_PredictorOptionsDiv.style.display = "block";
+            if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
+                FetchUserDataFromBSPServer();
+            }
+        }
+    });
+
+    topPageLinksList.appendChild(btnOpenSettings);
+    isBSPOptionDisplay = true;
+}
+
+function InjectBSPSettingsButtonInProfile(node) {
+    if (!node)
+        return;
+
+    if (node.className.indexOf('mobile') !== -1) {
+        OnMobile = true;
+        return;
+    }
+
+    var btnOpenSettingsProfile = document.createElement("a");
+    btnOpenSettingsProfile.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
+    btnOpenSettingsProfile.style.float = "none";
+    btnOpenSettingsProfile.innerHTML = '<div class="TDup_button" style="font-size:large"><img src="' + mainBSPIcon + '" style="max-width:100px;max-height:30px;vertical-align:middle;"/>Settings</div>';
+
+    btnOpenSettingsProfile.addEventListener("click", () => {
+        if (TDup_PredictorOptionsDiv == undefined) {
+            BuildSettingsMenu(document.querySelector(".content-title"));
+        }
+
+        if (TDup_PredictorOptionsDiv.style.display == "block") {
+            TDup_PredictorOptionsDiv.style.display = "none";
+        }
+        else {
+            TDup_PredictorOptionsDiv.style.display = "block";
+            if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
+                FetchUserDataFromBSPServer();
+            }
+        }
+    });
+
+    ;
+    node.insertBefore(btnOpenSettingsProfile, node.children[1]);
+}
+
+var statsAlreadyDisplayedOnProfile = false;
 function InjectInProfilePage(isInit = true, node = undefined) {
+    if (statsAlreadyDisplayedOnProfile)
+        return;
+
+    var mainContainer = document;
+
     var el;
     if (isInit == true) {
-        el = document.querySelectorAll('.empty-block')
+        mainContainer = document;
     }
     else if (node == undefined) {
         return;
     }
     else {
-        el = node.querySelectorAll('.empty-block')
+        mainContainer = node;
     }
 
-    for (var i = 0; i < el.length; ++i) {
-        divWhereToInject = el[i];
-        if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
-            GetPredictionForPlayer(ProfileTargetId, OnProfilePlayerStatsRetrieved);
+    el = mainContainer.querySelectorAll('.empty-block');
+    if (el.length == 0)
+        return;
+
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false)) {
+        el = document.querySelectorAll('.user-information');
+    }
+
+    if (ProfileTargetId == -1)
+        return;
+
+    if (el.length == 0)
+        return;
+
+    statsAlreadyDisplayedOnProfile = true;
+    divWhereToInject = el[0];
+
+    let profileId = GetStorage(StorageKey.PlayerId);
+    if (profileId != undefined && profileId == ProfileTargetId) {
+        if (GetStorageBoolWithDefaultValue(StorageKey.IsEnabledOnOwnProfile, false) == false) {
+            return;
         }
+    }
+
+    AutoSyncTornStatsPlayer(ProfileTargetId);
+
+    if (GetStorageBool(StorageKey.IsPrimaryAPIKeyValid)) {
+        GetPredictionForPlayer(ProfileTargetId, OnProfilePlayerStatsRetrieved);
     }
 }
 
 function InjectInFactionPage(node) {
     if (!node) return;
+
+    AutoSyncTornStatsFaction(FactionTargetId);
 
     let el = node.querySelectorAll('a');
     for (let i = 0; i < el.length; ++i) {
@@ -2297,22 +2718,44 @@ function InjectInGenericGridPage(isInit, node) {
     }
     for (let i = 0; i < el.length; ++i) {
         var iter = el[i];
-        var toSplit = iter.innerHTML;
-        var myArray = toSplit.split("[");
-        if (myArray.length < 2)
-            continue;
+        var title = iter.title;
 
-        myArray = myArray[1].split("]");
-        if (myArray.length < 1)
+        var playerId = -1;
+        let myArray = iter.innerHTML.split("[");
+        if (myArray.length >= 2) {
+
+            myArray = myArray[1].split("]");
+            if (myArray.length >= 1) {
+                playerId = parseInt(myArray[0]);
+            }
+        }
+
+        if (playerId == -1) {
+            if (iter.title != undefined) {
+                let myArray2 = iter.title.split("[");
+                if (myArray2.length >= 2) {
+
+                    myArray2 = myArray2[1].split("]");
+                    if (myArray2.length >= 1) {
+                        playerId = parseInt(myArray2[0]);
+                    }
+                }
+            }
+        }
+
+        if (playerId == -1)
             continue;
 
         var parentNode = iter.parentNode;
         var style = window.getComputedStyle(parentNode);
-        if (style.display == "none") {
-            continue;
-        }
+        if (style.display == "none")
+            continue;        
 
-        var playerId = parseInt(myArray[0]);
+        var thisStyle = window.getComputedStyle(iter);
+        if (thisStyle.width == "0px")
+            continue;
+
+       
         if (!(playerId in dictDivPerPlayer)) {
             dictDivPerPlayer[playerId] = new Array();
         }
@@ -2347,43 +2790,62 @@ function IsBSPEnabledOnCurrentPage() {
 (function () {
     'use strict';
 
+    LogInfo("Init Starting");
+
     InitColors();
 
-    if (window.location.href.startsWith("https://www.torn.com/profiles.php")) {
+    LogInfo("Init Step 1 - InitColors done");
+
+    if (!GetStorageBool(StorageKey.IsHidingBSPOptionButtonInToolbar)) {
         LogInfo("Inject Option Menu...");
-        InjectOptionMenu(document.querySelector(".content-title"));
+
+        InjectBSPSettingsButtonInProfile(document.querySelector(".container clearfix"));
+        InjectBSPSettingsButtonInProfile(document.querySelector("#sidebar"));
         LogInfo("Inject Option Menu done.");
     }
 
+    LogInfo("Init Step 2");
+
+    if (IsPage(PageType.Profile))
+        InjectOptionMenu(document.querySelector(".content-title"));
+
+    LogInfo("Init Step 3");
     if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
         InjectImportSpiesButton(document.querySelector(".content-title"));
     }
+
+    LogInfo("Init Step 4");
 
     if (!IsSubscriptionValid()) {
         LogInfo("BSP Subscription invalid");
         return;
     }
 
+    LogInfo("Init Step 5");
+
     if (!IsBSPEnabledOnCurrentPage()) {
         LogInfo("BSP disabled on current page");
         return;
     }
 
+    LogInfo("Init Step 6");
     // Cleanup outdated cache so we don't burst the 5mo limit of the localstorage with old & useless predictions that would be renewed anyway on demand.
     ClearOutdatedPredictionInCache();
 
+    LogInfo("Init Step 7");
     // Auto import stats daily (if option is enabled)
     AutoImportStats();
 
     let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
 
+    LogInfo("Init Step 8");
     // Inject in already loaded page:
     if (IsPage(PageType.Profile)) {
         InjectInProfilePage(true, undefined);
         setTimeout(InjectInProfilePage, 3000);
     }
     else if (IsPage(PageType.Faction) || IsPage(PageType.War)) {
-        //InjectInFactionPage(node);
+        //AutoSyncTornStatsFaction(factionId);
     }
     else if (IsPage(PageType.Bounty)) {
         InjectInBountyPagePage(true, undefined);
@@ -2392,14 +2854,15 @@ function IsBSPEnabledOnCurrentPage() {
         InjectInGenericGridPage(true, undefined);
     }
 
+    LogInfo("Init Step 9");
+
     // Start observer, to inject within dynamically loaded content
     var observer = new MutationObserver(function (mutations, observer) {
-        if (IsPage(PageType.FactionControl) && isShowingHonorBars == true) {
-            return; // Temporary disable the controls tab in the faction page, because forever loading on honor bars
-        }
         mutations.forEach(function (mutation) {
             for (const node of mutation.addedNodes) {
                 if (node.querySelector) {
+                    InjectBSPSettingsButtonInProfile(document.querySelector(".container clearfix"));
+
                     if (IsPage(PageType.Profile)) {
                         InjectInProfilePage(false, node);
                     }
@@ -2430,6 +2893,8 @@ function IsBSPEnabledOnCurrentPage() {
 
     observer.observe(document, { attributes: false, childList: true, characterData: false, subtree: true });
 
+    LogInfo("Init Step 10");
+
 })();
 
 // #endregion
@@ -2437,60 +2902,63 @@ function IsBSPEnabledOnCurrentPage() {
 // #region API BSP
 
 function FetchUserDataFromBSPServer() {
-    console.error("FetchUserDataFromBSPServer fetching..");
-    console.log("FetchUserDataFromBSPServer fetching..");
-
     let primaryAPIKey = GetStorage(StorageKey.PrimaryAPIKey);
     if (primaryAPIKey == undefined || primaryAPIKey == "") {
         LogInfo("BSP : Calling FetchUserDataFromBSPServer with primaryAPIKey undefined or empty, abording");
         return;
     }
 
-    let url = `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${GM_info.script.version}`;
-    PDA_httpGet(url)
-        .then(response => {
-            if (response.status == '200') {
-                let result = JSON.parse(response.responseText);
-                if (result == undefined) {
-                    subscriptionEndText.innerHTML = '<div style="color:red">WARNING - An error occured while fetching the subscription end date.</div>';
-                    return;
+    return new Promise((resolve, reject) => {
+        GM.xmlHttpRequest({
+            method: 'GET',
+            url: `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${GM_info.script.version}`,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            onload: (response) => {
+                try {
+                    let result = JSON.parse(response.responseText);
+                    if (result == undefined) {
+                        subscriptionEndText.innerHTML = '<div style="color:red">WARNING - An error occured while fetching the subscription end date.</div>';
+                        return;
+                    }
+
+                    SetStorage(StorageKey.DateSubscriptionEnd, result.SubscriptionEnd);
+
+                    let text = ' 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with message "bsp". Process is automated and treated within a minute. You can send in bulk)';
+
+                    if (result.SubscriptionActive) {
+                        var dateNow = new Date();
+                        var offsetInMinute = dateNow.getTimezoneOffset();
+                        var dateSubscriptionEnd = new Date(result.SubscriptionEnd);
+                        dateSubscriptionEnd.setMinutes(dateSubscriptionEnd.getMinutes() - offsetInMinute);
+                        var time_difference = dateSubscriptionEnd - dateNow;
+                        var days_difference = parseInt(time_difference / (1000 * 60 * 60 * 24));
+                        var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
+                        hours_difference %= 24;
+                        var minutes_difference = parseInt(time_difference / (1000 * 60));
+                        minutes_difference %= 60;
+
+                        subscriptionEndText.innerHTML = '<div style="color:' + GetColorTheme() + '">Thank you for using Battle Stats Predictor (BSP) script!<br /><br /> <div style="font-weight:bolder;">Your subscription expires in '
+                            + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
+                            + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
+                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.</div><br /><br />You can extend it for' + text + '</div>';
+                    }
+                    else {
+                        subscriptionEndText.innerHTML = '<div style="color:red">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
+                    }
+
+                    RefreshOptionMenuWithSubscription();
+
+                } catch (err) {
+                    reject(err);
                 }
-
-                SetStorage(StorageKey.DateSubscriptionEnd, result.SubscriptionEnd);
-
-                let text = ' 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with message "bsp". Process is automated and treated within a minute. You can send in bulk)';
-
-                if (result.SubscriptionActive) {
-                    var dateNow = new Date();
-                    var offsetInMinute = dateNow.getTimezoneOffset();
-                    var dateSubscriptionEnd = new Date(result.SubscriptionEnd);
-                    dateSubscriptionEnd.setMinutes(dateSubscriptionEnd.getMinutes() - offsetInMinute);
-                    var time_difference = dateSubscriptionEnd - dateNow;
-                    var days_difference = parseInt(time_difference / (1000 * 60 * 60 * 24));
-                    var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
-                    hours_difference %= 24;
-                    var minutes_difference = parseInt(time_difference / (1000 * 60));
-                    minutes_difference %= 60;
-
-                    subscriptionEndText.innerHTML = '<div style="color:#1E88E5">Thank you for using Battle Stats Predictor (BSP) script!<br /><br />Your subscription expires in '
-                        + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
-                        + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                        + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.<br /><br />You can extend it for' + text + '</div>';
-                }
-                else {
-                    subscriptionEndText.innerHTML = '<div style="color:#1E88E5">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
-                }
-
-                RefreshOptionMenuWithSubscription();
+            },
+            onerror: (err) => {
+                reject(err);
             }
-            else {
-                console.log(`[FetchUserDataFromBSPServer] error`)
-            }
-        })
-        .catch(e => {
-            console.log("FetchUserDataFromBSPServer exception: ");
-            console.error(e);
         });
+    });
 }
 
 function FetchScoreAndTBS(targetId) {
@@ -2548,6 +3016,7 @@ function VerifyTornAPIKey(callback) {
                 return;
             }
             else {
+                SetStorage(StorageKey.PlayerId, j.player_id);
                 callback(true);
                 return;
             }
@@ -2629,6 +3098,93 @@ function VerifyTornStatsAPIKey(callback) {
     });
 }
 
+var pageViewOnce = false;
+function AutoSyncTornStatsFaction(factionId) {
+    if (pageViewOnce == true)
+        return;
+
+    pageViewOnce = true;
+
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsAutoImportTornStatsSpies) == false)
+        return;
+
+    let lastDateAutoSyncThisFaction = GetStorage(StorageKey.AutoImportLastDateFaction + factionId);
+    if (lastDateAutoSyncThisFaction != undefined) {
+        let dateConsideredTooOld = new Date();
+        dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 15);
+        if (new Date(lastDateAutoSyncThisFaction) > dateConsideredTooOld) {
+            LogInfo("AutoSyncTornStatsFaction  - " + factionId + " - Too recent call in database, skipping");
+            return;
+        }
+    }
+
+    SetStorage(StorageKey.AutoImportLastDateFaction + factionId, new Date());
+    LogInfo("AutoSyncTornStatsFaction  - " + factionId + " - Getting spies from faction..");
+    return FetchFactionSpiesFromTornStats(factionId);
+}
+
+function AutoSyncTornStatsPlayer(playerId) {
+    if (pageViewOnce == true)
+        return;
+
+    pageViewOnce = true;
+
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsAutoImportTornStatsSpies) == false)
+        return;
+
+    let lastDateAutoSyncThisFaction = GetStorage(StorageKey.AutoImportLastDatePlayer + playerId);
+    if (lastDateAutoSyncThisFaction != undefined) {
+        let dateConsideredTooOld = new Date();
+        dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 15);
+        if (new Date(lastDateAutoSyncThisFaction) > dateConsideredTooOld) {
+            LogInfo("AutoSyncTornStatsPlayer  - " + playerId + " - Too recent call in database, skipying");
+            return;
+        }
+    }
+
+    SetStorage(StorageKey.AutoImportLastDatePlayer + playerId, new Date());
+    LogInfo("AutoSyncTornStatsPlayer  - " + playerId + " - Getting spies from player..");
+    return FetchPlayerSpiesFromTornStats(playerId);
+}
+
+function FetchPlayerSpiesFromTornStats(playerId) {
+
+    let urlToCall = "https://www.tornstats.com/api/v2/" + GetStorage(StorageKey.TornStatsAPIKey) + "/spy/user/" + playerId;
+
+    return new Promise((resolve, reject) => {
+        GM.xmlHttpRequest({
+            method: 'GET',
+            url: urlToCall,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            onload: (response) => {
+                try {
+                    var results = JSON.parse(response.responseText);
+
+                    if (results == undefined) {
+                        LogInfo("Error server: Spy not retrieved from TornStats for player " + playerId);
+                        return;
+                    }
+                    if (results.status === false) {
+                        LogInfo("Error request: Spy not retrieved from TornStats for player " + playerId);
+                        return;
+                    }
+
+                    LogInfo("Spy retrieved from TornStats for player " + playerId);
+                    let setSpyInCacheResult = SetTornStatsSpyInCache(playerId, results.spy);
+
+                } catch (err) {
+                    reject(err);
+                }
+            },
+            onerror: (err) => {
+                reject(err);
+            }
+        });
+    });
+}
+
 function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedElem) {
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
@@ -2639,21 +3195,30 @@ function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedEl
             },
             onload: (response) => {
                 try {
-                    button.disabled = false;
+                    if (button != undefined)
+                        button.disabled = false;
+
                     var results = JSON.parse(response.responseText);
+                    var isUI = successElem != undefined;
 
                     if (results == undefined) {
-                        failedElem.style.visibility = "visible";
-                        failedElem.style.display = "block";
-                        failedElem.innerHTML = "Error while calling TornStats";
-                        successElem.style.visibility = "hidden";
+                        LogInfo("Error while calling TornStats");
+                        if (isUI) {
+                            failedElem.style.visibility = "visible";
+                            failedElem.style.display = "block";
+                            failedElem.innerHTML = "Error while calling TornStats";
+                            successElem.style.visibility = "hidden";
+                        }
                         return;
                     }
                     if (results.status === false) {
-                        failedElem.style.visibility = "visible";
-                        failedElem.style.display = "block";
-                        failedElem.innerHTML = results.message;
-                        successElem.style.visibility = "hidden";
+                        LogInfo("Error - TornStats");
+                        if (isUI) {
+                            failedElem.style.visibility = "visible";
+                            failedElem.style.display = "block";
+                            failedElem.innerHTML = results.message;
+                            successElem.style.visibility = "hidden";
+                        }
                         return;
                     }
 
@@ -2679,10 +3244,14 @@ function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedEl
                         }
                     }
 
-                    failedElem.style.visibility = "hidden";
-                    successElem.style.visibility = "visible";
-                    successElem.style.display = "block";
-                    successElem.innerHTML = membersCount + " spies fetched from TornStats. " + newSpiesAdded + " new spies added. " + spyUpdated + " spies updated. " + spyError + " errors";
+                    let textToDisplay = membersCount + " spies fetched from TornStats. " + newSpiesAdded + " new spies added. " + spyUpdated + " spies updated. " + spyError + " errors";
+                    LogInfo(textToDisplay);
+                    if (isUI) {
+                        failedElem.style.visibility = "hidden";
+                        successElem.style.visibility = "visible";
+                        successElem.style.display = "block";
+                        successElem.innerHTML = textToDisplay;
+                    }
                 } catch (err) {
                     reject(err);
                 }
