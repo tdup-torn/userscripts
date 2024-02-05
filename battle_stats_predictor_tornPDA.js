@@ -125,7 +125,6 @@ function SetStorage(key, value) {
         LogInfo("BSP threw an exception in SetStorage method : " + e);
     }
 }
-
 function GetLocalBattleStats() {
     let data = localStorage[StorageKey.PlayerBattleStats];
     if (data == undefined) {
@@ -268,6 +267,13 @@ ref.parentNode.insertBefore(styleToAdd, ref);
 
 // #region Utils
 
+function LogInfo(value) {
+    var now = new Date();
+    console.log(": [** BSP **] " + now.toISOString() + " - " + value);
+}
+
+LogInfo("BSP_1")
+
 const PageType = {
     Profile: 'Profile',
     RecruitCitizens: 'Recruit Citizens',
@@ -331,10 +337,7 @@ var mapPageAddressEndWith = {
 }
 
 
-function LogInfo(value) {
-    var now = new Date();
-    console.log(": [** BSP **] " + now.toISOString() + " - " + value);
-}
+LogInfo("BSP_2")
 
 function JSONparse(str) {
     try {
@@ -455,6 +458,7 @@ function IsNPC(targetID) {
     }
 }
 
+LogInfo("BSP_3")
 // #endregion
 
 // #region Cache
@@ -818,6 +822,7 @@ function AutoImportStats() {
 
 // #endregion
 
+LogInfo("BSP_4")
 // #region Get Data for Player
 
 async function GetPredictionForPlayer(targetId, callback) {
@@ -875,6 +880,7 @@ async function GetPredictionForPlayer(targetId, callback) {
 
 // #endregion
 
+LogInfo("BSP_5")
 // #region Callback
 
 function GetConsolidatedDataForPlayerStats(prediction) {
@@ -1353,6 +1359,7 @@ function HasParentWithClass(element, className) {
 
 // #endregion
 
+LogInfo("BSP_6")
 // #region Option Menus
 
 function OpenOptionsTab(evt, optionsTabName) {
@@ -2424,6 +2431,7 @@ function BuildSettingsMenu(node) {
 
 // #endregion
 
+LogInfo("BSP_7")
 // #region Inject into pages
 
 function InjectImportSpiesButton(node) {
@@ -2767,6 +2775,7 @@ function InjectInGenericGridPage(isInit, node) {
 
 // #endregion
 
+LogInfo("BSP_8")
 // #region Script OnLoad
 function InitColors() {
     for (var i = 0; i < LOCAL_COLORS.length; ++i) {
@@ -2778,6 +2787,7 @@ function InitColors() {
     }
 }
 
+LogInfo("BSP_9")
 function IsBSPEnabledOnCurrentPage() {
     for ([key, val] of Object.entries(PageType)) {
         if (IsPage(val)) {
@@ -2787,6 +2797,7 @@ function IsBSPEnabledOnCurrentPage() {
     return false;
 }
 
+LogInfo("BSP_10")
 (function () {
     'use strict';
 
@@ -2991,7 +3002,7 @@ function FetchScoreAndTBS(targetId) {
 
 
 // #endregion
-
+LogInfo("BSP_11")
 // #region API Torn
 
 function VerifyTornAPIKey(callback) {
@@ -3064,6 +3075,7 @@ function GetPlayerStatsFromTornAPI(callback) {
 
 // #endregion
 
+LogInfo("BSP_12")
 // #region API TornStats
 function VerifyTornStatsAPIKey(callback) {
     return new Promise((resolve, reject) => {
@@ -3137,7 +3149,7 @@ function AutoSyncTornStatsPlayer(playerId) {
         let dateConsideredTooOld = new Date();
         dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 15);
         if (new Date(lastDateAutoSyncThisFaction) > dateConsideredTooOld) {
-            LogInfo("AutoSyncTornStatsPlayer  - " + playerId + " - Too recent call in database, skipying");
+            LogInfo("AutoSyncTornStatsPlayer  - " + playerId + " - Too recent call in database, skipping");
             return;
         }
     }
@@ -3265,6 +3277,7 @@ function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedEl
 
 // #endregion
 
+LogInfo("BSP_13")
 // #region API YATA
 
 function FetchSpiesFromYata(callback) {
