@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     8.9.3
+// @version     9.0.0
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -709,6 +709,13 @@ function ClearCache(storageType) {
         else if (key.startsWith(prefix)) {
             localStorage.removeItem(key);
         }
+
+        if (storageType == eStorageType.TornStatsSpies) {
+            if (key.startsWith(StorageKey.AutoImportLastDatePlayer) || key.startsWith(StorageKey.AutoImportLastDateFaction))
+            {
+                localStorage.removeItem(key);
+            }
+        }
     }
 }
 
@@ -800,6 +807,7 @@ function ClearOutdatedPredictionInCache() {
 
 function AutoImportStats() {
     // Automatic import stats
+    
     if (GetStorageBool(StorageKey.IsAutoImportStats) == true) {
         let dateConsideredTooOld = new Date();
         dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 1);
@@ -811,6 +819,7 @@ function AutoImportStats() {
                 return;
             }
         }
+
         SetStorage(StorageKey.AutoImportStatsLastDate, new Date());
         GetPlayerStatsFromTornAPI();
     }
@@ -904,11 +913,11 @@ function GetConsolidatedDataForPlayerStats(prediction) {
             case SUCCESS:
                 {
                     let intTBS = parseInt(prediction.TBS.toLocaleString('en-US').replaceAll(',', ''));
+                    objectToReturn.TargetTBS = intTBS;
                     let intTBSBalanced = parseInt(prediction.TBS_Balanced.toLocaleString('en-US').replaceAll(',', ''));
+                    //objectToReturn.TargetTBS = (intTBS + intTBSBalanced) / 2;
 
-                    objectToReturn.TargetTBS = (intTBS + intTBSBalanced) / 2;
                     if (prediction.Result == TOO_STRONG) {
-                        objectToReturn.TargetTBS = intTBS;
                         objectToReturn.Score = 500000;
                     }
                     else {
@@ -934,10 +943,24 @@ function GetConsolidatedDataForPlayerStats(prediction) {
     return objectToReturn;
 }
 
-
+var divStats = undefined;
+var isDivStatsCreated = false;
 function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     if (prediction == undefined)
         return;
+
+    if (prediction.timestamp != undefined) {
+        let spyDateConsideredTooOld = new Date();
+        let daysToUseSpies = GetStorage(StorageKey.DaysToUseSpies);
+        if (daysToUseSpies == undefined || daysToUseSpies < 1)
+            daysToUseSpies = 30;
+
+        spyDateConsideredTooOld.setDate(spyDateConsideredTooOld.getDate() - daysToUseSpies);
+        let spyDate = new Date(prediction.timestamp * 1000);
+        if (spyDate < spyDateConsideredTooOld) {
+            return;
+        }
+    }
 
     let localBattleStats = GetLocalBattleStats();
     let localTBS = localBattleStats.TBS;
@@ -1000,24 +1023,27 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
 
     var relativeTime = FormatRelativeTime(prediction.PredictionDate);
 
-    let divStats = document.createElement("div");
+    if (!isDivStatsCreated) {
+        divStats = document.createElement("div");
+        isDivStatsCreated = true;
 
-    if (GetStorageBoolWithDefaultValue(StorageKey.IsClickingOnProfileStatsAttackPlayer)) {
-        divStats.addEventListener('click', function () {
-            // Define the URL you want to open
-            var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + playerId;
+        if (GetStorageBoolWithDefaultValue(StorageKey.IsClickingOnProfileStatsAttackPlayer)) {
+            divStats.addEventListener('click', function () {
+                // Define the URL you want to open
+                var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + playerId;
 
-            // Open the URL in a new tab or window
-            window.open(urlAttack, '_blank');
-        });
-    }
+                // Open the URL in a new tab or window
+                window.open(urlAttack, '_blank');
+            });
+        }
 
-    if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false)) {
-        var referenceNode = divWhereToInject.firstChild.childNodes[1];
-        divWhereToInject.firstChild.insertBefore(divStats, referenceNode);
-    }
-    else {
-        divWhereToInject.insertBefore(divStats, divWhereToInject.firstChild);
+        if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false)) {
+            var referenceNode = divWhereToInject.firstChild.childNodes[1];
+            divWhereToInject.firstChild.insertBefore(divStats, referenceNode);
+        }
+        else {
+            divWhereToInject.insertBefore(divStats, divWhereToInject.firstChild);
+        }
     }
 
     let isShowingBScore = GetStorageBool(StorageKey.IsShowingBattleStatsScore);
@@ -1062,7 +1088,7 @@ function FormatRelativeTime(date) {
     let diff = Math.round((dateNow - date) / 1000);
 
     if (diff < 60) {
-        return diff + ' second' + (diff > 1 ? 's' : '') + ' ago';
+        return 'Seconds ago';
     } else if (diff < 3600) {
         var minutes = Math.floor(diff / 60);
         return minutes + ' minute' + (minutes > 1 ? 's' : '') + ' ago';
@@ -3035,6 +3061,7 @@ function GetPlayerStatsFromTornAPI(callback) {
                 SetStorage(StorageKey.IsBattleStatsAPIKeyValid, true);
                 ReComputeStats(parseInt(j.strength), parseInt(j.defense), parseInt(j.speed), parseInt(j.dexterity));
                 LogInfo("GetPlayerStatsFromTornAPI done");
+
                 if (callback != undefined) callback(true);
             }
         },
@@ -3110,7 +3137,7 @@ function AutoSyncTornStatsPlayer(playerId) {
         return;
 
     pageViewOnce = true;
-
+    
     if (GetStorageBoolWithDefaultValue(StorageKey.IsAutoImportTornStatsSpies) == false)
         return;
 
@@ -3155,6 +3182,7 @@ function FetchPlayerSpiesFromTornStats(playerId) {
 
                     LogInfo("Spy retrieved from TornStats for player " + playerId);
                     let setSpyInCacheResult = SetTornStatsSpyInCache(playerId, results.spy);
+                    OnProfilePlayerStatsRetrieved(playerId, GetTornStatsSpyFromCache(playerId));
 
                 } catch (err) {
                     reject(err);
@@ -3224,6 +3252,11 @@ function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedEl
                         else if (setSpyInCacheResult == eSetSpyInCacheResult.Error) {
                             spyError++;
                         }
+                    }
+
+                    if (!isUI && newSpiesAdded > 0) {
+                        // OnPlayerStatsRetrievedForGrid(factionMember.id, GetTornStatsSpyFromCache(factionMember.id)); Doesnt work, because we prevent updating several times the grid format.. unfortunate!
+                        window.location.reload();
                     }
 
                     let textToDisplay = membersCount + " spies fetched from TornStats. " + newSpiesAdded + " new spies added. " + spyUpdated + " spies updated. " + spyError + " errors";
