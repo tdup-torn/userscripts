@@ -2452,11 +2452,8 @@ function BuildSettingsMenu(node) {
 
 // #region Inject into pages
 
-var btnImportTornStatsSpies = undefined;
 function InjectImportSpiesButton(node) {
     if (!node) return;
-
-    if (btnImportTornStatsSpies != undefined) return;
 
     if (!GetStorageBool(StorageKey.IsTornStatsAPIKeyValid)) return;
 
@@ -2465,9 +2462,12 @@ function InjectImportSpiesButton(node) {
     if (topPageLinksList == undefined)
         return;
 
+    var tdupDivBtnBspExists = topPageLinksList.querySelector(".TDup_divBtnBsp") !== null;
+    if (tdupDivBtnBspExists) return;
+
     node.style.position = "relative";
 
-    btnImportTornStatsSpies = document.createElement("a");
+    let btnImportTornStatsSpies = document.createElement("a");
     btnImportTornStatsSpies.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
     btnImportTornStatsSpies.innerHTML = '<div class="TDup_button">BSP Import Spies</div>';
 
