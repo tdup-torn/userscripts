@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.0.0
+// @version     9.0.1
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -2452,8 +2452,11 @@ function BuildSettingsMenu(node) {
 
 // #region Inject into pages
 
+var btnImportTornStatsSpies = undefined;
 function InjectImportSpiesButton(node) {
     if (!node) return;
+
+    if (btnImportTornStatsSpies != undefined) return;
 
     if (!GetStorageBool(StorageKey.IsTornStatsAPIKeyValid)) return;
 
@@ -2464,7 +2467,7 @@ function InjectImportSpiesButton(node) {
 
     node.style.position = "relative";
 
-    let btnImportTornStatsSpies = document.createElement("a");
+    btnImportTornStatsSpies = document.createElement("a");
     btnImportTornStatsSpies.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
     btnImportTornStatsSpies.innerHTML = '<div class="TDup_button">BSP Import Spies</div>';
 
