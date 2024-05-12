@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.0.2
+// @version     9.0.3
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -258,11 +258,13 @@ styleToAdd.innerHTML += 'font-size: 12px;font-weight: 100; line-height: 1;  marg
 styleToAdd.innerHTML += 'text-transform: none;  user-select: none; -webkit-user-select: none;  touch-action: manipulation; width: 100%;}';
 styleToAdd.innerHTML += '.TDup_button: hover, .TDup_button:focus { opacity: .75;}'
 
-// Get the first script tag
 var ref = document.querySelector('script');
 
-// Insert our new styles before the first script tag
-ref.parentNode.insertBefore(styleToAdd, ref);
+var styleInjected = false;
+if (ref != undefined && ref.parentNode != undefined) {
+    ref.parentNode.insertBefore(styleToAdd, ref);
+    styleInjected = true;
+}
 
 // #endregion
 
@@ -2818,6 +2820,18 @@ function IsBSPEnabledOnCurrentPage() {
 
 (function () {
     'use strict';
+
+    document.addEventListener('DOMContentLoaded', function () {
+
+        if (styleInjected == false) {
+            var ref = document.querySelector('script');
+            if (ref != undefined && ref.parentNode != undefined) {
+                LogInfo("Style injected in DOMContentLoaded");
+                ref.parentNode.insertBefore(styleToAdd, ref);
+                styleInjected = true;
+            }
+        }
+    });
 
     InitColors();
 
