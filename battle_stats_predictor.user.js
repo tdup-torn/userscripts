@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.0.3
+// @version     9.0.4
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -301,7 +301,7 @@ const PageType = {
 var mapPageTypeAddress = {
     [PageType.Profile]: 'https://www.torn.com/profiles.php',
     [PageType.RecruitCitizens]: 'https://www.torn.com/bringafriend.php',
-    [PageType.HallOfFame]: 'https://www.torn.com/halloffame.php',
+    [PageType.HallOfFame]: 'https://www.torn.com/page.php?sid=hof',
     [PageType.Faction]: 'https://www.torn.com/factions.php',
     [PageType.Company]: 'https://www.torn.com/joblist.php',
     [PageType.Competition]: 'https://www.torn.com/competition.php',
@@ -1167,6 +1167,10 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             spyMargin = '0px 23px';
         }
     }
+    else if (IsPage(PageType.HallOfFame) && isShowingHonorBars) {
+        mainMarginWhenDisplayingHonorBars = "-10px -9px";
+        spyMargin = '-16px 17px';
+    }
     else if (IsPage(PageType.Search) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '6px -8px';
     }
@@ -1187,10 +1191,6 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         if (isShowingHonorBars) {
             mainMarginWhenDisplayingHonorBars = '5px 0px';
         }
-    }
-    else if (IsPage(PageType.HallOfFame) && isShowingHonorBars) {
-        mainMarginWhenDisplayingHonorBars = '-25px 50px';
-        spyMargin = '-30px 75px';
     }
     else if (IsPage(PageType.PointMarket) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '5px -5px';
@@ -2738,6 +2738,43 @@ function InjectInBountyPagePage(isInit, node) {
     }
 }
 
+function InjectInHOFPage(isInit, node) {
+    var targetLinks;
+    if (isInit == true) {
+        targetLinks = document.querySelectorAll('a[href^="/profiles.php?"]');
+    }
+    else {
+        targetLinks = node.querySelectorAll('a[href^="/profiles.php?"]');
+    }
+
+    targetLinks.forEach(targetLink => {
+
+        let url = new URL(targetLink.href, window.location.origin);
+        let playerId = url.searchParams.get('XID');
+
+        if (playerId == undefined)
+           return;
+
+        let parentN = targetLink.parentNode;
+
+        if (parentN == undefined)
+            return;
+
+        if (parentN.className == undefined)
+            return;
+
+        if (parentN.className.includes('honorWrap'))
+        {
+            if (!(playerId in dictDivPerPlayer)) {
+                dictDivPerPlayer[playerId] = new Array();
+            }
+
+            dictDivPerPlayer[playerId].push(parentN);
+            GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
+        }
+    });
+}
+
 function InjectInGenericGridPage(isInit, node) {
     // For pages with several players, grid format
     var el;
@@ -2879,6 +2916,9 @@ function IsBSPEnabledOnCurrentPage() {
     else if (IsPage(PageType.Bounty)) {
         InjectInBountyPagePage(true, undefined);
     }
+    else if (IsPage(PageType.HallOfFame)) {
+        InjectInHOFPage(true, undefined);
+    }
     else {
         InjectInGenericGridPage(true, undefined);
     }
@@ -2890,18 +2930,16 @@ function IsBSPEnabledOnCurrentPage() {
                 if (node.querySelector) {
                     InjectBSPSettingsButtonInProfile(document.querySelector(".container clearfix"));
 
-                    if (IsPage(PageType.Profile)) {
+                    if (IsPage(PageType.Profile))
                         InjectInProfilePage(false, node);
-                    }
-                    if (IsPage(PageType.Faction) || IsPage(PageType.War)) {
+                    else if (IsPage(PageType.Faction) || IsPage(PageType.War)) 
                         InjectInFactionPage(node);
-                    }
-                    else if (IsPage(PageType.Bounty)) {
+                    else if (IsPage(PageType.HallOfFame))
+                        InjectInHOFPage(false, node);
+                    else if (IsPage(PageType.Bounty)) 
                         InjectInBountyPagePage(false, node);
-                    }
-                    else {
+                    else
                         InjectInGenericGridPage(false, node);
-                    }
                 }
             }
         });
