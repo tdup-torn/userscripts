@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.0.4
+// @version     9.0.5
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -163,6 +163,7 @@ var SUCCESS = 1;
 var TOO_WEAK = 2;
 var TOO_STRONG = 3;
 var MODEL_ERROR = 4;
+var HOF = 5;
 
 var apiRegister;
 var comparisonBattleStatsText;
@@ -204,6 +205,12 @@ var PREDICTION_VALIDITY_DAYS = 5;
 var mainColor = "#344556";
 var mainBSPIcon = "https://i.postimg.cc/K8cNpzCS/BSPLogo11low.png";
 
+var tornstatsIcon = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
+var yataIcon = "https://www.imgbly.com/ib/jPTzuUgrTM.png";
+
+var starIcon = "https://freesvg.org/storage/img/thumb/primary-favorites.png";
+var floppyDiskIcon = "https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png";
+var hofIcon = "https://i.ibb.co/hshjLw7/HOF.png";
 // #endregion
 
 // #region Styles
@@ -896,6 +903,7 @@ function GetConsolidatedDataForPlayerStats(prediction) {
     objectToReturn.Success = SUCCESS;
     objectToReturn.OldSpyStrongerThanPrediction = false;
     objectToReturn.Spy = undefined;
+    objectToReturn.IsHOF = false;
 
     let isUsingSpy = prediction.IsSpy === true;
     if (isUsingSpy) {
@@ -912,14 +920,18 @@ function GetConsolidatedDataForPlayerStats(prediction) {
                 return objectToReturn;
             case TOO_WEAK:
             case TOO_STRONG:
+            case HOF:
             case SUCCESS:
                 {
                     let intTBS = parseInt(prediction.TBS.toLocaleString('en-US').replaceAll(',', ''));
                     objectToReturn.TargetTBS = intTBS;
                     let intTBSBalanced = parseInt(prediction.TBS_Balanced.toLocaleString('en-US').replaceAll(',', ''));
-                    //objectToReturn.TargetTBS = (intTBS + intTBSBalanced) / 2;
 
-                    if (prediction.Result == TOO_STRONG) {
+                    if (prediction.Result == HOF) {
+                        objectToReturn.IsHOF = true;
+                    }
+
+                    if (prediction.Result == TOO_STRONG || prediction.Result == HOF) {
                         objectToReturn.Score = 500000;
                     }
                     else {
@@ -999,25 +1011,32 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     if (prediction.IsSpy) {
         prediction.PredictionDate = new Date(prediction.timestamp * 1000);
         if (prediction.Source == "TornStats") {
-            imgType = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
+            imgType = tornstatsIcon;
         }
         else if (prediction.Source == "YATA") {
-            imgType = "https://www.imgbly.com/ib/jPTzuUgrTM.png";
+            imgType = yataIcon;
         }
 
-        extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png"/>';
+        extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + starIcon+ '"/>';
     }
 
     if (consolidatedData != undefined) {
-        if (consolidatedData.OldSpyStrongerThanPrediction) {
-            extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png"/>';
+        if (consolidatedData.IsHOF) {
+            imgType = "https://i.ibb.co/x55qnBr/HOF-Long.png";
+            extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + hofIcon+'"/>';
+            if (consolidatedData.Spy != undefined) {
+                prediction.PredictionDate = new Date(consolidatedData.Spy.timestamp * 1000);
+            }
+        }
+        else if (consolidatedData.OldSpyStrongerThanPrediction) {
+            extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + floppyDiskIcon+'"/>';
             if (consolidatedData.Spy != undefined) {
                 prediction.PredictionDate = new Date(consolidatedData.Spy.timestamp * 1000);
                 if (consolidatedData.Spy.Source == "TornStats") {
-                    imgType = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
+                    imgType = tornstatsIcon;
                 }
                 else if (consolidatedData.Spy.Source == "YATA") {
-                    imgType = "https://www.imgbly.com/ib/jPTzuUgrTM.png";
+                    imgType = yataIcon;
                 }
             }
         }
@@ -1328,11 +1347,15 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             FFPredicted = Math.max(1, FFPredicted);
             FFPredicted = FFPredicted.toFixed(2);
 
-            extraIndicator = '<img style="position:absolute; width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="https://freesvg.org/storage/img/thumb/primary-favorites.png" />';
+            extraIndicator = '<img style="position:absolute; width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + starIcon + '" />';
             title = 'title="Data coming from spy (' + consolidatedData.Spy.Source + ') FF : ' + FFPredicted + ' "';
         }
+        else if (consolidatedData.IsHOF) {
+            extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + hofIcon + '" />';
+            title = 'title="Stats coming from the Top 100 HOF forum thread"';            
+        }
         else if (consolidatedData.OldSpyStrongerThanPrediction) {
-            extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png" />';
+            extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + floppyDiskIcon+ '" />';
             title = 'title="Old spy (' + consolidatedData.Spy.Source + ' FF Predicted = ' + FFPredicted + ') having greater TBS than prediction -> showing old spy data instead"';
         }
         else if (showScoreInstead) {
