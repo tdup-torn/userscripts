@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.0.5
+// @version     9.1.0
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -31,6 +31,7 @@
 // @connect     api.torn.com
 // @connect     www.lol-manager.com
 // @connect     www.tornstats.com
+// @connect     localhost
 // @connect     yata.yt
 // @author      TDup
 // ==/UserScript==
@@ -75,6 +76,11 @@ const StorageKey = {
     AutoImportLastDatePlayer: 'tdup.battleStatsPredictor.tornstats_AutoImportLastDatePlayer_',
     AutoImportLastDateFaction: 'tdup.battleStatsPredictor.tornstats_AutoImportLastDateFaction_',
 
+    UploadDataAPIKey: 'tdup.battleStatsPredictor.UploadDataAPIKey',
+    UploadDataAPIKeyIsValid: 'tdup.battleStatsPredictor.UploadDataAPIKeyIsValid',
+    UploadDataLastUploadTime: 'tdup.battleStatsPredictor.UploadDataLastUploadTime',
+    UploadDataIsAutoMode: 'tdup.battleStatsPredictor.UploadDataIsAutoMode',
+
     YataAPIKey: 'tdup.battleStatsPredictor.YataApiKey',
     IsYataAPIKeyValid: 'tdup.battleStatsPredictor.IsYataApiKeyValid',
     OldYataSpy: 'tdup.battleStatsPredictor.cache.spy.yata_', //TDTODO : to remove
@@ -106,6 +112,9 @@ const StorageKey = {
     TestLocalStorageKey: 'tdup.battleStatsPredictor.TestLocalStorage',
 };
 
+function GetBSPServer() {    
+    return "http://www.lol-manager.com/api";
+}
 function GetStorage(key) { return localStorage[key]; }
 function GetStorageEmptyIfUndefined(key) { return (localStorage[key] == undefined) ? "" : localStorage[key]; }
 function GetStorageBool(key) { return (localStorage[key] == "true") ? true : false; }
@@ -164,6 +173,7 @@ var TOO_WEAK = 2;
 var TOO_STRONG = 3;
 var MODEL_ERROR = 4;
 var HOF = 5;
+var FFATTACKS = 6;
 
 var apiRegister;
 var comparisonBattleStatsText;
@@ -211,6 +221,8 @@ var yataIcon = "https://www.imgbly.com/ib/jPTzuUgrTM.png";
 var starIcon = "https://freesvg.org/storage/img/thumb/primary-favorites.png";
 var floppyDiskIcon = "https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png";
 var hofIcon = "https://i.ibb.co/hshjLw7/HOF.png";
+var FFAttacksIcon = "https://i.ibb.co/3BnTDDt/primary-favorites2.png";
+
 // #endregion
 
 // #region Styles
@@ -904,6 +916,7 @@ function GetConsolidatedDataForPlayerStats(prediction) {
     objectToReturn.OldSpyStrongerThanPrediction = false;
     objectToReturn.Spy = undefined;
     objectToReturn.IsHOF = false;
+    objectToReturn.isFFAttacks = false;
 
     let isUsingSpy = prediction.IsSpy === true;
     if (isUsingSpy) {
@@ -921,25 +934,21 @@ function GetConsolidatedDataForPlayerStats(prediction) {
             case TOO_WEAK:
             case TOO_STRONG:
             case HOF:
+            case FFATTACKS:
             case SUCCESS:
                 {
                     let intTBS = parseInt(prediction.TBS.toLocaleString('en-US').replaceAll(',', ''));
                     objectToReturn.TargetTBS = intTBS;
-                    let intTBSBalanced = parseInt(prediction.TBS_Balanced.toLocaleString('en-US').replaceAll(',', ''));
 
                     if (prediction.Result == HOF) {
                         objectToReturn.IsHOF = true;
                     }
 
-                    if (prediction.Result == TOO_STRONG || prediction.Result == HOF) {
-                        objectToReturn.Score = 500000;
+                    if (prediction.Result == FFATTACKS) {
+                        objectToReturn.isFFAttacks = true;
                     }
-                    else {
-                        let a = intTBSBalanced / 4;
-                        let scoreSqrd = 16 * a;
-                        let score = Math.sqrt(scoreSqrd);
-                        objectToReturn.Score = parseInt(score);
-                    }
+
+                    objectToReturn.Score = prediction.Score;
 
                     if (prediction.attachedSpy != undefined) {
                         if (prediction.attachedSpy.total > 0 && prediction.attachedSpy.total > objectToReturn.TargetTBS) {
@@ -1027,6 +1036,9 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
             if (consolidatedData.Spy != undefined) {
                 prediction.PredictionDate = new Date(consolidatedData.Spy.timestamp * 1000);
             }
+        }
+        else if (consolidatedData.isFFAttacks) {
+            extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + FFAttacksIcon + '"/>';
         }
         else if (consolidatedData.OldSpyStrongerThanPrediction) {
             extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + floppyDiskIcon+'"/>';
@@ -1353,6 +1365,10 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         else if (consolidatedData.IsHOF) {
             extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + hofIcon + '" />';
             title = 'title="Stats coming from the Top 100 HOF forum thread"';            
+        }
+        else if (consolidatedData.isFFAttacks) {
+            extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + FFAttacksIcon + '" />';
+            title = 'title="Stats coming from BSP users attacks"';
         }
         else if (consolidatedData.OldSpyStrongerThanPrediction) {
             extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + floppyDiskIcon+ '" />';
@@ -2032,6 +2048,114 @@ function BuildOptionsCheckboxPageWhereItsEnabled(parentDiv, pageType, defaultVal
     parentDiv.appendChild(pageCheckBoxNode);
 }
 
+function BuildOptionMenu_Uploadstats(tabs, menu) {
+    let contentDiv = BuildOptionMenu(tabs, menu, "Upload Data", true);
+
+    // UploadStats
+    let UploadStatsNode = document.createElement("div");
+    UploadStatsNode.className = "TDup_optionsTabContentDiv";
+
+    let tipsDiv = document.createElement("div");
+    tipsDiv.className = "TDup_optionsTabContentDiv";
+    tipsDiv.innerHTML = 'Upload your attack logs to help BSP being more accurate. Requires a custom key (this API key is sent to the server but wont be stored. Your own stats are not stored)';
+
+    let additionalSub = document.createElement("div");
+    additionalSub.className = "TDup_optionsTabContentDiv";
+    additionalSub.innerHTML = 'Setup and you will gain 3 months of BSP subscription';
+
+    let UploadStatsAPIKeyLabel = document.createElement("label");
+    UploadStatsAPIKeyLabel.innerHTML = 'Your API key';
+
+    let UploadStatsAPIKeyInput = document.createElement("input");
+    if (GetStorage(StorageKey.UploadDataAPIKey)) {
+        UploadStatsAPIKeyInput.value = GetStorage(StorageKey.UploadDataAPIKey);
+    }
+
+    let apiRegister = document.createElement("div");
+    apiRegister.className = "TDup_optionsTabContentDiv";
+    apiRegister.innerHTML = '<a href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=BSP_Attacks&user=basic,attacks,battlestats" target="_blank"><input type"button" class="TDup_buttonInOptionMenu" value="Generate a custom key"/></a>';
+
+    let btnFetchSpiesFromUploadStats = document.createElement("input");
+    btnFetchSpiesFromUploadStats.type = "button";
+    btnFetchSpiesFromUploadStats.value = "Upload my latest fights";
+    btnFetchSpiesFromUploadStats.className = "TDup_buttonInOptionMenu";
+
+    let successValidateUploadStatsAPIKey = document.createElement("label");
+    successValidateUploadStatsAPIKey.innerHTML = 'UploadStats API Key verified, and attacks added to the system. Thanks';
+    successValidateUploadStatsAPIKey.style.color = 'green';
+    successValidateUploadStatsAPIKey.style.visibility = "hidden";
+
+    let errorValidateUploadStatsAPIKey = document.createElement("label");
+    errorValidateUploadStatsAPIKey.innerHTML = 'Error';
+    errorValidateUploadStatsAPIKey.style.backgroundColor = 'red';
+    errorValidateUploadStatsAPIKey.style.visibility = "hidden";
+
+    function OnUploadStatsSpiesFetched(success, reason) {
+        btnFetchSpiesFromUploadStats.disabled = false;
+        SetStorage(StorageKey.UploadDataAPIKeyIsValid, success);
+        if (success === true) {
+            successValidateUploadStatsAPIKey.style.visibility = "visible";
+            successValidateUploadStatsAPIKey.innerHTML = reason;
+            errorValidateUploadStatsAPIKey.style.visibility = "hidden";
+        }
+        else {
+            errorValidateUploadStatsAPIKey.style.visibility = "visible";
+            successValidateUploadStatsAPIKey.style.visibility = "hidden";
+            errorValidateUploadStatsAPIKey.innerHTML = reason;
+        }
+    }
+
+    btnFetchSpiesFromUploadStats.addEventListener("click", () => {
+        btnFetchSpiesFromUploadStats.disabled = true;
+        SetStorage(StorageKey.UploadDataAPIKey, UploadStatsAPIKeyInput.value);
+        CallBSPUploadStats(OnUploadStatsSpiesFetched);
+    });
+
+
+    let isAutoUploadStatsNode = document.createElement("div");
+    isAutoUploadStatsNode.className = "TDup_optionsTabContentDiv";
+    let isAutoUploadStats = GetStorageBoolWithDefaultValue(StorageKey.UploadDataIsAutoMode, true);
+
+    let checkboxisAutoUploadStats = document.createElement('input');
+    checkboxisAutoUploadStats.type = "checkbox";
+    checkboxisAutoUploadStats.name = "name";
+    checkboxisAutoUploadStats.value = "value";
+    checkboxisAutoUploadStats.id = "idIsAutoUploadStats";
+    checkboxisAutoUploadStats.checked = isAutoUploadStats;
+
+    checkboxisAutoUploadStats.addEventListener("change", () => {
+        let isAutoUploadStats = checkboxisAutoUploadStats.checked;
+        SetStorage(StorageKey.UploadDataIsAutoMode, isAutoUploadStats);
+    });
+
+    var isAutoUploadStatsLabel = document.createElement('label')
+    isAutoUploadStatsLabel.htmlFor = "idIsAutoUploadStats";
+    isAutoUploadStatsLabel.appendChild(document.createTextNode('Auto Upload your latest attacks, once a day'));
+    isAutoUploadStatsNode.appendChild(isAutoUploadStatsLabel);
+    isAutoUploadStatsNode.appendChild(checkboxisAutoUploadStats);
+
+    //
+
+    let UploadStatsApiKeyDiv = document.createElement("div");
+    UploadStatsApiKeyDiv.className = "TDup_optionsTabContentDiv";
+    UploadStatsApiKeyDiv.appendChild(tipsDiv);
+    if (!GetStorageBool(StorageKey.UploadDataAPIKeyIsValid)) {
+        UploadStatsApiKeyDiv.appendChild(additionalSub);
+        UploadStatsApiKeyDiv.appendChild(apiRegister);
+    }
+    UploadStatsApiKeyDiv.appendChild(UploadStatsAPIKeyLabel);
+    UploadStatsApiKeyDiv.appendChild(UploadStatsAPIKeyInput);
+    UploadStatsApiKeyDiv.appendChild(btnFetchSpiesFromUploadStats);
+    UploadStatsApiKeyDiv.appendChild(successValidateUploadStatsAPIKey);
+    UploadStatsApiKeyDiv.appendChild(errorValidateUploadStatsAPIKey);
+    if (GetStorage(StorageKey.UploadDataAPIKeyIsValid)) {
+        UploadStatsApiKeyDiv.appendChild(isAutoUploadStatsNode);
+    }
+    UploadStatsNode.appendChild(UploadStatsApiKeyDiv);
+
+    contentDiv.appendChild(UploadStatsNode);
+}
+
 function BuildOptionMenu_YATA(tabs, menu) {
     let contentDiv = BuildOptionMenu(tabs, menu, "YATA", true);
 
@@ -2459,6 +2583,7 @@ function BuildSettingsMenu(node) {
     BuildOptionMenu_Global(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea, true);
     BuildOptionMenu_Colors(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
     BuildOptionMenu_Pages(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
+    BuildOptionMenu_Uploadstats(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
     BuildOptionMenu_YATA(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
     BuildOptionMenu_TornStats(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
     BuildOptionMenu_Debug(TDup_PredictorOptionsMenuArea, TDup_PredictorOptionsContentArea);
@@ -2903,6 +3028,22 @@ function IsBSPEnabledOnCurrentPage() {
         LogInfo("Inject Option Menu done.");
     }
 
+    if (GetStorageBool(StorageKey.UploadDataAPIKeyIsValid) && GetStorageBool(StorageKey.UploadDataIsAutoMode))
+    {
+        LogInfo("Auto update attacks (once a day)");
+        let dateNow = new Date();
+        let dateSaved = new Date(GetStorage(StorageKey.UploadDataLastUploadTime));
+        var time_difference = dateNow - dateSaved;
+        var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
+
+        if (hours_difference > 24)
+        {
+            CallBSPUploadStats(undefined);
+        }
+    }
+
+    //CallBSPUploadStats
+
     if (IsPage(PageType.Profile))
         InjectOptionMenu(document.querySelector(".content-title"));
 
@@ -2994,10 +3135,12 @@ function FetchUserDataFromBSPServer() {
         return;
     }
 
+
+
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
-            url: `http://www.lol-manager.com/api/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${GM_info.script.version}`,
+            url: `${GetBSPServer()}/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${GM_info.script.version}`, 
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -3034,6 +3177,13 @@ function FetchUserDataFromBSPServer() {
                         subscriptionEndText.innerHTML = '<div style="color:red">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
                     }
 
+                    if (!GetStorageBool(StorageKey.UploadDataAPIKeyIsValid)) {
+                        let tipsDiv = document.createElement("div");
+                        tipsDiv.className = "TDup_optionsTabContentDiv";
+                        tipsDiv.innerHTML = 'Help BSP get better by uploading your attacks and get subscription time';
+                        subscriptionEndText.appendChild(tipsDiv);
+                    }
+
                     RefreshOptionMenuWithSubscription();
 
                 } catch (err) {
@@ -3057,7 +3207,7 @@ function FetchScoreAndTBS(targetId) {
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
-            url: `http://www.lol-manager.com/api/battlestats/${GetStorage(StorageKey.PrimaryAPIKey)}/${targetId}/${GM_info.script.version}`,
+            url: `${GetBSPServer()}/battlestats/${GetStorage(StorageKey.PrimaryAPIKey)}/${targetId}/${GM_info.script.version}`,
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -3075,6 +3225,60 @@ function FetchScoreAndTBS(targetId) {
     });
 }
 
+function CallBSPUploadStats(callback) {
+    let uploadStatsAPIKey = GetStorage(StorageKey.UploadDataAPIKey);
+    if (uploadStatsAPIKey == undefined || uploadStatsAPIKey == "") {
+        LogInfo("BSP : Calling CallBSPUploadStats with uploadStatsAPIKey undefined or empty, abording");
+        return;
+    }
+
+    return new Promise((resolve, reject) => {
+        GM.xmlHttpRequest({
+            method: 'GET',
+            url: `${GetBSPServer()}/battlestats/uploaddata/${GetStorage(StorageKey.UploadDataAPIKey)}/${GM_info.script.version}`,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            onload: (response) => {
+                try {
+                    resolve(JSON.parse(response.responseText));
+
+                    let result = JSON.parse(response.responseText);
+                    if (result == undefined) {
+
+                        SetStorage(StorageKey.UploadDataLastUploadTime, new Date());
+                        callback(false, 'An error occured');
+                    }
+                    else {
+                        SetStorage(StorageKey.UploadDataLastUploadTime, new Date());
+                        if (result.Result == 0) {
+                            callback(true, 'Success');
+                        }
+                        else if (result.Result == 2) { // WrongAPIKey
+                            callback(false, 'API Key doesnt allow');
+                        }
+                        else if (result.Result == 3) { // CantGetBscore
+                            callback(false, 'Cant get your gym stats');
+                        }
+                        else if (result.Result == 4) { // CantGetAttacks
+                            callback(false, 'Cant get your attacks');
+                        }
+                        else {
+                            callback(false, 'An error occured');
+                        }
+                    }                    
+                } catch (err) {
+                    reject(err);
+                    callback(false, 'An error occured');
+                }
+            },
+            onerror: (err) => {
+                reject(err);
+                callback(false, 'An error occured');
+            }
+        });
+    });
+}
 
 // #endregion
 
