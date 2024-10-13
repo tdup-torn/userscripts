@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.1.0
+// @version     9.1.1
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -31,7 +31,6 @@
 // @connect     api.torn.com
 // @connect     www.lol-manager.com
 // @connect     www.tornstats.com
-// @connect     localhost
 // @connect     yata.yt
 // @author      TDup
 // ==/UserScript==
@@ -218,10 +217,10 @@ var mainBSPIcon = "https://i.postimg.cc/K8cNpzCS/BSPLogo11low.png";
 var tornstatsIcon = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
 var yataIcon = "https://www.imgbly.com/ib/jPTzuUgrTM.png";
 
-var starIcon = "https://freesvg.org/storage/img/thumb/primary-favorites.png";
-var floppyDiskIcon = "https://cdn3.iconfinder.com/data/icons/data-storage-5/16/floppy_disk-512.png";
-var hofIcon = "https://i.ibb.co/hshjLw7/HOF.png";
-var FFAttacksIcon = "https://i.ibb.co/3BnTDDt/primary-favorites2.png";
+var starIcon = "https://i.ibb.co/23TYRyL/star-v2.png";
+var oldSpyIcon = "https://i.ibb.co/b7982wh/oldSpy.png";
+var hofIcon = "https://i.ibb.co/fkFDrVx/HOF-v2.png";
+var FFAttacksIcon = "https://i.ibb.co/GJ04WJn/player-Data-v2.png";
 
 // #endregion
 
@@ -857,7 +856,7 @@ async function GetPredictionForPlayer(targetId, callback) {
     let targetSpy = GetMostRecentSpyFromCache(targetId);
     if (targetSpy != undefined && targetSpy.total != undefined && targetSpy.total != 0) {
         let spyDateConsideredTooOld = new Date();
-        let daysToUseSpies = GetStorage(StorageKey.DaysToUseSpies);
+        let daysToUseSpies = parseInt(GetStorage(StorageKey.DaysToUseSpies));
         spyDateConsideredTooOld.setDate(spyDateConsideredTooOld.getDate() - daysToUseSpies);
         let spyDate = new Date(targetSpy.timestamp * 1000);
         if (spyDate > spyDateConsideredTooOld) {
@@ -974,7 +973,7 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
 
     if (prediction.timestamp != undefined) {
         let spyDateConsideredTooOld = new Date();
-        let daysToUseSpies = GetStorage(StorageKey.DaysToUseSpies);
+        let daysToUseSpies = parseInt(GetStorage(StorageKey.DaysToUseSpies));
         if (daysToUseSpies == undefined || daysToUseSpies < 1)
             daysToUseSpies = 30;
 
@@ -1041,7 +1040,7 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
             extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + FFAttacksIcon + '"/>';
         }
         else if (consolidatedData.OldSpyStrongerThanPrediction) {
-            extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + floppyDiskIcon+'"/>';
+            extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + oldSpyIcon+'"/>';
             if (consolidatedData.Spy != undefined) {
                 prediction.PredictionDate = new Date(consolidatedData.Spy.timestamp * 1000);
                 if (consolidatedData.Spy.Source == "TornStats") {
@@ -1371,8 +1370,8 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             title = 'title="Stats coming from BSP users attacks"';
         }
         else if (consolidatedData.OldSpyStrongerThanPrediction) {
-            extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + floppyDiskIcon+ '" />';
-            title = 'title="Old spy (' + consolidatedData.Spy.Source + ' FF Predicted = ' + FFPredicted + ') having greater TBS than prediction -> showing old spy data instead"';
+            extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + oldSpyIcon+ '" />';
+            title = 'title="Old spy having greater TBS than prediction -> showing old spy data instead"';
         }
         else if (showScoreInstead) {
             title = 'title="FF Predicted = ' + FFPredicted + '"';
@@ -2523,16 +2522,48 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
     DiscordLink.className = "TDup_optionsTabContentDiv";
 
     let DiscordText = document.createElement("div");
-    DiscordText.innerHTML = 'Give feedback, report bugs or just come to say hi on the Discord';
+    DiscordText.innerHTML = 'Give feedback, report bugs or just come to say hi on the <a href="https://discord.gg/zgrVX5j6MQ" target="_blank">Discord <img width="18" height="18" title="Discord" src="https://wiki.soldat.pl/images/6/6f/DiscordLogo.png" /> </a>';
     DiscordLink.appendChild(DiscordText);
 
-    let DiscordLinkImg = document.createElement("div");
-    DiscordLinkImg.style.textAlign = "center";
-    DiscordLinkImg.innerHTML = '<a href="https://discord.gg/zgrVX5j6MQ" target="_blank"><img width="64" height="64" title="Discord" src="https://wiki.soldat.pl/images/6/6f/DiscordLogo.png" /> </a>';
-
-    DiscordLink.appendChild(DiscordLinkImg);
-
     contentDiv.appendChild(DiscordLink);
+
+    let tips = document.createElement("div");
+    tips.className = "TDup_optionsTabContentDiv";
+    tips.innerHTML = "Tips :<br />You can click on the colored area to quick attack, from any screen! <br> <img width='300' src='https://i.ibb.co/4TtQqzf/quick-Attack.png'</img>";
+    tips.style.fontStyle = "italic";
+    contentDiv.appendChild(tips);
+
+    const ul = document.createElement("ul");
+    ul.style = "list-style-type: none;padding: 0;";
+    const items = [
+        { urlImage: hofIcon, name: "Top 100 Hall Of Fame" },
+        { urlImage: starIcon, name: "Your spy" },
+        { urlImage: oldSpyIcon, name: "Old spy" },
+        { urlImage: FFAttacksIcon, name: "Bsp Users attacks" },
+    ];
+
+    items.forEach(item => {
+        const li = document.createElement("li");
+        li.style = "display: flex;align-items: center;margin-bottom: 8px;";
+
+        const img = document.createElement("img");
+        img.src = item.urlImage;
+        img.width = 24;
+        img.height = 24;
+        img.style.marginRight = "8px";
+
+        const span = document.createElement("span");
+        span.textContent = item.name;
+
+        li.appendChild(img);
+        li.appendChild(span);
+
+        ul.appendChild(li);
+    });
+
+    contentDiv.appendChild(ul);
+
+    
 }
 
 function RefreshOptionMenuWithSubscription() {
@@ -3135,8 +3166,6 @@ function FetchUserDataFromBSPServer() {
         return;
     }
 
-
-
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
@@ -3154,7 +3183,7 @@ function FetchUserDataFromBSPServer() {
 
                     SetStorage(StorageKey.DateSubscriptionEnd, result.SubscriptionEnd);
 
-                    let text = ' 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a> with message "bsp". Process is automated and treated within a minute. You can send in bulk)';
+                    let text = ' 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a>. Process is automated and treated within a minute. You can send in bulk)';
 
                     if (result.SubscriptionActive) {
                         var dateNow = new Date();
@@ -3171,11 +3200,13 @@ function FetchUserDataFromBSPServer() {
                         subscriptionEndText.innerHTML = '<div style="color:' + GetColorTheme() + '">Thank you for using Battle Stats Predictor (BSP) script!<br /><br /> <div style="font-weight:bolder;">Your subscription expires in '
                             + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
                             + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.</div><br /><br />You can extend it for' + text + '</div>';
+                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.</div><br />You can extend it for' + text + '</div>';                       
+
                     }
                     else {
                         subscriptionEndText.innerHTML = '<div style="color:red">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
                     }
+                    
 
                     if (!GetStorageBool(StorageKey.UploadDataAPIKeyIsValid)) {
                         let tipsDiv = document.createElement("div");
@@ -3426,7 +3457,7 @@ function AutoSyncTornStatsPlayer(playerId) {
     let lastDateAutoSyncThisFaction = GetStorage(StorageKey.AutoImportLastDatePlayer + playerId);
     if (lastDateAutoSyncThisFaction != undefined) {
         let dateConsideredTooOld = new Date();
-        dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 15);
+        dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 1);
         if (new Date(lastDateAutoSyncThisFaction) > dateConsideredTooOld) {
             LogInfo("AutoSyncTornStatsPlayer  - " + playerId + " - Too recent call in database, skipying");
             return;
