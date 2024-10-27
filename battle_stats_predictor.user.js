@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.1.1
+// @version     9.2.0
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -15,7 +15,6 @@
 // @match       https://www.torn.com/competition.php*
 // @match       https://www.torn.com/bounties.php*
 // @match       https://www.torn.com/hospitalview.php*
-// @match       https://www.torn.com/imarket.php*
 // @match       https://www.torn.com/forums.php*
 // @match       https://www.torn.com/blacklist.php*
 // @match       https://www.torn.com/friendlist.php*
@@ -111,7 +110,7 @@ const StorageKey = {
     TestLocalStorageKey: 'tdup.battleStatsPredictor.TestLocalStorage',
 };
 
-function GetBSPServer() {    
+function GetBSPServer() {
     return "http://www.lol-manager.com/api";
 }
 function GetStorage(key) { return localStorage[key]; }
@@ -324,13 +323,13 @@ var mapPageTypeAddress = {
     [PageType.Company]: 'https://www.torn.com/joblist.php',
     [PageType.Competition]: 'https://www.torn.com/competition.php',
     [PageType.Bounty]: 'https://www.torn.com/bounties.php',
-    [PageType.Search]: 'https://www.torn.com/page.php',
+    [PageType.Search]: 'https://www.torn.com/page.php?sid=UserList',
     [PageType.Hospital]: 'https://www.torn.com/hospitalview.php',
     [PageType.Chain]: 'https://www.torn.com/factions.php?step=your#/war/chain',
     [PageType.FactionControl]: 'https://www.torn.com/factions.php?step=your#/tab=controls',
     [PageType.FactionControlPayday]: 'https://www.torn.com/factions.php?step=your#/tab=controls',
     [PageType.FactionControlApplications]: 'https://www.torn.com/factions.php?step=your#/tab=controls',
-    [PageType.Market]: 'https://www.torn.com/imarket.php',
+    [PageType.Market]: 'https://www.torn.com/page.php?sid=ItemMarket',
     [PageType.Forum]: 'https://www.torn.com/forums.php',
     [PageType.ForumThread]: 'https://www.torn.com/forums.php#/p=threads',
     [PageType.ForumSearch]: 'https://www.torn.com/forums.php#/p=search',
@@ -346,8 +345,8 @@ var mapPageTypeAddress = {
 
 var mapPageAddressEndWith = {
     [PageType.FactionControl]: '/tab=controls',
-    [PageType.FactionControlPayday] : 'tab=controls&option=pay-day',
-    [PageType.FactionControlApplications] : 'tab=controls&option=application'
+    [PageType.FactionControlPayday]: 'tab=controls&option=pay-day',
+    [PageType.FactionControlApplications]: 'tab=controls&option=application'
 }
 
 
@@ -409,7 +408,7 @@ function IsPage(pageType) {
     if (startWith != undefined) {
         return window.location.href.startsWith(startWith);
     }
-    return false;   
+    return false;
 }
 
 function IsUrlEndsWith(value) {
@@ -632,7 +631,7 @@ const eStorageType = {
     TornStatsSpies: 'TornStatsSpies',
     YATASpies: 'YATASpies',
     ALL_ExceptBSP: 'ALL_ExceptBSP',
-    TornChat: 'TornChat'    
+    TornChat: 'TornChat'
 };
 
 function GetPredictionStorage(storageType) {
@@ -731,8 +730,7 @@ function ClearCache(storageType) {
         }
 
         if (storageType == eStorageType.TornStatsSpies) {
-            if (key.startsWith(StorageKey.AutoImportLastDatePlayer) || key.startsWith(StorageKey.AutoImportLastDateFaction))
-            {
+            if (key.startsWith(StorageKey.AutoImportLastDatePlayer) || key.startsWith(StorageKey.AutoImportLastDateFaction)) {
                 localStorage.removeItem(key);
             }
         }
@@ -767,10 +765,10 @@ function ExportPredictorStorage() {
 function TestLocalStorage() {
     try {
         var textToStore = 'This is a test to detect if there is enough space in the localstorage.';
-        textToStore+=     'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
-        textToStore+=     'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
-        textToStore+=     'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
-        textToStore+=     'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
+        textToStore += 'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
+        textToStore += 'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
+        textToStore += 'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
+        textToStore += 'Its written, then deleted right away, when the BSP player clicks on a debug button.The Goal is to troubleshoot easily this issue when it happens.Making it long enough for proper testing.';
 
         localStorage[StorageKey.TestLocalStorageKey] = textToStore;
         localStorage.removeItem(StorageKey.TestLocalStorageKey);
@@ -827,7 +825,7 @@ function ClearOutdatedPredictionInCache() {
 
 function AutoImportStats() {
     // Automatic import stats
-    
+
     if (GetStorageBool(StorageKey.IsAutoImportStats) == true) {
         let dateConsideredTooOld = new Date();
         dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 1);
@@ -935,6 +933,7 @@ function GetConsolidatedDataForPlayerStats(prediction) {
             case HOF:
             case FFATTACKS:
             case SUCCESS:
+            default:
                 {
                     let intTBS = parseInt(prediction.TBS.toLocaleString('en-US').replaceAll(',', ''));
                     objectToReturn.TargetTBS = intTBS;
@@ -1025,13 +1024,13 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
             imgType = yataIcon;
         }
 
-        extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + starIcon+ '"/>';
+        extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + starIcon + '"/>';
     }
 
     if (consolidatedData != undefined) {
         if (consolidatedData.IsHOF) {
             imgType = "https://i.ibb.co/x55qnBr/HOF-Long.png";
-            extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + hofIcon+'"/>';
+            extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + hofIcon + '"/>';
             if (consolidatedData.Spy != undefined) {
                 prediction.PredictionDate = new Date(consolidatedData.Spy.timestamp * 1000);
             }
@@ -1040,7 +1039,7 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
             extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + FFAttacksIcon + '"/>';
         }
         else if (consolidatedData.OldSpyStrongerThanPrediction) {
-            extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + oldSpyIcon+'"/>';
+            extraIndicator = '<img style="position:absolute; width:18px; height:18px; margin: -10px -10px;z-index: 101;" src="' + oldSpyIcon + '"/>';
             if (consolidatedData.Spy != undefined) {
                 prediction.PredictionDate = new Date(consolidatedData.Spy.timestamp * 1000);
                 if (consolidatedData.Spy.Source == "TornStats") {
@@ -1127,10 +1126,10 @@ function FormatRelativeTime(date) {
     } else if (diff < 86400) {
         var hours = Math.floor(diff / 3600);
         return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
-    } else if (diff < 86400 * 24) {
+    } else if (diff < 86400 * 24 * 365) {
         var days = Math.floor(diff / (3600 * 24));
         return days + ' day' + (days > 1 ? 's' : '') + ' ago';
-    } else if (diff < 86400 * 24 * 365) {
+    } else if (diff < 86400 * 24 * 365 * 15) {
         var years = Math.floor(diff / (3600 * 24 * 365));
         return years + ' year' + (years > 1 ? 's' : '') + ' ago';
     }
@@ -1226,12 +1225,14 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         mainMarginWhenDisplayingHonorBars = '5px -5px';
     }
     else if (IsPage(PageType.Market) && isShowingHonorBars) {
-        if (OnMobile) {
+        mainMarginWhenDisplayingHonorBars = '-10px -10px';
+        spyMargin = '-18px 13px';
+        /*if (OnMobile) {
             mainMarginWhenDisplayingHonorBars = '8px 0px';
         }
         else {
             mainMarginWhenDisplayingHonorBars = '-27px 55px';
-        }
+        }*/
     }
     else if (IsPage(PageType.Hospital) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px 6px';
@@ -1363,14 +1364,14 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         }
         else if (consolidatedData.IsHOF) {
             extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + hofIcon + '" />';
-            title = 'title="Stats coming from the Top 100 HOF forum thread"';            
+            title = 'title="Stats coming from the Top 100 HOF forum thread"';
         }
         else if (consolidatedData.isFFAttacks) {
             extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + FFAttacksIcon + '" />';
             title = 'title="Stats coming from BSP users attacks"';
         }
         else if (consolidatedData.OldSpyStrongerThanPrediction) {
-            extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + oldSpyIcon+ '" />';
+            extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + oldSpyIcon + '" />';
             title = 'title="Old spy having greater TBS than prediction -> showing old spy data instead"';
         }
         else if (showScoreInstead) {
@@ -2048,7 +2049,7 @@ function BuildOptionsCheckboxPageWhereItsEnabled(parentDiv, pageType, defaultVal
 }
 
 function BuildOptionMenu_Uploadstats(tabs, menu) {
-    let contentDiv = BuildOptionMenu(tabs, menu, "Upload Data", true);
+    let contentDiv = BuildOptionMenu(tabs, menu, "Upload Data", false);
 
     // UploadStats
     let UploadStatsNode = document.createElement("div");
@@ -2352,7 +2353,7 @@ function BuildOptionMenu_Debug(tabs, menu) {
     localStorageProgressBar.innerHTML += "<br/><br/> Used by BSP Predictions <br/> " + storagePredictionSize.toLocaleString('en-US') + "b (Number : " + storagePredictionNumber + ")";
     localStorageProgressBar.innerHTML += "<br/><br/> Used by BSP TornStats spies <br/> " + storageTornStatsSize.toLocaleString('en-US') + "b (Number : " + storageTornStatsNumber + ")";
     localStorageProgressBar.innerHTML += "<br/><br/> Used by BSP YATA spies <br/> " + storageYATASize.toLocaleString('en-US') + "b (Number : " + storageYATANumber + ")";
-    localStorageProgressBar.innerHTML += "<br/><br/> Used by others = " + storageALLExceptBSPSize.toLocaleString('en-US') + "b <br/>(Torn chat = " + storageTornChatSize.toLocaleString('en-US')+"b)";
+    localStorageProgressBar.innerHTML += "<br/><br/> Used by others = " + storageALLExceptBSPSize.toLocaleString('en-US') + "b <br/>(Torn chat = " + storageTornChatSize.toLocaleString('en-US') + "b)";
 
     localStorageInfosDiv.appendChild(localStorageProgressBar);
     contentDiv.appendChild(localStorageInfosDiv);
@@ -2563,7 +2564,7 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
 
     contentDiv.appendChild(ul);
 
-    
+
 }
 
 function RefreshOptionMenuWithSubscription() {
@@ -2917,7 +2918,7 @@ function InjectInBountyPagePage(isInit, node) {
     }
 }
 
-function InjectInHOFPage(isInit, node) {
+function InjectInHOFMarketPage(isInit, node) {
     var targetLinks;
     if (isInit == true) {
         targetLinks = document.querySelectorAll('a[href^="/profiles.php?"]');
@@ -2932,7 +2933,7 @@ function InjectInHOFPage(isInit, node) {
         let playerId = url.searchParams.get('XID');
 
         if (playerId == undefined)
-           return;
+            return;
 
         let parentN = targetLink.parentNode;
 
@@ -2942,8 +2943,7 @@ function InjectInHOFPage(isInit, node) {
         if (parentN.className == undefined)
             return;
 
-        if (parentN.className.includes('honorWrap'))
-        {
+        if (parentN.className.includes('honorWrap')) {
             if (!(playerId in dictDivPerPlayer)) {
                 dictDivPerPlayer[playerId] = new Array();
             }
@@ -2996,13 +2996,13 @@ function InjectInGenericGridPage(isInit, node) {
         var parentNode = iter.parentNode;
         var style = window.getComputedStyle(parentNode);
         if (style.display == "none")
-            continue;        
+            continue;
 
         var thisStyle = window.getComputedStyle(iter);
         if (thisStyle.width == "0px")
             continue;
 
-       
+
         if (!(playerId in dictDivPerPlayer)) {
             dictDivPerPlayer[playerId] = new Array();
         }
@@ -3059,16 +3059,14 @@ function IsBSPEnabledOnCurrentPage() {
         LogInfo("Inject Option Menu done.");
     }
 
-    if (GetStorageBool(StorageKey.UploadDataAPIKeyIsValid) && GetStorageBool(StorageKey.UploadDataIsAutoMode))
-    {
+    if (GetStorageBool(StorageKey.UploadDataAPIKeyIsValid) && GetStorageBool(StorageKey.UploadDataIsAutoMode)) {
         LogInfo("Auto update attacks (once a day)");
         let dateNow = new Date();
         let dateSaved = new Date(GetStorage(StorageKey.UploadDataLastUploadTime));
         var time_difference = dateNow - dateSaved;
         var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
 
-        if (hours_difference > 24)
-        {
+        if (hours_difference > 24) {
             CallBSPUploadStats(undefined);
         }
     }
@@ -3111,8 +3109,8 @@ function IsBSPEnabledOnCurrentPage() {
     else if (IsPage(PageType.Bounty)) {
         InjectInBountyPagePage(true, undefined);
     }
-    else if (IsPage(PageType.HallOfFame)) {
-        InjectInHOFPage(true, undefined);
+    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market)) {
+        InjectInHOFMarketPage(true, undefined);
     }
     else {
         InjectInGenericGridPage(true, undefined);
@@ -3127,11 +3125,11 @@ function IsBSPEnabledOnCurrentPage() {
 
                     if (IsPage(PageType.Profile))
                         InjectInProfilePage(false, node);
-                    else if (IsPage(PageType.Faction) || IsPage(PageType.War)) 
+                    else if (IsPage(PageType.Faction) || IsPage(PageType.War))
                         InjectInFactionPage(node);
-                    else if (IsPage(PageType.HallOfFame))
-                        InjectInHOFPage(false, node);
-                    else if (IsPage(PageType.Bounty)) 
+                    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market))
+                        InjectInHOFMarketPage(false, node);
+                    else if (IsPage(PageType.Bounty))
                         InjectInBountyPagePage(false, node);
                     else
                         InjectInGenericGridPage(false, node);
@@ -3169,7 +3167,7 @@ function FetchUserDataFromBSPServer() {
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
-            url: `${GetBSPServer()}/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${GM_info.script.version}`, 
+            url: `${GetBSPServer()}/battlestats/user/${GetStorage(StorageKey.PrimaryAPIKey)}/${GM_info.script.version}`,
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -3200,13 +3198,13 @@ function FetchUserDataFromBSPServer() {
                         subscriptionEndText.innerHTML = '<div style="color:' + GetColorTheme() + '">Thank you for using Battle Stats Predictor (BSP) script!<br /><br /> <div style="font-weight:bolder;">Your subscription expires in '
                             + parseInt(days_difference) + ' day' + (days_difference > 1 ? 's' : '') + ', '
                             + parseInt(hours_difference) + ' hour' + (hours_difference > 1 ? 's' : '') + ', '
-                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.</div><br />You can extend it for' + text + '</div>';                       
+                            + parseInt(minutes_difference) + ' minute' + (minutes_difference > 1 ? 's' : '') + '.</div><br />You can extend it for' + text + '</div>';
 
                     }
                     else {
                         subscriptionEndText.innerHTML = '<div style="color:red">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
                     }
-                    
+
 
                     if (!GetStorageBool(StorageKey.UploadDataAPIKeyIsValid)) {
                         let tipsDiv = document.createElement("div");
@@ -3297,7 +3295,7 @@ function CallBSPUploadStats(callback) {
                         else {
                             callback(false, 'An error occured');
                         }
-                    }                    
+                    }
                 } catch (err) {
                     reject(err);
                     callback(false, 'An error occured');
@@ -3450,7 +3448,7 @@ function AutoSyncTornStatsPlayer(playerId) {
         return;
 
     pageViewOnce = true;
-    
+
     if (GetStorageBoolWithDefaultValue(StorageKey.IsAutoImportTornStatsSpies) == false)
         return;
 
