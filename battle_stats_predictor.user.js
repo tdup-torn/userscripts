@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.2.0
+// @version     9.2.1
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -214,7 +214,7 @@ var mainColor = "#344556";
 var mainBSPIcon = "https://i.postimg.cc/K8cNpzCS/BSPLogo11low.png";
 
 var tornstatsIcon = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
-var yataIcon = "https://www.imgbly.com/ib/jPTzuUgrTM.png";
+var yataIcon = "https://i.ibb.co/hYvQC2L/yata.png";
 
 var starIcon = "https://i.ibb.co/23TYRyL/star-v2.png";
 var oldSpyIcon = "https://i.ibb.co/b7982wh/oldSpy.png";
@@ -1061,7 +1061,7 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         if (GetStorageBoolWithDefaultValue(StorageKey.IsClickingOnProfileStatsAttackPlayer)) {
             divStats.addEventListener('click', function () {
                 // Define the URL you want to open
-                var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + playerId;
+                var urlAttack = "https://www.torn.com/loader.php?sid=attack&user2ID=" + playerId;
 
                 // Open the URL in a new tab or window
                 window.open(urlAttack, '_blank');
@@ -1166,7 +1166,7 @@ function IsThereMyNodeAlready(node, urlAttack) {
 }
 
 function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
-    var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
+    var urlAttack = "https://www.torn.com/loader.php?sid=attack&user2ID=" + targetId;
     let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
     let spyMargin = '-6px 23px';
     let mainMarginWhenDisplayingHonorBars = "-10px -9px";
