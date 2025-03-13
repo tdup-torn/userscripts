@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.2.1
+// @version     9.3.0
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -16,12 +16,14 @@
 // @match       https://www.torn.com/bounties.php*
 // @match       https://www.torn.com/hospitalview.php*
 // @match       https://www.torn.com/forums.php*
-// @match       https://www.torn.com/blacklist.php*
-// @match       https://www.torn.com/friendlist.php*
+// @match       https://www.torn.com/page.php?sid=list&type=friends
+// @match       https://www.torn.com/page.php?sid=list&type=enemies
+// @match       https://www.torn.com/page.php?sid=list&type=targets
 // @match       https://www.torn.com/pmarket.php*
 // @match       https://www.torn.com/properties.php*
 // @match       https://www.torn.com/war.php*
 // @match       https://www.torn.com/preferences.php*
+// @match       https://www.torn.com/loader.php?sid=attack*
 // @run-at      document-end
 // @grant       GM.xmlHttpRequest
 // @grant       GM_setValue
@@ -203,7 +205,7 @@ var TDup_PredictorOptionsContentArea;
 
 var ProfileTargetId = -1;
 var FactionTargetId = -1;
-var divWhereToInject;
+var PlayerProfileDivWhereToInject;
 var dictDivPerPlayer = {};
 
 var OnMobile = false;
@@ -228,6 +230,7 @@ var FFAttacksIcon = "https://i.ibb.co/GJ04WJn/player-Data-v2.png";
 var styleToAdd = document.createElement('style');
 
 styleToAdd.innerHTML += '.iconStats {height: 20px; width: 32px; position: relative; text-align: center; font-size: 12px; font-weight:bold; color: black; box-sizing: border-box; border: 1px solid black;line-height: 18px;font-family: initial;}';
+styleToAdd.innerHTML += '.iconStatsAttack {height: 30px; width: 80px; position: relative; text-align: center; font-size: 28px; font-weight:bold; color: black; box-sizing: border-box; border: 1px solid black;line-height: 28px;font-family: initial;}';
 
 /* Style the tab */
 styleToAdd.innerHTML += '.TDup_optionsMenu {border: 1px solid #ccc;background-color: #f1f1f1;}';
@@ -308,11 +311,13 @@ const PageType = {
     Abroad: 'Abroad',
     Enemies: 'Enemies',
     Friends: 'Friends',
+    Targets: 'Targets',
     PointMarket: 'Point Market',
     Properties: 'Properties',
     War: 'War',
     ChainReport: 'ChainReport',
     RWReport: 'RWReport',
+    Attack: 'Attack',
 };
 
 var mapPageTypeAddress = {
@@ -334,13 +339,15 @@ var mapPageTypeAddress = {
     [PageType.ForumThread]: 'https://www.torn.com/forums.php#/p=threads',
     [PageType.ForumSearch]: 'https://www.torn.com/forums.php#/p=search',
     [PageType.Abroad]: 'https://www.torn.com/index.php?page=people',
-    [PageType.Enemies]: 'https://www.torn.com/blacklist.php',
-    [PageType.Friends]: 'https://www.torn.com/friendlist.php',
+    [PageType.Enemies]: 'https://www.torn.com/page.php?sid=list&type=enemies',
+    [PageType.Friends]: 'https://www.torn.com/page.php?sid=list&type=friends',
+    [PageType.Targets]: 'https://www.torn.com/page.php?sid=list&type=targets',
     [PageType.PointMarket]: 'https://www.torn.com/pmarket.php',
     [PageType.Properties]: 'https://www.torn.com/properties.php',
     [PageType.War]: 'https://www.torn.com/war.php',
     [PageType.ChainReport]: 'https://www.torn.com/war.php?step=chainreport',
     [PageType.RWReport]: 'https://www.torn.com/war.php?step=rankreport',
+    [PageType.Attack]: 'https://www.torn.com/loader.php?sid=attack',
 }
 
 var mapPageAddressEndWith = {
@@ -964,6 +971,11 @@ function GetConsolidatedDataForPlayerStats(prediction) {
     return objectToReturn;
 }
 
+function OpenAttackScreenForPlayerId(playerId) {
+    var urlAttack = "https://www.torn.com/loader.php?sid=attack&user2ID=" + playerId;
+    window.open(urlAttack, '_blank');
+}
+
 var divStats = undefined;
 var isDivStatsCreated = false;
 function OnProfilePlayerStatsRetrieved(playerId, prediction) {
@@ -1060,20 +1072,16 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
 
         if (GetStorageBoolWithDefaultValue(StorageKey.IsClickingOnProfileStatsAttackPlayer)) {
             divStats.addEventListener('click', function () {
-                // Define the URL you want to open
-                var urlAttack = "https://www.torn.com/loader.php?sid=attack&user2ID=" + playerId;
-
-                // Open the URL in a new tab or window
-                window.open(urlAttack, '_blank');
+                OpenAttackScreenForPlayerId(playerId);
             });
         }
 
         if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false)) {
-            var referenceNode = divWhereToInject.firstChild.childNodes[1];
-            divWhereToInject.firstChild.insertBefore(divStats, referenceNode);
+            var referenceNode = PlayerProfileDivWhereToInject.firstChild.childNodes[1];
+            PlayerProfileDivWhereToInject.firstChild.insertBefore(divStats, referenceNode);
         }
         else {
-            divWhereToInject.insertBefore(divStats, divWhereToInject.firstChild);
+            PlayerProfileDivWhereToInject.appendChild(divStats);
         }
     }
 
@@ -1166,7 +1174,7 @@ function IsThereMyNodeAlready(node, urlAttack) {
 }
 
 function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
-    var urlAttack = "https://www.torn.com/loader.php?sid=attack&user2ID=" + targetId;
+    var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
     let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
     let spyMargin = '-6px 23px';
     let mainMarginWhenDisplayingHonorBars = "-10px -9px";
@@ -1209,16 +1217,11 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     else if (IsPage(PageType.RecruitCitizens) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px';
     }
-    else if (IsPage(PageType.Friends)) {
-        spyMargin = '0px 23px';
+    else if (IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets)) {
+        spyMargin = '-5px 23px';
         if (isShowingHonorBars) {
-            mainMarginWhenDisplayingHonorBars = '5px 0px';
-        }
-    }
-    else if (IsPage(PageType.Enemies)) {
-        spyMargin = '0px 23px';
-        if (isShowingHonorBars) {
-            mainMarginWhenDisplayingHonorBars = '5px 0px';
+            mainMarginWhenDisplayingHonorBars = '-10px 0px';
+            spyMargin = '-14px 23px';
         }
     }
     else if (IsPage(PageType.PointMarket) && isShowingHonorBars) {
@@ -1227,12 +1230,6 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     else if (IsPage(PageType.Market) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '-10px -10px';
         spyMargin = '-18px 13px';
-        /*if (OnMobile) {
-            mainMarginWhenDisplayingHonorBars = '8px 0px';
-        }
-        else {
-            mainMarginWhenDisplayingHonorBars = '-27px 55px';
-        }*/
     }
     else if (IsPage(PageType.Hospital) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px 6px';
@@ -2005,6 +2002,7 @@ function BuildOptionMenu_Pages(tabs, menu) {
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.HallOfFame, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Enemies, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Friends, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Targets, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.RecruitCitizens, false);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Company, false);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Hospital, false);
@@ -2013,6 +2011,7 @@ function BuildOptionMenu_Pages(tabs, menu) {
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.War, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Market, false, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Forum, false, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Attack, false, true);
     contentDiv.appendChild(divForCheckbox);
 }
 
@@ -2798,7 +2797,7 @@ function InjectInProfilePage(isInit = true, node = undefined) {
         mainContainer = node;
     }
 
-    el = mainContainer.querySelectorAll('.empty-block');
+    el = mainContainer.querySelectorAll('.buttons-wrap');
     if (el.length == 0)
         return;
 
@@ -2813,7 +2812,7 @@ function InjectInProfilePage(isInit = true, node = undefined) {
         return;
 
     statsAlreadyDisplayedOnProfile = true;
-    divWhereToInject = el[0];
+    PlayerProfileDivWhereToInject = el[0];
 
     let profileId = GetStorage(StorageKey.PlayerId);
     if (profileId != undefined && profileId == ProfileTargetId) {
@@ -2918,7 +2917,7 @@ function InjectInBountyPagePage(isInit, node) {
     }
 }
 
-function InjectInHOFMarketPage(isInit, node) {
+function InjectInGenericGridPageNewTornFormat(isInit, node) {
     var targetLinks;
     if (isInit == true) {
         targetLinks = document.querySelectorAll('a[href^="/profiles.php?"]');
@@ -3012,6 +3011,107 @@ function InjectInGenericGridPage(isInit, node) {
     }
 }
 
+var nodeForAttackPage;
+function InjectInAttackPage(isInit, node) {
+
+    if (isInit == true) {
+        nodeForAttackPage = Array.from(document.querySelectorAll('*')).find(element =>
+            String(element.className).includes('titleContainer')
+        );
+    }
+    else {
+        nodeForAttackPage = Array.from(node.querySelectorAll('*')).find(element =>
+            String(element.className).includes('titleContainer')
+        );
+    }
+
+    if (nodeForAttackPage) {
+        const url = window.location.href;
+        const urlObj = new URL(url);
+        const playerId = urlObj.searchParams.get('user2ID');
+        GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForAttackPage);
+    }
+}
+
+function OnPlayerStatsRetrievedForAttackPage(targetId, prediction) {
+
+    let spyMargin = '-5px 70px';
+
+    let consolidatedData = GetConsolidatedDataForPlayerStats(prediction);
+    let localBattleStats = GetLocalBattleStats();
+
+    let colorComparedToUs;
+    let formattedBattleStats;
+    let FFPredicted = 0;
+
+    let showScoreInstead = GetStorageBool(StorageKey.IsShowingBattleStatsScore);
+    if (showScoreInstead == true) {
+        let scoreRatio = 100 * consolidatedData.Score / localBattleStats.Score;
+        colorComparedToUs = GetColorScoreDifference(scoreRatio);
+        if (GetStorageBool(StorageKey.IsShowingBattleStatsPercentage)) {
+            let ratioToDisplay = Math.min(999, scoreRatio);
+            formattedBattleStats = ratioToDisplay.toFixed(0) + "%";
+        }
+        else {
+            formattedBattleStats = FormatBattleStats(consolidatedData.Score);
+        }
+
+        FFPredicted = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
+        FFPredicted = FFPredicted.toFixed(2);
+    }
+    else {
+        let tbsRatio = 100 * consolidatedData.TargetTBS / localBattleStats.TBS;
+        colorComparedToUs = GetColorMaxValueDifference(tbsRatio);
+
+        if (GetStorageBool(StorageKey.IsShowingBattleStatsPercentage)) {
+            let ratioToDisplay = Math.min(999, tbsRatio);
+            formattedBattleStats = ratioToDisplay.toFixed(0) + "%";
+        }
+        else {
+            formattedBattleStats = FormatBattleStats(consolidatedData.TargetTBS);
+        }
+    }
+
+    if (consolidatedData.Success == FAIL) {
+        colorComparedToUs = "pink";
+        formattedBattleStats = "Wait";
+    } else if (consolidatedData.Success == MODEL_ERROR) {
+        colorComparedToUs = "pink";
+        formattedBattleStats = "Error";
+    }
+
+    let extraIndicator = '';
+    let title = '';
+    if (consolidatedData.IsUsingSpy) {
+        let FFPredicted = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
+        FFPredicted = Math.max(1, FFPredicted);
+        FFPredicted = FFPredicted.toFixed(2);
+
+        extraIndicator = '<img style="position:absolute; width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + starIcon + '" />';
+        title = 'title="Data coming from spy (' + consolidatedData.Spy.Source + ') FF : ' + FFPredicted + ' "';
+    }
+    else if (consolidatedData.IsHOF) {
+        extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + hofIcon + '" />';
+        title = 'title="Stats coming from the Top 100 HOF forum thread"';
+    }
+    else if (consolidatedData.isFFAttacks) {
+        extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + FFAttacksIcon + '" />';
+        title = 'title="Stats coming from BSP users attacks"';
+    }
+    else if (consolidatedData.OldSpyStrongerThanPrediction) {
+        extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + oldSpyIcon + '" />';
+        title = 'title="Old spy having greater TBS than prediction -> showing old spy data instead"';
+    }
+    else if (showScoreInstead) {
+        title = 'title="FF Predicted = ' + FFPredicted + '"';
+    }
+
+    let tipsDiv = document.createElement("div");
+    tipsDiv.innerHTML = extraIndicator + '<div style="z-index: 100;"><div class="iconStatsAttack" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div>';
+    nodeForAttackPage.appendChild(tipsDiv);
+
+}
+
 // #endregion
 
 // #region Script OnLoad
@@ -3060,13 +3160,13 @@ function IsBSPEnabledOnCurrentPage() {
     }
 
     if (GetStorageBool(StorageKey.UploadDataAPIKeyIsValid) && GetStorageBool(StorageKey.UploadDataIsAutoMode)) {
-        LogInfo("Auto update attacks (once a day)");
         let dateNow = new Date();
         let dateSaved = new Date(GetStorage(StorageKey.UploadDataLastUploadTime));
         var time_difference = dateNow - dateSaved;
         var hours_difference = parseInt(time_difference / (1000 * 60 * 60));
 
         if (hours_difference > 24) {
+            LogInfo("Auto update attacks (once a day)");
             CallBSPUploadStats(undefined);
         }
     }
@@ -3109,12 +3209,16 @@ function IsBSPEnabledOnCurrentPage() {
     else if (IsPage(PageType.Bounty)) {
         InjectInBountyPagePage(true, undefined);
     }
-    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market)) {
-        InjectInHOFMarketPage(true, undefined);
+    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets)) {
+        InjectInGenericGridPageNewTornFormat(true, undefined);
+    }
+    else if (IsPage(PageType.Attack)) {
+        InjectInAttackPage(true, undefined);
     }
     else {
         InjectInGenericGridPage(true, undefined);
     }
+
 
     // Start observer, to inject within dynamically loaded content
     var observer = new MutationObserver(function (mutations, observer) {
@@ -3127,10 +3231,12 @@ function IsBSPEnabledOnCurrentPage() {
                         InjectInProfilePage(false, node);
                     else if (IsPage(PageType.Faction) || IsPage(PageType.War))
                         InjectInFactionPage(node);
-                    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market))
-                        InjectInHOFMarketPage(false, node);
+                    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets))
+                        InjectInGenericGridPageNewTornFormat(false, node);
                     else if (IsPage(PageType.Bounty))
                         InjectInBountyPagePage(false, node);
+                    else if (IsPage(PageType.Attack))
+                        InjectInAttackPage(false, node);
                     else
                         InjectInGenericGridPage(false, node);
                 }
@@ -3314,7 +3420,7 @@ function CallBSPUploadStats(callback) {
 // #region API Torn
 
 function VerifyTornAPIKey(callback) {
-    var urlToUse = "https://api.torn.com/user/?comment=BSPAuth&key=" + GetStorage(StorageKey.PrimaryAPIKey);
+    var urlToUse = "https://api.torn.com/v2/user/personalstats,profile?key=" + GetStorage(StorageKey.PrimaryAPIKey) + "&cat=all&comment=BSPAuth"
     GM.xmlHttpRequest({
         method: "GET",
         url: urlToUse,
@@ -3334,11 +3440,21 @@ function VerifyTornAPIKey(callback) {
                 callback(false, "unknown issue");
                 return;
             }
-            else {
-                SetStorage(StorageKey.PlayerId, j.player_id);
-                callback(true);
+
+            if (
+                !j.personalstats ||
+                !j.personalstats.attacking ||
+                !j.personalstats.attacking.attacks ||
+                j.personalstats.attacking.attacks.won === undefined
+            ) {
+                callback(false, "Cant get personaldata, make sure your API key has proper authorizations");
                 return;
             }
+
+            SetStorage(StorageKey.PlayerId, j.player_id);
+            callback(true);
+            return;
+
         },
         onabort: () => callback(false, "Couldn't check (aborted)"),
         onerror: () => callback(false, "Couldn't check (error)"),
