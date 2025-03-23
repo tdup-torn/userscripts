@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.3.0
+// @version     9.3.1
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -318,6 +318,7 @@ const PageType = {
     ChainReport: 'ChainReport',
     RWReport: 'RWReport',
     Attack: 'Attack',
+    RussianRoulette: 'RussianRoulette',
 };
 
 var mapPageTypeAddress = {
@@ -348,7 +349,8 @@ var mapPageTypeAddress = {
     [PageType.ChainReport]: 'https://www.torn.com/war.php?step=chainreport',
     [PageType.RWReport]: 'https://www.torn.com/war.php?step=rankreport',
     [PageType.Attack]: 'https://www.torn.com/loader.php?sid=attack',
-}    
+    [PageType.RussianRoulette]: 'https://www.torn.com/page.php?sid=russianRoulette',
+}
 
 var mapPageAddressEndWith = {
     [PageType.FactionControl]: '/tab=controls',
@@ -1217,16 +1219,11 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     else if (IsPage(PageType.RecruitCitizens) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px';
     }
-    else if (IsPage(PageType.Friends)) {
-        spyMargin = '0px 23px';
+    else if (IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets)) {
+        spyMargin = '-5px 23px';
         if (isShowingHonorBars) {
-            mainMarginWhenDisplayingHonorBars = '5px 0px';
-        }
-    }
-    else if (IsPage(PageType.Enemies)) {
-        spyMargin = '0px 23px';
-        if (isShowingHonorBars) {
-            mainMarginWhenDisplayingHonorBars = '5px 0px';
+            mainMarginWhenDisplayingHonorBars = '-10px 0px';
+            spyMargin = '-14px 23px';
         }
     }
     else if (IsPage(PageType.PointMarket) && isShowingHonorBars) {
@@ -1278,6 +1275,11 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         }
         else {
             mainMarginWhenDisplayingHonorBars = '10px 0px';
+        }
+    }
+    else if (IsPage(PageType.RussianRoulette)) {
+        if (isShowingHonorBars) {
+            spyMargin = '-14px 15px';
         }
     }
 
@@ -2014,9 +2016,11 @@ function BuildOptionMenu_Pages(tabs, menu) {
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.PointMarket, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Properties, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.War, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.RussianRoulette, true, false);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Market, false, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Forum, false, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Attack, false, true);
+
     contentDiv.appendChild(divForCheckbox);
 }
 
@@ -3214,8 +3218,8 @@ function IsBSPEnabledOnCurrentPage() {
     else if (IsPage(PageType.Bounty)) {
         InjectInBountyPagePage(true, undefined);
     }
-    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets)) {
-        InjectInGenericGridPageNewTornFormat(true, undefined); 
+    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette)) {
+        InjectInGenericGridPageNewTornFormat(true, undefined);
     }
     else if (IsPage(PageType.Attack)) {
         InjectInAttackPage(true, undefined);
@@ -3236,7 +3240,7 @@ function IsBSPEnabledOnCurrentPage() {
                         InjectInProfilePage(false, node);
                     else if (IsPage(PageType.Faction) || IsPage(PageType.War))
                         InjectInFactionPage(node);
-                    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets))
+                    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette))
                         InjectInGenericGridPageNewTornFormat(false, node);
                     else if (IsPage(PageType.Bounty))
                         InjectInBountyPagePage(false, node);
