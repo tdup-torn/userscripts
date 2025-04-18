@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.3.1
+// @version     9.3.3
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -70,7 +70,6 @@ const StorageKey = {
     // Spies are only kept in your local cache, no spies is sent to the BSP backend.
     TornStatsAPIKey: 'tdup.battleStatsPredictor.TornStatsApiKey',
     IsTornStatsAPIKeyValid: 'tdup.battleStatsPredictor.IsTornStatsApiKeyValid',
-    OldTornStatsSpy: 'tdup.battleStatsPredictor.cache.spy.tornstats_', //TDTODO : to remove in a couple of versions (I keep it so it gets cleared)
     TornStatsSpy: 'tdup.battleStatsPredictor.cache.spy_v2.tornstats_',
     IsAutoImportTornStatsSpies: 'tdup.battleStatsPredictor.tornstats_isAutoImportSpies',
     AutoImportLastDatePlayer: 'tdup.battleStatsPredictor.tornstats_AutoImportLastDatePlayer_',
@@ -83,7 +82,6 @@ const StorageKey = {
 
     YataAPIKey: 'tdup.battleStatsPredictor.YataApiKey',
     IsYataAPIKeyValid: 'tdup.battleStatsPredictor.IsYataApiKeyValid',
-    OldYataSpy: 'tdup.battleStatsPredictor.cache.spy.yata_', //TDTODO : to remove
     YataSpy: 'tdup.battleStatsPredictor.cache.spy_v2.yata_',
 
     DaysToUseSpies: 'tdup.battleStatsPredictor.DaysToUseTornStatsSpy',
@@ -318,7 +316,7 @@ const PageType = {
     ChainReport: 'ChainReport',
     RWReport: 'RWReport',
     Attack: 'Attack',
-    RussianRoulette: 'RussianRoulette',
+    RussianRoulette: 'Russian Roulette',
 };
 
 var mapPageTypeAddress = {
@@ -517,7 +515,6 @@ function SetPredictionInCache(playerId, prediction) {
         LogInfo("BSP threw an exception in SetPredictionInCache method : " + e);
     }
 }
-
 function GetTornStatsSpyFromCache(playerId) {
     let key = StorageKey.TornStatsSpy + playerId;
     let data = localStorage[key];
@@ -801,16 +798,6 @@ function ClearOutdatedPredictionInCache() {
 
     let numberOfPredictionCleared = 0;
     for (let key in localStorage) {
-        if (key.startsWith(StorageKey.OldTornStatsSpy)) {
-            localStorage.removeItem(key); // remove previous version of TornStats spies from cache
-            continue;
-        }
-
-        if (key.startsWith(StorageKey.OldYataSpy)) {
-            localStorage.removeItem(key); // remove previous version of YATA spies from cache
-            continue;
-        }
-
         if (key.startsWith(StorageKey.BSPPrediction)) {
             let prediction = JSON.parse(localStorage[key]);
             if (prediction != undefined) {
@@ -877,7 +864,10 @@ async function GetPredictionForPlayer(targetId, callback) {
         var isPredictionValid = true;
         var expirationDate = new Date();
         expirationDate.setDate(expirationDate.getDate() - PREDICTION_VALIDITY_DAYS);
-        var predictionDate = new Date(prediction.PredictionDate);
+        var predictionDate = new Date(prediction.PredictionDate); // might remove that in the future, and rely only on DateFetched
+        if (prediction.DateFetched != undefined)
+            predictionDate = new Date(prediction.DateFetched);
+       
         if (predictionDate < expirationDate) {
             var key = StorageKey.BSPPrediction + targetId;
             localStorage.removeItem(key);
@@ -900,6 +890,7 @@ async function GetPredictionForPlayer(targetId, callback) {
     const newPrediction = await FetchScoreAndTBS(targetId);
     LogInfo("Prediction for target " + targetId + " not found in the cache, value retrieved from BSP server!");
     if (newPrediction != undefined) {
+        newPrediction.DateFetched = new Date(); // Keep a trace of the local date when the prediction was fetched, so we don't fetch it again every time (PREDICTION_VALIDITY_DAYS)
         SetPredictionInCache(targetId, newPrediction);
     }
 
@@ -1355,7 +1346,9 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
                 }
             }
         }
+       
 
+        let StatsToSort = consolidatedData.TargetTBS;
         let extraIndicator = '';
         let title = '';
         if (consolidatedData.IsUsingSpy) {
@@ -1384,10 +1377,10 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
 
         let toInject = '';
         if (isShowingHonorBars) {
-            toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+            toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" data-bsp-stats="' + StatsToSort + '"' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
         }
         else {
-            toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+            toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div  class="iconStats" data-bsp-stats="' + StatsToSort + '" '+ title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
 
             if (IsPage(PageType.War) && !IsPage(PageType.ChainReport) && !IsPage(PageType.RWReport)) {
                 dictDivPerPlayer[targetId][i].style.position = "absolute";
@@ -2538,7 +2531,7 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
 
     let tips = document.createElement("div");
     tips.className = "TDup_optionsTabContentDiv";
-    tips.innerHTML = "Tips :<br />You can click on the colored area to quick attack, from any screen! <br> <img width='300' src='https://i.ibb.co/4TtQqzf/quick-Attack.png'</img>";
+    tips.innerHTML = "Tips :<br />You can click on the colored area to quick attack, from any screen! <br> <img width='200' src='https://i.ibb.co/4TtQqzf/quick-Attack.png'</img>";
     tips.style.fontStyle = "italic";
     contentDiv.appendChild(tips);
 
@@ -2546,10 +2539,16 @@ function BuildOptionMenu_Infos(menuArea, contentArea) {
     ul.style = "list-style-type: none;padding: 0;";
     const items = [
         { urlImage: hofIcon, name: "Top 100 Hall Of Fame" },
-        { urlImage: starIcon, name: "Your spy" },
-        { urlImage: oldSpyIcon, name: "Old spy" },
-        { urlImage: FFAttacksIcon, name: "Bsp Users attacks" },
+        { urlImage: starIcon, name: "Your spy (TornStats or Yata)" },
+        { urlImage: oldSpyIcon, name: "Old spy (that is displayed because prediction is lower than this)" },
+        { urlImage: FFAttacksIcon, name: "Prediction using BSP user attack sharing (more reliable - BScore computed from FairFight)" },
     ];
+
+    let legend = document.createElement("div");
+    legend.className = "TDup_optionsTabContentDiv";
+    legend.innerHTML = "Legend:";
+    legend.style.fontStyle = "italic";
+    contentDiv.appendChild(legend);
 
     items.forEach(item => {
         const li = document.createElement("li");
@@ -2840,7 +2839,7 @@ function InjectInProfilePage(isInit = true, node = undefined) {
 function InjectInFactionPage(node) {
     if (!node) return;
 
-    AutoSyncTornStatsFaction(FactionTargetId);
+    AutoSyncTornStatsFaction(FactionTargetId);  
 
     let el = node.querySelectorAll('a');
     for (let i = 0; i < el.length; ++i) {
@@ -3214,6 +3213,7 @@ function IsBSPEnabledOnCurrentPage() {
     }
     else if (IsPage(PageType.Faction) || IsPage(PageType.War)) {
         //AutoSyncTornStatsFaction(factionId);
+        InjectSortButtons(true, undefined);
     }
     else if (IsPage(PageType.Bounty)) {
         InjectInBountyPagePage(true, undefined);
@@ -3238,8 +3238,10 @@ function IsBSPEnabledOnCurrentPage() {
 
                     if (IsPage(PageType.Profile))
                         InjectInProfilePage(false, node);
-                    else if (IsPage(PageType.Faction) || IsPage(PageType.War))
+                    else if (IsPage(PageType.Faction) || IsPage(PageType.War)) {
                         InjectInFactionPage(node);
+                        InjectSortButtons(true, node);
+                    }                       
                     else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette))
                         InjectInGenericGridPageNewTornFormat(false, node);
                     else if (IsPage(PageType.Bounty))
@@ -3296,7 +3298,7 @@ function FetchUserDataFromBSPServer() {
 
                     SetStorage(StorageKey.DateSubscriptionEnd, result.SubscriptionEnd);
 
-                    let text = ' 1xan/15days (send to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a>. Process is automated and treated within a minute. You can send in bulk)';
+                    let text = ' 1xan/15days.<br />Send directly to <a style="display:inline-block;" href="https://www.torn.com/profiles.php?XID=2660552">TDup[2660552]</a>. Process is automated and treated within a minute. <br />You can send in bulk. Dont use trade or parcels!';
 
                     if (result.SubscriptionActive) {
                         var dateNow = new Date();
@@ -3320,13 +3322,30 @@ function FetchUserDataFromBSPServer() {
                         subscriptionEndText.innerHTML = '<div style="color:red">WARNING - Your subscription has expired.<br />You can renew it for' + text + '</div>';
                     }
 
+                    let sharingAttackInfoDiv = document.createElement("div");
+                    sharingAttackInfoDiv.className = "TDup_optionsTabContentDiv";
 
-                    if (!GetStorageBool(StorageKey.UploadDataAPIKeyIsValid)) {
-                        let tipsDiv = document.createElement("div");
-                        tipsDiv.className = "TDup_optionsTabContentDiv";
-                        tipsDiv.innerHTML = 'Help BSP get better by uploading your attacks and get subscription time';
-                        subscriptionEndText.appendChild(tipsDiv);
+                    let textToDisplay = '';
+                    if (result.SubscriptionState == 1) {
+                        if (GetStorageBool(StorageKey.UploadDataAPIKeyIsValid) && GetStorageBool(StorageKey.UploadDataIsAutoMode)) {
+                            textToDisplay = 'Thanks for sharing your attack logs - it helps BSP being more accurate &#10084;';
+                        }
+                        else {
+                            textToDisplay = 'Thanks for sharing your attack logs in the past! You can enable it again in the Upload Data section to help BSP become more accurate &#10084;';
+                        }
                     }
+                    else {
+                        if (GetStorageBool(StorageKey.UploadDataAPIKeyIsValid) && GetStorageBool(StorageKey.UploadDataIsAutoMode)) {
+                            textToDisplay = 'Thanks for sharing your attack logs, it helps BSP being more accurate. You will receive 3 months of subscription time once a valid attack is uploaded (a fight less than 48 hours old with a FairFight value below 3.0)';
+                        }
+                        else {
+                            textToDisplay = 'Help BSP be more accurate by uploading your attacks and get 3 months of free subscription time!<br />To do so, go to the Upload Data section and enable it.<br />Your subscription time will be credited once you upload your first usable data(a fight less than 48 hours old with a FairFight value below 3.0).';
+                        }
+                    }
+
+                    sharingAttackInfoDiv.innerHTML = '<div style="color:#25ab1b">' + textToDisplay + '</div>'
+
+                    subscriptionEndText.appendChild(sharingAttackInfoDiv);
 
                     RefreshOptionMenuWithSubscription();
 
@@ -3780,3 +3799,132 @@ function FetchSpiesFromYata(callback) {
 
 
 // #endregion
+
+function InjectSortButtons(isInit, node) {
+    var el;
+    if (isInit == true) {
+        el = document.querySelectorAll('.members-cont');
+        //el = document.querySelectorAll('.member.left');
+    }
+    else if (node == undefined) {
+        return;
+    }
+    else {
+        el = node.querySelectorAll('.members-cont');
+        //el = node.querySelectorAll('.member.left');
+    }
+
+    if (el == undefined) {
+        return;
+    }
+
+    if (el.children == 0) {
+        return;
+    }
+
+    if (el.length == 0) {
+        return;
+    }
+
+    function SortPlayers(button, mainNode) {
+        button.sortModeDesc = !button.sortModeDesc;
+        button.isSorting = true;
+        if (button.sortModeDesc) {
+            button.innerHTML = "<i class='fa fa-arrow-up'></i> BSP";            
+        }
+        else {
+            button.innerHTML = "<i class='fa fa-arrow-down'></i> BSP";
+        }
+
+        let nodes = mainNode.querySelectorAll('.members-list');//.forEach((subNode) => watchWall(w));
+        let nodeMain = nodes[0];
+        var itemsArr = [];
+        for (var i = 0; i < nodeMain.children.length; ++i) {
+            itemsArr.push(nodeMain.children[i]);
+        }
+
+        itemsArr.sort(function (a, b) {
+            let divA = a.querySelector('.iconStats');
+            let scoreA = parseInt(divA.getAttribute("data-bsp-stats"));
+            let divB = b.querySelector('.iconStats');
+            let scoreB = parseInt(divB.getAttribute("data-bsp-stats"));
+
+            let result = scoreA == scoreB
+                ? 0
+                : (scoreA > scoreB ? 1 : -1);
+
+            if (!button.sortModeDesc) {
+                result = -result;
+            }
+            return result;
+        });
+
+        for (i = 0; i < itemsArr.length; ++i) {
+            nodeMain.appendChild(itemsArr[i]);
+        }
+    }
+
+    for (let i = 0; i < 2; ++i) {
+        let headerNode = el[i].querySelector('.member.left');
+
+        if (headerNode.innerHTML.includes("BSP"))
+            continue;
+
+        let btnSortMembers = document.createElement("button");
+        btnSortMembers.sortModeDesc = true;
+        btnSortMembers.isSorting = true;
+        btnSortMembers.className = "TDup_buttonInOptionMenu";
+        btnSortMembers.innerHTML = "<i class='fa fa-arrow-right'></i> BSP";
+
+        btnSortMembers.addEventListener("click", function (evt) {
+            btnSortMembers.disabled = true;
+            //SetStorage(StorageKey.BattleStatsAPIKey, gymStatsAPIKeyInput.value);
+            SortPlayers(btnSortMembers, headerNode.parentNode.parentNode, true);
+            btnSortMembers.disabled = false;
+            evt.stopPropagation();
+        });
+
+        headerNode.insertBefore(btnSortMembers, headerNode.children[1]);
+    }
+
+    //if (isInit == true) {
+    //    el = document.querySelectorAll('.f-war-list');
+    //}
+    //else if (node == undefined) {
+    //    return;
+    //}
+    //else {
+    //    el = node.querySelectorAll('.f-war-list');
+    //}
+
+    //if (el == undefined) {
+    //    return;
+    //}
+
+    //if (el.children == 0) {
+    //    return;
+    //}
+
+    //if (el.length == 0) {
+    //    return;
+    //}
+
+    //let headerNode = el[1].querySelector('[role="heading"]');
+    //let btnSortMembers = document.createElement("button");
+    //btnSortMembers.sortModeDesc = true;
+    //btnSortMembers.isSorting = true;
+    //btnSortMembers.className = "TDup_buttonInOptionMenu";
+    //btnSortMembers.innerHTML = "<i class='fa fa-arrow-right'></i> BSP";
+
+    //btnSortMembers.addEventListener("click", function (evt) {
+    //    //btnSortMembers.disabled = true;
+    //    SortPlayers(btnSortMembers, headerNode.parentNode.parentNode, true);
+    //    //btnSortMembers.disabled = false;
+    //    evt.stopPropagation();
+    //});
+
+    //if (headerNode.innerHTML.includes("BSP"))
+    //    return;
+
+    //headerNode.insertBefore(btnSortMembers, headerNode.children[1]);
+}
