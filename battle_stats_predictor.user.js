@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.3.2
+// @version     9.3.3
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -94,6 +94,8 @@ const StorageKey = {
 
     // Pages enabled
     IsBSPEnabledOnPage: 'tdup.battleStatsPredictor.IsBSPEnabledOnPage_',
+
+    ShouldOpenAttackURLInNewTab: 'tdup.battleStatsPredictor.ShouldOpenAttackURLInNewTab',
 
     // Display choice
     IsShowingHonorBars: 'tdup.battleStatsPredictor.isShowingHonorBars',
@@ -220,6 +222,8 @@ var starIcon = "https://i.ibb.co/23TYRyL/star-v2.png";
 var oldSpyIcon = "https://i.ibb.co/b7982wh/oldSpy.png";
 var hofIcon = "https://i.ibb.co/fkFDrVx/HOF-v2.png";
 var FFAttacksIcon = "https://i.ibb.co/GJ04WJn/player-Data-v2.png";
+
+var URL_TORN_ATTACK = "https://www.torn.com/loader.php?sid=attack&user2ID=";
 
 // #endregion
 
@@ -867,7 +871,7 @@ async function GetPredictionForPlayer(targetId, callback) {
         var predictionDate = new Date(prediction.PredictionDate); // might remove that in the future, and rely only on DateFetched
         if (prediction.DateFetched != undefined)
             predictionDate = new Date(prediction.DateFetched);
-       
+
         if (predictionDate < expirationDate) {
             var key = StorageKey.BSPPrediction + targetId;
             localStorage.removeItem(key);
@@ -965,8 +969,13 @@ function GetConsolidatedDataForPlayerStats(prediction) {
 }
 
 function OpenAttackScreenForPlayerId(playerId) {
-    var urlAttack = "https://www.torn.com/loader.php?sid=attack&user2ID=" + playerId;
-    window.open(urlAttack, '_blank');
+    var urlAttack = URL_TORN_ATTACK + playerId;
+    if (GetStorageBoolWithDefaultValue(StorageKey.ShouldOpenAttackURLInNewTab, true)) {
+        window.open(urlAttack, '_blank');
+    }
+    else {
+        window.open(urlAttack);
+    }
 }
 
 var divStats = undefined;
@@ -1167,7 +1176,7 @@ function IsThereMyNodeAlready(node, urlAttack) {
 }
 
 function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
-    var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
+    var urlAttack = URL_TORN_ATTACK + targetId;
     let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
     let spyMargin = '-6px 23px';
     let mainMarginWhenDisplayingHonorBars = "-10px -9px";
@@ -1373,12 +1382,13 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             title = 'title="FF Predicted = ' + FFPredicted + '"';
         }
 
+        let newTabifNeeded = GetStorageBoolWithDefaultValue(StorageKey.ShouldOpenAttackURLInNewTab, true) ? ' target="_blank"' : '';
         let toInject = '';
         if (isShowingHonorBars) {
-            toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
         }
         else {
-            toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
 
             if (IsPage(PageType.War) && !IsPage(PageType.ChainReport) && !IsPage(PageType.RWReport)) {
                 dictDivPerPlayer[targetId][i].style.position = "absolute";
@@ -1929,6 +1939,9 @@ function BuildOptionMenu_Pages(tabs, menu) {
 
     // Alternative profile display
     AddOption(contentDiv, StorageKey.IsClickingOnProfileStatsAttackPlayer, false, 'Click on profile stats area to attack?', 'IsClickingOnProfileStatsAttackPlayer');
+
+    // Open attack in new tab
+    AddOption(contentDiv, StorageKey.ShouldOpenAttackURLInNewTab, true, 'Open attack screen in new tab', 'ShouldOpenAttackURLInNewTab');
 
     // Hide BSP Option button, in toolbar
     AddOption(contentDiv, StorageKey.IsHidingBSPOptionButtonInToolbar, false, 'Hide BSP Option button in toolbar?', 'IsHidingBSPOptionButtonInToolbar');
