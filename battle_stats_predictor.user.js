@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.3.3
+// @version     9.3.4
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -299,6 +299,7 @@ const PageType = {
     Faction: 'Faction',
     Company: 'Company',
     Competition: 'Competition',
+    Elimination: 'Elimination',
     Bounty: 'Bounty',
     Search: 'Search',
     Hospital: 'Hospital',
@@ -330,6 +331,7 @@ var mapPageTypeAddress = {
     [PageType.Faction]: 'https://www.torn.com/factions.php',
     [PageType.Company]: 'https://www.torn.com/joblist.php',
     [PageType.Competition]: 'https://www.torn.com/competition.php',
+    [PageType.Elimination]: 'https://www.torn.com/page.php?sid=competition',
     [PageType.Bounty]: 'https://www.torn.com/bounties.php',
     [PageType.Search]: 'https://www.torn.com/page.php?sid=UserList',
     [PageType.Hospital]: 'https://www.torn.com/hospitalview.php',
@@ -1268,8 +1270,8 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     else if (IsPage(PageType.War)) {
         spyMargin = isShowingHonorBars ? '-16px 15px' : '-4px 24px';
     }
-    else if (IsPage(PageType.Competition) && isShowingHonorBars) {
-
+    else if (IsPage(PageType.Competition) && isShowingHonorBars)
+    {
         if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=revenge")) {
             mainMarginWhenDisplayingHonorBars = '0px 0px';
         }
@@ -1277,12 +1279,15 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             mainMarginWhenDisplayingHonorBars = '10px 0px';
         }
     }
+    else if (IsPage(PageType.Elimination) && isShowingHonorBars) {
+        mainMarginWhenDisplayingHonorBars = '-11px 0px';
+        spyMargin = '-18px 23px';
+    }
     else if (IsPage(PageType.RussianRoulette)) {
         if (isShowingHonorBars) {
             spyMargin = '-14px 15px';
         }
     }
-
 
     let consolidatedData = GetConsolidatedDataForPlayerStats(prediction);
     let localBattleStats = GetLocalBattleStats();
@@ -2010,6 +2015,7 @@ function BuildOptionMenu_Pages(tabs, menu) {
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Search, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Abroad, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Competition, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Elimination, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.HallOfFame, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Enemies, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Friends, true);
@@ -2972,6 +2978,43 @@ function InjectInGenericGridPageNewTornFormat(isInit, node) {
     });
 }
 
+function InjectInEliminationPage(isInit, node) {
+    var targetLinks;
+    if (isInit == true) {
+        targetLinks = document.querySelectorAll('a[href^="/profiles.php?"]');
+    }
+    else {
+        targetLinks = node.querySelectorAll('a[href^="/profiles.php?"]');
+    }
+
+    targetLinks.forEach(targetLink => {
+
+        let url = new URL(targetLink.href, window.location.origin);
+        let playerId = url.searchParams.get('XID');
+
+        if (playerId == undefined)
+            return;
+
+        let parentN = targetLink.parentNode;
+
+        if (parentN == undefined)
+            return;
+
+        if (parentN.className == undefined)
+            return;
+        
+        if (parentN.className.includes('dataGridData')) {
+            if (!(playerId in dictDivPerPlayer)) {
+                dictDivPerPlayer[playerId] = new Array();
+            }
+
+            dictDivPerPlayer[playerId].push(parentN);
+            GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
+        }
+
+    });
+}
+
 function InjectInGenericGridPage(isInit, node) {
     // For pages with several players, grid format
     var el;
@@ -3190,10 +3233,11 @@ function IsBSPEnabledOnCurrentPage() {
         }
     }
 
-    //CallBSPUploadStats
-
     if (IsPage(PageType.Profile))
         InjectOptionMenu(document.querySelector(".content-title"));
+
+    if (IsPage(PageType.Elimination)) // To remove after Elim. Little hack to force enable elimination injection without user having to open BSP Settings.
+        GetStorageBoolWithDefaultValue(StorageKey.IsBSPEnabledOnPage + PageType.Elimination, true);
 
     if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
         InjectImportSpiesButton(document.querySelector(".content-title"));
@@ -3228,6 +3272,9 @@ function IsBSPEnabledOnCurrentPage() {
     else if (IsPage(PageType.Bounty)) {
         InjectInBountyPagePage(true, undefined);
     }
+    else if (IsPage(PageType.Elimination)) {
+        InjectInEliminationPage(true, undefined);
+    }
     else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette)) {
         InjectInGenericGridPageNewTornFormat(true, undefined);
     }
@@ -3248,6 +3295,8 @@ function IsBSPEnabledOnCurrentPage() {
 
                     if (IsPage(PageType.Profile))
                         InjectInProfilePage(false, node);
+                    else if (IsPage(PageType.Elimination))
+                        InjectInEliminationPage(false, node);
                     else if (IsPage(PageType.Faction) || IsPage(PageType.War))
                         InjectInFactionPage(node);
                     else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette))
