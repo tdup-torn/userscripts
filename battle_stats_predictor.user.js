@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.3.4
+// @version     9.3.5
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -269,6 +269,7 @@ styleToAdd.innerHTML += '.TDup_optionsTabContent p { margin:10px 0px; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent a { color:black !important;}';
 
 styleToAdd.innerHTML += '.TDup_ColoredStatsInjectionDiv { position:absolute;}';
+styleToAdd.innerHTML += '.TDup_ColoredStatsInjectionDivWithoutHonorBar { }';
 
 styleToAdd.innerHTML += '.TDup_optionsTabContent input { margin:0px 10px !important; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent input[type = button] { margin:0px 10px 0px 0px !important; }';
@@ -1270,8 +1271,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     else if (IsPage(PageType.War)) {
         spyMargin = isShowingHonorBars ? '-16px 15px' : '-4px 24px';
     }
-    else if (IsPage(PageType.Competition) && isShowingHonorBars)
-    {
+    else if (IsPage(PageType.Competition) && isShowingHonorBars) {
         if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=revenge")) {
             mainMarginWhenDisplayingHonorBars = '0px 0px';
         }
@@ -1410,7 +1410,18 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             dictDivPerPlayer[targetId][i].insertBefore(coloredStatsInjectionDiv, firstChild);
         }
         else {
-            dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+            if (IsPage(PageType.Elimination)) {
+                let coloredStatsInjectionDiv = document.createElement("div");
+                coloredStatsInjectionDiv.className = "TDup_ColoredStatsInjectionDivWithoutHonorBar";
+                coloredStatsInjectionDiv.innerHTML = toInject;
+
+                // Get the first child element of the parent (or null if there are no child elements)
+                var firstChild = dictDivPerPlayer[targetId][i].firstChild;
+                dictDivPerPlayer[targetId][i].insertBefore(coloredStatsInjectionDiv, firstChild);
+            }
+            else {
+                dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+            }
         }
     }
 }
@@ -3002,16 +3013,34 @@ function InjectInEliminationPage(isInit, node) {
 
         if (parentN.className == undefined)
             return;
-        
+
         if (parentN.className.includes('dataGridData')) {
-            if (!(playerId in dictDivPerPlayer)) {
-                dictDivPerPlayer[playerId] = new Array();
+
+            const prevPlayerId = parentN.dataset.tdupPlayerId;
+            if (prevPlayerId === String(playerId)) {
+                return;
             }
 
-            dictDivPerPlayer[playerId].push(parentN);
+            if (prevPlayerId) {
+                if (dictDivPerPlayer[prevPlayerId]) {
+                    dictDivPerPlayer[prevPlayerId] =
+                        dictDivPerPlayer[prevPlayerId].filter(el => el !== parentN);
+                }
+                ClearInjectedStatsInCell(parentN);
+            }
+
+            parentN.dataset.tdupPlayerId = String(playerId);
+
+            if (!(playerId in dictDivPerPlayer)) {
+                dictDivPerPlayer[playerId] = [];
+            }
+
+            if (!dictDivPerPlayer[playerId].includes(parentN)) {
+                dictDivPerPlayer[playerId].push(parentN);
+            }
+
             GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
         }
-
     });
 }
 
@@ -3196,6 +3225,14 @@ function IsBSPEnabledOnCurrentPage() {
     return false;
 }
 
+function ClearInjectedStatsInCell(cell) {
+    if (!cell) return;
+
+    cell.querySelectorAll(
+        '.TDup_ColoredStatsInjectionDiv, .TDup_ColoredStatsInjectionDivWithoutHonorBar'
+    ).forEach(el => el.remove());
+}
+
 (function () {
     'use strict';
 
@@ -3285,8 +3322,42 @@ function IsBSPEnabledOnCurrentPage() {
         InjectInGenericGridPage(true, undefined);
     }
 
+    // Elimination gets its own way of observing changes, because of how the page is built (virtualization)    
+    if (IsPage(PageType.Elimination)) {
+        var observer = new MutationObserver(function (mutations, observer) {
+            const toProcess = new Set();
 
-    // Start observer, to inject within dynamically loaded content
+            mutations.forEach(function (mutation) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType === 1) {
+                        toProcess.add(node);
+                    }
+                }
+                if (mutation.type === 'attributes' || mutation.type === 'characterData') {
+                    let target = mutation.target.nodeType === 1 ? mutation.target : mutation.target.parentElement;
+                    if (target) {
+                        toProcess.add(target);
+                    }
+                }
+            });
+
+            toProcess.forEach(node => {
+                if (!node.querySelector) return;
+
+                InjectInEliminationPage(false, node);
+            });
+        });
+
+        observer.observe(document, {
+            attributes: true,
+            childList: true,
+            characterData: true,
+            subtree: true
+        });
+
+        return;
+    }
+
     var observer = new MutationObserver(function (mutations, observer) {
         mutations.forEach(function (mutation) {
             for (const node of mutation.addedNodes) {
