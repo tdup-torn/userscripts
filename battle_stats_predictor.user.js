@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.3.5
+// @version     9.3.6
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -301,6 +301,7 @@ const PageType = {
     Company: 'Company',
     Competition: 'Competition',
     Elimination: 'Elimination',
+    EliminationAttacks: 'EliminationAttacks',
     Bounty: 'Bounty',
     Search: 'Search',
     Hospital: 'Hospital',
@@ -333,6 +334,7 @@ var mapPageTypeAddress = {
     [PageType.Company]: 'https://www.torn.com/joblist.php',
     [PageType.Competition]: 'https://www.torn.com/competition.php',
     [PageType.Elimination]: 'https://www.torn.com/page.php?sid=competition',
+    [PageType.EliminationAttacks]: 'https://www.torn.com/page.php?sid=competition#/attacks',
     [PageType.Bounty]: 'https://www.torn.com/bounties.php',
     [PageType.Search]: 'https://www.torn.com/page.php?sid=UserList',
     [PageType.Hospital]: 'https://www.torn.com/hospitalview.php',
@@ -1280,8 +1282,15 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         }
     }
     else if (IsPage(PageType.Elimination) && isShowingHonorBars) {
-        mainMarginWhenDisplayingHonorBars = '-11px 0px';
-        spyMargin = '-18px 23px';
+        if (IsPage(PageType.EliminationAttacks)) {
+            mainMarginWhenDisplayingHonorBars = '-11px -100px';
+            spyMargin = '-18px -75px';
+        }
+        else {
+            mainMarginWhenDisplayingHonorBars = '-11px 0px';
+            spyMargin = '-18px 23px';
+        }
+
     }
     else if (IsPage(PageType.RussianRoulette)) {
         if (isShowingHonorBars) {
