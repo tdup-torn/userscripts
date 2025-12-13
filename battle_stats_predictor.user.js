@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.3.6
+// @version     9.3.7
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -302,6 +302,7 @@ const PageType = {
     Competition: 'Competition',
     Elimination: 'Elimination',
     EliminationAttacks: 'EliminationAttacks',
+    EliminationRevenge: 'EliminationRevenge',
     Bounty: 'Bounty',
     Search: 'Search',
     Hospital: 'Hospital',
@@ -335,6 +336,7 @@ var mapPageTypeAddress = {
     [PageType.Competition]: 'https://www.torn.com/competition.php',
     [PageType.Elimination]: 'https://www.torn.com/page.php?sid=competition',
     [PageType.EliminationAttacks]: 'https://www.torn.com/page.php?sid=competition#/attacks',
+    [PageType.EliminationRevenge]: 'https://www.torn.com/page.php?sid=competition#/revenge',
     [PageType.Bounty]: 'https://www.torn.com/bounties.php',
     [PageType.Search]: 'https://www.torn.com/page.php?sid=UserList',
     [PageType.Hospital]: 'https://www.torn.com/hospitalview.php',
@@ -1419,7 +1421,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             dictDivPerPlayer[targetId][i].insertBefore(coloredStatsInjectionDiv, firstChild);
         }
         else {
-            if (IsPage(PageType.Elimination)) {
+            if (IsPage(PageType.Elimination) && !IsPage(PageType.EliminationRevenge)) {
                 let coloredStatsInjectionDiv = document.createElement("div");
                 coloredStatsInjectionDiv.className = "TDup_ColoredStatsInjectionDivWithoutHonorBar";
                 coloredStatsInjectionDiv.innerHTML = toInject;
@@ -3318,10 +3320,10 @@ function ClearInjectedStatsInCell(cell) {
     else if (IsPage(PageType.Bounty)) {
         InjectInBountyPagePage(true, undefined);
     }
-    else if (IsPage(PageType.Elimination)) {
+    else if (IsPage(PageType.Elimination) && !IsPage(PageType.EliminationRevenge)) {
         InjectInEliminationPage(true, undefined);
     }
-    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette)) {
+    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette) || IsPage(PageType.EliminationRevenge)) {
         InjectInGenericGridPageNewTornFormat(true, undefined);
     }
     else if (IsPage(PageType.Attack)) {
@@ -3332,7 +3334,7 @@ function ClearInjectedStatsInCell(cell) {
     }
 
     // Elimination gets its own way of observing changes, because of how the page is built (virtualization)    
-    if (IsPage(PageType.Elimination)) {
+    if (IsPage(PageType.Elimination) && !IsPage(PageType.EliminationRevenge)) {
         var observer = new MutationObserver(function (mutations, observer) {
             const toProcess = new Set();
 
@@ -3375,11 +3377,11 @@ function ClearInjectedStatsInCell(cell) {
 
                     if (IsPage(PageType.Profile))
                         InjectInProfilePage(false, node);
-                    else if (IsPage(PageType.Elimination))
+                    else if (IsPage(PageType.Elimination) && !IsPage(PageType.EliminationRevenge))
                         InjectInEliminationPage(false, node);
                     else if (IsPage(PageType.Faction) || IsPage(PageType.War))
                         InjectInFactionPage(node);
-                    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette))
+                    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette) || IsPage(PageType.EliminationRevenge))
                         InjectInGenericGridPageNewTornFormat(false, node);
                     else if (IsPage(PageType.Bounty))
                         InjectInBountyPagePage(false, node);
