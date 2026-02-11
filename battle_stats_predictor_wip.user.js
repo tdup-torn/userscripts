@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.3.3
+// @version     9.3.8
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -95,6 +95,8 @@ const StorageKey = {
     // Pages enabled
     IsBSPEnabledOnPage: 'tdup.battleStatsPredictor.IsBSPEnabledOnPage_',
 
+    ShouldOpenAttackURLInNewTab: 'tdup.battleStatsPredictor.ShouldOpenAttackURLInNewTab',
+
     // Display choice
     IsShowingHonorBars: 'tdup.battleStatsPredictor.isShowingHonorBars',
     IsShowingAlternativeProfileDisplay: 'tdup.battleStatsPredictor.isShowingAlternativeProfileDisplay',
@@ -110,6 +112,9 @@ const StorageKey = {
     TestLocalStorageKey: 'tdup.battleStatsPredictor.TestLocalStorage',
 };
 
+function CanQueryAnyAPI() {
+    return document.visibilityState === "visible" && document.hasFocus();
+}
 function GetBSPServer() {
     return "http://www.lol-manager.com/api";
 }
@@ -221,6 +226,8 @@ var oldSpyIcon = "https://i.ibb.co/b7982wh/oldSpy.png";
 var hofIcon = "https://i.ibb.co/fkFDrVx/HOF-v2.png";
 var FFAttacksIcon = "https://i.ibb.co/GJ04WJn/player-Data-v2.png";
 
+var URL_TORN_ATTACK = "https://www.torn.com/loader.php?sid=attack&user2ID=";
+
 // #endregion
 
 // #region Styles
@@ -265,6 +272,7 @@ styleToAdd.innerHTML += '.TDup_optionsTabContent p { margin:10px 0px; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent a { color:black !important;}';
 
 styleToAdd.innerHTML += '.TDup_ColoredStatsInjectionDiv { position:absolute;}';
+styleToAdd.innerHTML += '.TDup_ColoredStatsInjectionDivWithoutHonorBar { }';
 
 styleToAdd.innerHTML += '.TDup_optionsTabContent input { margin:0px 10px !important; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent input[type = button] { margin:0px 10px 0px 0px !important; }';
@@ -295,6 +303,9 @@ const PageType = {
     Faction: 'Faction',
     Company: 'Company',
     Competition: 'Competition',
+    Elimination: 'Elimination',
+    EliminationAttacks: 'EliminationAttacks',
+    EliminationRevenge: 'EliminationRevenge',
     Bounty: 'Bounty',
     Search: 'Search',
     Hospital: 'Hospital',
@@ -326,6 +337,9 @@ var mapPageTypeAddress = {
     [PageType.Faction]: 'https://www.torn.com/factions.php',
     [PageType.Company]: 'https://www.torn.com/joblist.php',
     [PageType.Competition]: 'https://www.torn.com/competition.php',
+    [PageType.Elimination]: 'https://www.torn.com/page.php?sid=competition',
+    [PageType.EliminationAttacks]: 'https://www.torn.com/page.php?sid=competition#/attacks',
+    [PageType.EliminationRevenge]: 'https://www.torn.com/page.php?sid=competition#/revenge',
     [PageType.Bounty]: 'https://www.torn.com/bounties.php',
     [PageType.Search]: 'https://www.torn.com/page.php?sid=UserList',
     [PageType.Hospital]: 'https://www.torn.com/hospitalview.php',
@@ -867,7 +881,7 @@ async function GetPredictionForPlayer(targetId, callback) {
         var predictionDate = new Date(prediction.PredictionDate); // might remove that in the future, and rely only on DateFetched
         if (prediction.DateFetched != undefined)
             predictionDate = new Date(prediction.DateFetched);
-       
+
         if (predictionDate < expirationDate) {
             var key = StorageKey.BSPPrediction + targetId;
             localStorage.removeItem(key);
@@ -965,8 +979,13 @@ function GetConsolidatedDataForPlayerStats(prediction) {
 }
 
 function OpenAttackScreenForPlayerId(playerId) {
-    var urlAttack = "https://www.torn.com/loader.php?sid=attack&user2ID=" + playerId;
-    window.open(urlAttack, '_blank');
+    var urlAttack = URL_TORN_ATTACK + playerId;
+    if (GetStorageBoolWithDefaultValue(StorageKey.ShouldOpenAttackURLInNewTab, true)) {
+        window.open(urlAttack, '_blank');
+    }
+    else {
+        window.open(urlAttack);
+    }
 }
 
 var divStats = undefined;
@@ -1167,7 +1186,7 @@ function IsThereMyNodeAlready(node, urlAttack) {
 }
 
 function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
-    var urlAttack = "https://www.torn.com/loader2.php?sid=getInAttack&user2ID=" + targetId;
+    var urlAttack = URL_TORN_ATTACK + targetId;
     let isShowingHonorBars = GetStorageBoolWithDefaultValue(StorageKey.IsShowingHonorBars, true);
     let spyMargin = '-6px 23px';
     let mainMarginWhenDisplayingHonorBars = "-10px -9px";
@@ -1260,7 +1279,6 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         spyMargin = isShowingHonorBars ? '-16px 15px' : '-4px 24px';
     }
     else if (IsPage(PageType.Competition) && isShowingHonorBars) {
-
         if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=revenge")) {
             mainMarginWhenDisplayingHonorBars = '0px 0px';
         }
@@ -1268,12 +1286,22 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             mainMarginWhenDisplayingHonorBars = '10px 0px';
         }
     }
+    else if (IsPage(PageType.Elimination) && isShowingHonorBars) {
+        if (IsPage(PageType.EliminationAttacks)) {
+            mainMarginWhenDisplayingHonorBars = '-11px -100px';
+            spyMargin = '-18px -75px';
+        }
+        else {
+            mainMarginWhenDisplayingHonorBars = '-11px 0px';
+            spyMargin = '-18px 23px';
+        }
+
+    }
     else if (IsPage(PageType.RussianRoulette)) {
         if (isShowingHonorBars) {
             spyMargin = '-14px 15px';
         }
     }
-
 
     let consolidatedData = GetConsolidatedDataForPlayerStats(prediction);
     let localBattleStats = GetLocalBattleStats();
@@ -1346,9 +1374,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
                 }
             }
         }
-       
 
-        let StatsToSort = consolidatedData.TargetTBS;
         let extraIndicator = '';
         let title = '';
         if (consolidatedData.IsUsingSpy) {
@@ -1375,12 +1401,13 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             title = 'title="FF Predicted = ' + FFPredicted + '"';
         }
 
+        let newTabifNeeded = GetStorageBoolWithDefaultValue(StorageKey.ShouldOpenAttackURLInNewTab, true) ? ' target="_blank"' : '';
         let toInject = '';
         if (isShowingHonorBars) {
-            toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" data-bsp-stats="' + StatsToSort + '"' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
         }
         else {
-            toInject = '<a href="' + urlAttack + '" target="_blank">' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div  class="iconStats" data-bsp-stats="' + StatsToSort + '" '+ title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
 
             if (IsPage(PageType.War) && !IsPage(PageType.ChainReport) && !IsPage(PageType.RWReport)) {
                 dictDivPerPlayer[targetId][i].style.position = "absolute";
@@ -1397,7 +1424,18 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             dictDivPerPlayer[targetId][i].insertBefore(coloredStatsInjectionDiv, firstChild);
         }
         else {
-            dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+            if (IsPage(PageType.Elimination) && !IsPage(PageType.EliminationRevenge)) {
+                let coloredStatsInjectionDiv = document.createElement("div");
+                coloredStatsInjectionDiv.className = "TDup_ColoredStatsInjectionDivWithoutHonorBar";
+                coloredStatsInjectionDiv.innerHTML = toInject;
+
+                // Get the first child element of the parent (or null if there are no child elements)
+                var firstChild = dictDivPerPlayer[targetId][i].firstChild;
+                dictDivPerPlayer[targetId][i].insertBefore(coloredStatsInjectionDiv, firstChild);
+            }
+            else {
+                dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+            }
         }
     }
 }
@@ -1932,6 +1970,9 @@ function BuildOptionMenu_Pages(tabs, menu) {
     // Alternative profile display
     AddOption(contentDiv, StorageKey.IsClickingOnProfileStatsAttackPlayer, false, 'Click on profile stats area to attack?', 'IsClickingOnProfileStatsAttackPlayer');
 
+    // Open attack in new tab
+    AddOption(contentDiv, StorageKey.ShouldOpenAttackURLInNewTab, true, 'Open attack screen in new tab', 'ShouldOpenAttackURLInNewTab');
+
     // Hide BSP Option button, in toolbar
     AddOption(contentDiv, StorageKey.IsHidingBSPOptionButtonInToolbar, false, 'Hide BSP Option button in toolbar?', 'IsHidingBSPOptionButtonInToolbar');
 
@@ -1999,6 +2040,7 @@ function BuildOptionMenu_Pages(tabs, menu) {
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Search, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Abroad, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Competition, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Elimination, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.HallOfFame, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Enemies, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Friends, true);
@@ -2839,7 +2881,7 @@ function InjectInProfilePage(isInit = true, node = undefined) {
 function InjectInFactionPage(node) {
     if (!node) return;
 
-    AutoSyncTornStatsFaction(FactionTargetId);  
+    AutoSyncTornStatsFaction(FactionTargetId);
 
     let el = node.querySelectorAll('a');
     for (let i = 0; i < el.length; ++i) {
@@ -2956,6 +2998,61 @@ function InjectInGenericGridPageNewTornFormat(isInit, node) {
             }
 
             dictDivPerPlayer[playerId].push(parentN);
+            GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
+        }
+    });
+}
+
+function InjectInEliminationPage(isInit, node) {
+    var targetLinks;
+    if (isInit == true) {
+        targetLinks = document.querySelectorAll('a[href^="/profiles.php?"]');
+    }
+    else {
+        targetLinks = node.querySelectorAll('a[href^="/profiles.php?"]');
+    }
+
+    targetLinks.forEach(targetLink => {
+
+        let url = new URL(targetLink.href, window.location.origin);
+        let playerId = url.searchParams.get('XID');
+
+        if (playerId == undefined)
+            return;
+
+        let parentN = targetLink.parentNode;
+
+        if (parentN == undefined)
+            return;
+
+        if (parentN.className == undefined)
+            return;
+
+        if (parentN.className.includes('dataGridData')) {
+
+            const prevPlayerId = parentN.dataset.tdupPlayerId;
+            if (prevPlayerId === String(playerId)) {
+                return;
+            }
+
+            if (prevPlayerId) {
+                if (dictDivPerPlayer[prevPlayerId]) {
+                    dictDivPerPlayer[prevPlayerId] =
+                        dictDivPerPlayer[prevPlayerId].filter(el => el !== parentN);
+                }
+                ClearInjectedStatsInCell(parentN);
+            }
+
+            parentN.dataset.tdupPlayerId = String(playerId);
+
+            if (!(playerId in dictDivPerPlayer)) {
+                dictDivPerPlayer[playerId] = [];
+            }
+
+            if (!dictDivPerPlayer[playerId].includes(parentN)) {
+                dictDivPerPlayer[playerId].push(parentN);
+            }
+
             GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
         }
     });
@@ -3142,6 +3239,14 @@ function IsBSPEnabledOnCurrentPage() {
     return false;
 }
 
+function ClearInjectedStatsInCell(cell) {
+    if (!cell) return;
+
+    cell.querySelectorAll(
+        '.TDup_ColoredStatsInjectionDiv, .TDup_ColoredStatsInjectionDivWithoutHonorBar'
+    ).forEach(el => el.remove());
+}
+
 (function () {
     'use strict';
 
@@ -3158,6 +3263,12 @@ function IsBSPEnabledOnCurrentPage() {
     });
 
     InitColors();
+
+    //Test canQuery
+    //setInterval(() => {
+    //    let canQuery = CanQueryAnyAPI();
+    //    LogInfo("BSP CanQuery =" + canQuery);
+    //}, 500);
 
     if (!GetStorageBool(StorageKey.IsHidingBSPOptionButtonInToolbar)) {
         LogInfo("Inject Option Menu...");
@@ -3179,10 +3290,11 @@ function IsBSPEnabledOnCurrentPage() {
         }
     }
 
-    //CallBSPUploadStats
-
     if (IsPage(PageType.Profile))
         InjectOptionMenu(document.querySelector(".content-title"));
+
+    if (IsPage(PageType.Elimination)) // To remove after Elim. Little hack to force enable elimination injection without user having to open BSP Settings.
+        GetStorageBoolWithDefaultValue(StorageKey.IsBSPEnabledOnPage + PageType.Elimination, true);
 
     if (window.location.href.startsWith("https://www.torn.com/factions.php")) {
         InjectImportSpiesButton(document.querySelector(".content-title"));
@@ -3213,12 +3325,14 @@ function IsBSPEnabledOnCurrentPage() {
     }
     else if (IsPage(PageType.Faction) || IsPage(PageType.War)) {
         //AutoSyncTornStatsFaction(factionId);
-        InjectSortButtons(true, undefined);
     }
     else if (IsPage(PageType.Bounty)) {
         InjectInBountyPagePage(true, undefined);
     }
-    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette)) {
+    else if (IsPage(PageType.Elimination) && !IsPage(PageType.EliminationRevenge)) {
+        InjectInEliminationPage(true, undefined);
+    }
+    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette) || IsPage(PageType.EliminationRevenge)) {
         InjectInGenericGridPageNewTornFormat(true, undefined);
     }
     else if (IsPage(PageType.Attack)) {
@@ -3228,8 +3342,42 @@ function IsBSPEnabledOnCurrentPage() {
         InjectInGenericGridPage(true, undefined);
     }
 
+    // Elimination gets its own way of observing changes, because of how the page is built (virtualization)    
+    if (IsPage(PageType.Elimination) && !IsPage(PageType.EliminationRevenge)) {
+        var observer = new MutationObserver(function (mutations, observer) {
+            const toProcess = new Set();
 
-    // Start observer, to inject within dynamically loaded content
+            mutations.forEach(function (mutation) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType === 1) {
+                        toProcess.add(node);
+                    }
+                }
+                if (mutation.type === 'attributes' || mutation.type === 'characterData') {
+                    let target = mutation.target.nodeType === 1 ? mutation.target : mutation.target.parentElement;
+                    if (target) {
+                        toProcess.add(target);
+                    }
+                }
+            });
+
+            toProcess.forEach(node => {
+                if (!node.querySelector) return;
+
+                InjectInEliminationPage(false, node);
+            });
+        });
+
+        observer.observe(document, {
+            attributes: true,
+            childList: true,
+            characterData: true,
+            subtree: true
+        });
+
+        return;
+    }
+
     var observer = new MutationObserver(function (mutations, observer) {
         mutations.forEach(function (mutation) {
             for (const node of mutation.addedNodes) {
@@ -3238,11 +3386,11 @@ function IsBSPEnabledOnCurrentPage() {
 
                     if (IsPage(PageType.Profile))
                         InjectInProfilePage(false, node);
-                    else if (IsPage(PageType.Faction) || IsPage(PageType.War)) {
+                    else if (IsPage(PageType.Elimination) && !IsPage(PageType.EliminationRevenge))
+                        InjectInEliminationPage(false, node);
+                    else if (IsPage(PageType.Faction) || IsPage(PageType.War))
                         InjectInFactionPage(node);
-                        InjectSortButtons(true, node);
-                    }                       
-                    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette))
+                    else if (IsPage(PageType.HallOfFame) || IsPage(PageType.Market) || IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets) || IsPage(PageType.RussianRoulette) || IsPage(PageType.EliminationRevenge))
                         InjectInGenericGridPageNewTornFormat(false, node);
                     else if (IsPage(PageType.Bounty))
                         InjectInBountyPagePage(false, node);
@@ -3275,6 +3423,10 @@ function IsBSPEnabledOnCurrentPage() {
 // #region API BSP
 
 function FetchUserDataFromBSPServer() {
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : FetchUserDataFromBSPServer - No focus, abording");
+        return;
+    }
     let primaryAPIKey = GetStorage(StorageKey.PrimaryAPIKey);
     if (primaryAPIKey == undefined || primaryAPIKey == "") {
         LogInfo("BSP : Calling FetchUserDataFromBSPServer with primaryAPIKey undefined or empty, abording");
@@ -3361,6 +3513,12 @@ function FetchUserDataFromBSPServer() {
 }
 
 function FetchScoreAndTBS(targetId) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : FetchScoreAndTBS - No focus, abording");
+        return;
+    }
+
     let primaryAPIKey = GetStorage(StorageKey.PrimaryAPIKey);
     if (primaryAPIKey == undefined || primaryAPIKey == "") {
         LogInfo("BSP : Calling FetchScoreAndTBS with primaryAPIKey undefined or empty, abording");
@@ -3389,6 +3547,12 @@ function FetchScoreAndTBS(targetId) {
 }
 
 function CallBSPUploadStats(callback) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : CallBSPUploadStats - No focus, abording");
+        return;
+    }
+
     let uploadStatsAPIKey = GetStorage(StorageKey.UploadDataAPIKey);
     if (uploadStatsAPIKey == undefined || uploadStatsAPIKey == "") {
         LogInfo("BSP : Calling CallBSPUploadStats with uploadStatsAPIKey undefined or empty, abording");
@@ -3448,6 +3612,12 @@ function CallBSPUploadStats(callback) {
 // #region API Torn
 
 function VerifyTornAPIKey(callback) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : VerifyTornAPIKey - No focus, abording");
+        return;
+    }
+
     var urlToUse = "https://api.torn.com/v2/user/personalstats,profile?key=" + GetStorage(StorageKey.PrimaryAPIKey) + "&cat=all&comment=BSPAuth"
     GM.xmlHttpRequest({
         method: "GET",
@@ -3491,6 +3661,12 @@ function VerifyTornAPIKey(callback) {
 }
 
 function GetPlayerStatsFromTornAPI(callback) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : GetPlayerStatsFromTornAPI - No focus, abording");
+        return;
+    }
+
     LogInfo("GetPlayerStatsFromTornAPI ... ");
     var urlToUse = "https://api.torn.com/user/?selections=battlestats&comment=BSPGetStats&key=" + GetStorage(StorageKey.BattleStatsAPIKey);
     GM.xmlHttpRequest({
@@ -3530,6 +3706,12 @@ function GetPlayerStatsFromTornAPI(callback) {
 
 // #region API TornStats
 function VerifyTornStatsAPIKey(callback) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : VerifyTornStatsAPIKey - No focus, abording");
+        return;
+    }
+
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
@@ -3613,6 +3795,11 @@ function AutoSyncTornStatsPlayer(playerId) {
 
 function FetchPlayerSpiesFromTornStats(playerId) {
 
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : FetchPlayerSpiesFromTornStats - No focus, abording");
+        return;
+    }
+
     let urlToCall = "https://www.tornstats.com/api/v2/" + GetStorage(StorageKey.TornStatsAPIKey) + "/spy/user/" + playerId;
 
     return new Promise((resolve, reject) => {
@@ -3651,6 +3838,12 @@ function FetchPlayerSpiesFromTornStats(playerId) {
 }
 
 function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedElem) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : FetchFactionSpiesFromTornStats - No focus, abording");
+        return;
+    }
+
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
@@ -3738,6 +3931,12 @@ function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedEl
 // #region API YATA
 
 function FetchSpiesFromYata(callback) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : FetchFactionSpiesFromTornStats - No focus, abording");
+        return;
+    }
+
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
@@ -3799,132 +3998,3 @@ function FetchSpiesFromYata(callback) {
 
 
 // #endregion
-
-function InjectSortButtons(isInit, node) {
-    var el;
-    if (isInit == true) {
-        el = document.querySelectorAll('.members-cont');
-        //el = document.querySelectorAll('.member.left');
-    }
-    else if (node == undefined) {
-        return;
-    }
-    else {
-        el = node.querySelectorAll('.members-cont');
-        //el = node.querySelectorAll('.member.left');
-    }
-
-    if (el == undefined) {
-        return;
-    }
-
-    if (el.children == 0) {
-        return;
-    }
-
-    if (el.length == 0) {
-        return;
-    }
-
-    function SortPlayers(button, mainNode) {
-        button.sortModeDesc = !button.sortModeDesc;
-        button.isSorting = true;
-        if (button.sortModeDesc) {
-            button.innerHTML = "<i class='fa fa-arrow-up'></i> BSP";            
-        }
-        else {
-            button.innerHTML = "<i class='fa fa-arrow-down'></i> BSP";
-        }
-
-        let nodes = mainNode.querySelectorAll('.members-list');//.forEach((subNode) => watchWall(w));
-        let nodeMain = nodes[0];
-        var itemsArr = [];
-        for (var i = 0; i < nodeMain.children.length; ++i) {
-            itemsArr.push(nodeMain.children[i]);
-        }
-
-        itemsArr.sort(function (a, b) {
-            let divA = a.querySelector('.iconStats');
-            let scoreA = parseInt(divA.getAttribute("data-bsp-stats"));
-            let divB = b.querySelector('.iconStats');
-            let scoreB = parseInt(divB.getAttribute("data-bsp-stats"));
-
-            let result = scoreA == scoreB
-                ? 0
-                : (scoreA > scoreB ? 1 : -1);
-
-            if (!button.sortModeDesc) {
-                result = -result;
-            }
-            return result;
-        });
-
-        for (i = 0; i < itemsArr.length; ++i) {
-            nodeMain.appendChild(itemsArr[i]);
-        }
-    }
-
-    for (let i = 0; i < 2; ++i) {
-        let headerNode = el[i].querySelector('.member.left');
-
-        if (headerNode.innerHTML.includes("BSP"))
-            continue;
-
-        let btnSortMembers = document.createElement("button");
-        btnSortMembers.sortModeDesc = true;
-        btnSortMembers.isSorting = true;
-        btnSortMembers.className = "TDup_buttonInOptionMenu";
-        btnSortMembers.innerHTML = "<i class='fa fa-arrow-right'></i> BSP";
-
-        btnSortMembers.addEventListener("click", function (evt) {
-            btnSortMembers.disabled = true;
-            //SetStorage(StorageKey.BattleStatsAPIKey, gymStatsAPIKeyInput.value);
-            SortPlayers(btnSortMembers, headerNode.parentNode.parentNode, true);
-            btnSortMembers.disabled = false;
-            evt.stopPropagation();
-        });
-
-        headerNode.insertBefore(btnSortMembers, headerNode.children[1]);
-    }
-
-    //if (isInit == true) {
-    //    el = document.querySelectorAll('.f-war-list');
-    //}
-    //else if (node == undefined) {
-    //    return;
-    //}
-    //else {
-    //    el = node.querySelectorAll('.f-war-list');
-    //}
-
-    //if (el == undefined) {
-    //    return;
-    //}
-
-    //if (el.children == 0) {
-    //    return;
-    //}
-
-    //if (el.length == 0) {
-    //    return;
-    //}
-
-    //let headerNode = el[1].querySelector('[role="heading"]');
-    //let btnSortMembers = document.createElement("button");
-    //btnSortMembers.sortModeDesc = true;
-    //btnSortMembers.isSorting = true;
-    //btnSortMembers.className = "TDup_buttonInOptionMenu";
-    //btnSortMembers.innerHTML = "<i class='fa fa-arrow-right'></i> BSP";
-
-    //btnSortMembers.addEventListener("click", function (evt) {
-    //    //btnSortMembers.disabled = true;
-    //    SortPlayers(btnSortMembers, headerNode.parentNode.parentNode, true);
-    //    //btnSortMembers.disabled = false;
-    //    evt.stopPropagation();
-    //});
-
-    //if (headerNode.innerHTML.includes("BSP"))
-    //    return;
-
-    //headerNode.insertBefore(btnSortMembers, headerNode.children[1]);
-}
