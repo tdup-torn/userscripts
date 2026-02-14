@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.3.7
+// @version     9.3.8
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -112,6 +112,9 @@ const StorageKey = {
     TestLocalStorageKey: 'tdup.battleStatsPredictor.TestLocalStorage',
 };
 
+function CanQueryAnyAPI() {
+    return document.visibilityState === "visible" && document.hasFocus();
+}
 function GetBSPServer() {
     return "http://www.lol-manager.com/api";
 }
@@ -3414,6 +3417,10 @@ function ClearInjectedStatsInCell(cell) {
 // #region API BSP
 
 function FetchUserDataFromBSPServer() {
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : FetchUserDataFromBSPServer - No focus, abording");
+        return;
+    }
     let primaryAPIKey = GetStorage(StorageKey.PrimaryAPIKey);
     if (primaryAPIKey == undefined || primaryAPIKey == "") {
         LogInfo("BSP : Calling FetchUserDataFromBSPServer with primaryAPIKey undefined or empty, abording");
@@ -3500,6 +3507,12 @@ function FetchUserDataFromBSPServer() {
 }
 
 function FetchScoreAndTBS(targetId) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : FetchScoreAndTBS - No focus, abording");
+        return;
+    }
+
     let primaryAPIKey = GetStorage(StorageKey.PrimaryAPIKey);
     if (primaryAPIKey == undefined || primaryAPIKey == "") {
         LogInfo("BSP : Calling FetchScoreAndTBS with primaryAPIKey undefined or empty, abording");
@@ -3528,6 +3541,12 @@ function FetchScoreAndTBS(targetId) {
 }
 
 function CallBSPUploadStats(callback) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : CallBSPUploadStats - No focus, abording");
+        return;
+    }
+
     let uploadStatsAPIKey = GetStorage(StorageKey.UploadDataAPIKey);
     if (uploadStatsAPIKey == undefined || uploadStatsAPIKey == "") {
         LogInfo("BSP : Calling CallBSPUploadStats with uploadStatsAPIKey undefined or empty, abording");
@@ -3587,6 +3606,12 @@ function CallBSPUploadStats(callback) {
 // #region API Torn
 
 function VerifyTornAPIKey(callback) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : VerifyTornAPIKey - No focus, abording");
+        return;
+    }
+
     var urlToUse = "https://api.torn.com/v2/user/personalstats,profile?key=" + GetStorage(StorageKey.PrimaryAPIKey) + "&cat=all&comment=BSPAuth"
     GM.xmlHttpRequest({
         method: "GET",
@@ -3630,6 +3655,12 @@ function VerifyTornAPIKey(callback) {
 }
 
 function GetPlayerStatsFromTornAPI(callback) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : GetPlayerStatsFromTornAPI - No focus, abording");
+        return;
+    }
+
     LogInfo("GetPlayerStatsFromTornAPI ... ");
     var urlToUse = "https://api.torn.com/user/?selections=battlestats&comment=BSPGetStats&key=" + GetStorage(StorageKey.BattleStatsAPIKey);
     GM.xmlHttpRequest({
@@ -3669,6 +3700,12 @@ function GetPlayerStatsFromTornAPI(callback) {
 
 // #region API TornStats
 function VerifyTornStatsAPIKey(callback) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : VerifyTornStatsAPIKey - No focus, abording");
+        return;
+    }
+
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
@@ -3752,6 +3789,11 @@ function AutoSyncTornStatsPlayer(playerId) {
 
 function FetchPlayerSpiesFromTornStats(playerId) {
 
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : FetchPlayerSpiesFromTornStats - No focus, abording");
+        return;
+    }
+
     let urlToCall = "https://www.tornstats.com/api/v2/" + GetStorage(StorageKey.TornStatsAPIKey) + "/spy/user/" + playerId;
 
     return new Promise((resolve, reject) => {
@@ -3790,6 +3832,12 @@ function FetchPlayerSpiesFromTornStats(playerId) {
 }
 
 function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedElem) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : FetchFactionSpiesFromTornStats - No focus, abording");
+        return;
+    }
+
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
@@ -3877,6 +3925,12 @@ function FetchFactionSpiesFromTornStats(factionId, button, successElem, failedEl
 // #region API YATA
 
 function FetchSpiesFromYata(callback) {
+
+    if (!CanQueryAnyAPI()) {
+        LogInfo("BSP : FetchSpiesFromYata - No focus, abording");
+        return;
+    }
+
     return new Promise((resolve, reject) => {
         GM.xmlHttpRequest({
             method: 'GET',
