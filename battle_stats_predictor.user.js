@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.3.8
+// @version     9.4.0
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -106,6 +106,7 @@ const StorageKey = {
     IsShowingBattleStatsPercentage: 'tdup.battleStatsPredictor.IsShowingBattleStatsPercentage',
     IsClickingOnProfileStatsAttackPlayer: 'tdup.battleStatsPredictor.IsClickingOnProfileStatsAttackPlayer',
     IsHidingBSPOptionButtonInToolbar: 'tdup.battleStatsPredictor.IsHidingBSPOptionButtonInToolbar',
+    HasSortByBSPButtonsOnFactionPage: 'tdup.battleStatsPredictor.HasSortByBSPButtonsOnFactionPage',
 
     // Cache management
     AutoClearOutdatedCacheLastDate: 'tdup.battleStatsPredictor.AutoClearOutdatedCacheLastDate',
@@ -895,7 +896,7 @@ async function GetPredictionForPlayer(targetId, callback) {
                 prediction.attachedSpy = targetSpy;
             }
             callback(targetId, prediction);
-            LogInfo("Prediction for target " + targetId + " found in the cache!");
+            //LogInfo("Prediction for target " + targetId + " found in the cache!");
             return;
         }
     }
@@ -1375,6 +1376,7 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             }
         }
 
+        let StatsToSort = showScoreInstead ? consolidatedData.Score: consolidatedData.TargetTBS;
         let extraIndicator = '';
         let title = '';
         if (consolidatedData.IsUsingSpy) {
@@ -1404,10 +1406,10 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         let newTabifNeeded = GetStorageBoolWithDefaultValue(StorageKey.ShouldOpenAttackURLInNewTab, true) ? ' target="_blank"' : '';
         let toInject = '';
         if (isShowingHonorBars) {
-            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" data-bsp-stats="' + StatsToSort + '" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
         }
         else {
-            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats"data-bsp-stats="' + StatsToSort + '" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
 
             if (IsPage(PageType.War) && !IsPage(PageType.ChainReport) && !IsPage(PageType.RWReport)) {
                 dictDivPerPlayer[targetId][i].style.position = "absolute";
@@ -1979,6 +1981,10 @@ function BuildOptionMenu_Pages(tabs, menu) {
     // Show Percentage instead
     AddOption(contentDiv, StorageKey.IsShowingBattleStatsPercentage, false, 'Display percentage rather than values in little colored squares?', 'IsShowingBattleStatsPercentage');
 
+    // Sort on faction page
+    AddOption(contentDiv, StorageKey.HasSortByBSPButtonsOnFactionPage, true, 'Allow sorting by BSP on faction/war page?', 'HasSortByBSPButtonsOnFactionPage');
+    
+
     // Spy
     let spyNumberOfDaysDiv = document.createElement("div");
     spyNumberOfDaysDiv.className = "TDup_optionsTabContentDiv";
@@ -2100,7 +2106,7 @@ function BuildOptionMenu_Uploadstats(tabs, menu) {
 
     let tipsDiv = document.createElement("div");
     tipsDiv.className = "TDup_optionsTabContentDiv";
-    tipsDiv.innerHTML = 'Upload your attack logs to help BSP being more accurate. Requires a custom key (this API key is sent to the server but wont be stored. Your own stats are not stored)';
+    tipsDiv.innerHTML = 'Upload your attack logs to help BSP being more accurate.<br/><br/>Requires a custom key (this API key is sent to the server but wont be stored. Your own stats are not stored nor shared).<br/><br/>Get 3 months worth of subscription once, when your first useful record is uploaded (less than FF3, more recent than 48h).<br/><br/>Thank you for helping BSP accuracy.';
 
     let additionalSub = document.createElement("div");
     additionalSub.className = "TDup_optionsTabContentDiv";
@@ -2937,6 +2943,10 @@ function InjectInFactionPage(node) {
             }
         }
     }
+
+    if (GetStorageBoolWithDefaultValue(StorageKey.HasSortByBSPButtonsOnFactionPage, true)) {
+        InjectSortButtons(node);
+    }
 }
 
 function InjectInBountyPagePage(isInit, node) {
@@ -3217,6 +3227,95 @@ function OnPlayerStatsRetrievedForAttackPage(targetId, prediction) {
 
 }
 
+function SortPlayers(button, mainNode) {
+    button.sortModeDesc = !button.sortModeDesc;
+    button.isSorting = true;
+    if (button.sortModeDesc) {
+        button.innerHTML = "<i class='fa fa-arrow-up'></i> BSP";
+    }
+    else {
+        button.innerHTML = "<i class='fa fa-arrow-down'></i> BSP";
+    }
+
+    let nodes = mainNode.querySelectorAll('.members-list'); // for war page
+    if (nodes.length == 0)
+        nodes = mainNode.querySelectorAll('.table-body'); // for faction page
+
+    let nodeMain = nodes[0];
+    var itemsArr = [];
+    for (var i = 0; i < nodeMain.children.length; ++i) {
+        itemsArr.push(nodeMain.children[i]);
+    }
+
+    itemsArr.sort(function (a, b) {
+        let divA = a.querySelector('.iconStats');
+        if (divA == undefined) {
+            return 0;
+        }
+        let scoreA = parseInt(divA.getAttribute("data-bsp-stats"));
+        let divB = b.querySelector('.iconStats');
+        if (divB == undefined) {
+            return 0;
+        }
+        let scoreB = parseInt(divB.getAttribute("data-bsp-stats"));
+
+        let result = scoreA == scoreB
+            ? 0
+            : (scoreA > scoreB ? 1 : -1);
+
+        if (!button.sortModeDesc) {
+            result = -result;
+        }
+        return result;
+    });
+
+    for (i = 0; i < itemsArr.length; ++i) {
+        nodeMain.appendChild(itemsArr[i]);
+    }
+}
+
+
+function InjectSortButtons(node) {
+    var el = node.querySelectorAll('.members-cont');  // for war page
+
+    if (el == undefined || el.children == 0 || el.length == 0) {
+        el = node.querySelectorAll('.members-list'); // for faction page
+        if (el == undefined || el.children == 0 || el.length == 0)
+            return;
+    }
+
+
+    let buttonsArray = [];
+    for (let i = 0; i < el.length; ++i) {
+        let headerNode = el[i].querySelector('.member');
+        if (headerNode == undefined || headerNode.innerHTML.includes("BSP"))
+            continue;
+
+        let btnSortMembers = document.createElement("button");
+        btnSortMembers.sortModeDesc = true;
+        btnSortMembers.isSorting = true;
+        btnSortMembers.className = "TDup_buttonInOptionMenu";
+        btnSortMembers.innerHTML = "<i class='fa fa-arrow-right'></i> BSP";
+
+        headerNode.insertBefore(btnSortMembers, headerNode.children[1]);
+
+        buttonsArray.push({
+            button: btnSortMembers,
+            headerNode: headerNode
+        });
+    }
+
+    for (i = 0; i < buttonsArray.length; ++i) {
+        buttonsArray[i].button.addEventListener("click", function (evt) {
+            evt.stopPropagation();
+            for (j = 0; j < buttonsArray.length; ++j) {
+                let { button, headerNode } = buttonsArray[j];
+                SortPlayers(button, headerNode.parentNode.parentNode);
+            }
+        });
+    }
+
+}
 // #endregion
 
 // #region Script OnLoad
