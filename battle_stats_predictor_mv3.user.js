@@ -3226,6 +3226,15 @@ function InjectInFactionPage(node) {
     AutoSyncTornStatsFaction(FactionTargetId);
 
     let el = node.querySelectorAll('a');
+    el = Array.from(el).filter(e => {
+        if (!e || typeof e.closest !== "function") return false;
+        if (e.closest('.raid-members-list')) return false; // Exclude raid.
+
+        const descWrap = e.closest('.desc-wrap');
+        if (descWrap && !descWrap.matches('[class*="warDesc"]')) return false; // Exclude walls.
+
+        return true;
+    });
     for (let i = 0; i < el.length; ++i) {
         var isDone = false;
         var iter = el[i];
