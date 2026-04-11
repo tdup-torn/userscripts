@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.4.1
+// @version     9.4.2
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -217,9 +217,9 @@ var OnMobile = false;
 var PREDICTION_VALIDITY_DAYS = 5;
 
 var mainColor = "#344556";
-var mainBSPIcon = "https://i.postimg.cc/K8cNpzCS/BSPLogo11low.png";
+var mainBSPIcon = "https://i.ibb.co/fGx9whvB/image.png";
 
-var tornstatsIcon = "https://i.postimg.cc/k5HjhCLV/tornstats-logo.png";
+var tornstatsIcon = "https://i.ibb.co/S7WYdNWp/image.png";
 var yataIcon = "https://i.ibb.co/hYvQC2L/yata.png";
 
 var starIcon = "https://i.ibb.co/23TYRyL/star-v2.png";
@@ -361,7 +361,7 @@ var mapPageTypeAddress = {
     [PageType.War]: 'https://www.torn.com/war.php',
     [PageType.ChainReport]: 'https://www.torn.com/war.php?step=chainreport',
     [PageType.RWReport]: 'https://www.torn.com/war.php?step=rankreport',
-    [PageType.Attack]: 'https://www.torn.com/loader.php?sid=attack',
+    [PageType.Attack]: 'https://www.torn.com/page.php?sid=attack',
     [PageType.RussianRoulette]: 'https://www.torn.com/page.php?sid=russianRoulette',
 }
 
@@ -995,6 +995,15 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
     if (prediction == undefined)
         return;
 
+    if (isDivStatsCreated)
+        return;
+
+    if (document.querySelector(".TDup_BSPProfileInjection")) {
+        // injection already happened. Don't do it again.
+        // Shouldn't happoen because protected by isDivStatsCreated, but somehow on PDA, some users see multiple BSP predictions divs. So let's add this protection.
+        return;
+    }
+
     if (prediction.timestamp != undefined) {
         let spyDateConsideredTooOld = new Date();
         let daysToUseSpies = parseInt(GetStorage(StorageKey.DaysToUseSpies));
@@ -1079,23 +1088,22 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
 
     var relativeTime = FormatRelativeTime(prediction.PredictionDate);
 
-    if (!isDivStatsCreated) {
-        divStats = document.createElement("div");
-        isDivStatsCreated = true;
+    divStats = document.createElement("div");
+    divStats.className = "TDup_BSPProfileInjection";
+    isDivStatsCreated = true;
 
-        if (GetStorageBoolWithDefaultValue(StorageKey.IsClickingOnProfileStatsAttackPlayer)) {
-            divStats.addEventListener('click', function () {
-                OpenAttackScreenForPlayerId(playerId);
-            });
-        }
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsClickingOnProfileStatsAttackPlayer)) {
+        divStats.addEventListener('click', function () {
+            OpenAttackScreenForPlayerId(playerId);
+        });
+    }
 
-        if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false)) {
-            var referenceNode = PlayerProfileDivWhereToInject.firstChild.childNodes[1];
-            PlayerProfileDivWhereToInject.firstChild.insertBefore(divStats, referenceNode);
-        }
-        else {
-            PlayerProfileDivWhereToInject.appendChild(divStats);
-        }
+    if (GetStorageBoolWithDefaultValue(StorageKey.IsShowingAlternativeProfileDisplay, false)) {
+        var referenceNode = PlayerProfileDivWhereToInject.firstChild.childNodes[1];
+        PlayerProfileDivWhereToInject.firstChild.insertBefore(divStats, referenceNode);
+    }
+    else {
+        PlayerProfileDivWhereToInject.appendChild(divStats);
     }
 
     let isShowingBScore = GetStorageBool(StorageKey.IsShowingBattleStatsScore);
@@ -1121,7 +1129,7 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         '</tr>' +
         '</table> ';
 
-    divStats.innerHTML = statsDivContent;
+    divStats.innerHTML = statsDivContent;    
 }
 
 function ConvertLocalDateToUTCIgnoringTimezone(date) {
@@ -1378,38 +1386,30 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
 
         let StatsToSort = showScoreInstead ? consolidatedData.Score: consolidatedData.TargetTBS;
         let extraIndicator = '';
-        let title = '';
         if (consolidatedData.IsUsingSpy) {
             let FFPredicted = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
             FFPredicted = Math.max(1, FFPredicted);
             FFPredicted = FFPredicted.toFixed(2);
 
             extraIndicator = '<img style="position:absolute; width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + starIcon + '" />';
-            title = 'title="Data coming from spy (' + consolidatedData.Spy.Source + ') FF : ' + FFPredicted + ' "';
         }
         else if (consolidatedData.IsHOF) {
             extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + hofIcon + '" />';
-            title = 'title="Stats coming from the Top 100 HOF forum thread"';
         }
         else if (consolidatedData.isFFAttacks) {
             extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + FFAttacksIcon + '" />';
-            title = 'title="Stats coming from BSP users attacks"';
         }
         else if (consolidatedData.OldSpyStrongerThanPrediction) {
             extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + oldSpyIcon + '" />';
-            title = 'title="Old spy having greater TBS than prediction -> showing old spy data instead"';
-        }
-        else if (showScoreInstead) {
-            title = 'title="FF Predicted = ' + FFPredicted + '"';
         }
 
         let newTabifNeeded = GetStorageBoolWithDefaultValue(StorageKey.ShouldOpenAttackURLInNewTab, true) ? ' target="_blank"' : '';
         let toInject = '';
         if (isShowingHonorBars) {
-            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" data-bsp-stats="' + StatsToSort + '" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" data-bsp-stats="' + StatsToSort + '" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
         }
         else {
-            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats"data-bsp-stats="' + StatsToSort + '" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats"data-bsp-stats="' + StatsToSort + '" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
 
             if (IsPage(PageType.War) && !IsPage(PageType.ChainReport) && !IsPage(PageType.RWReport)) {
                 dictDivPerPlayer[targetId][i].style.position = "absolute";
@@ -2810,6 +2810,11 @@ function InjectBSPSettingsButtonInProfile(node) {
         return;
     }
 
+    if (node.querySelector(".TDup_divBtnBsp")) {
+        // Don't inject multiple times (protection for PDA)
+        return;
+    }
+
     var btnOpenSettingsProfile = document.createElement("a");
     btnOpenSettingsProfile.className = "t-clear h c-pointer  line-h24 right TDup_divBtnBsp";
     btnOpenSettingsProfile.style.float = "none";
@@ -2831,7 +2836,7 @@ function InjectBSPSettingsButtonInProfile(node) {
         }
     });
 
-    ;
+    
     node.insertBefore(btnOpenSettingsProfile, node.children[1]);
 }
 
@@ -3079,7 +3084,6 @@ function InjectInGenericGridPage(isInit, node) {
     }
     for (let i = 0; i < el.length; ++i) {
         var iter = el[i];
-        var title = iter.title;
 
         var playerId = -1;
         let myArray = iter.innerHTML.split("[");
@@ -3196,33 +3200,25 @@ function OnPlayerStatsRetrievedForAttackPage(targetId, prediction) {
     }
 
     let extraIndicator = '';
-    let title = '';
     if (consolidatedData.IsUsingSpy) {
         let FFPredicted = Math.min(1 + (8 / 3) * (consolidatedData.Score / localBattleStats.Score), 3);
         FFPredicted = Math.max(1, FFPredicted);
         FFPredicted = FFPredicted.toFixed(2);
 
         extraIndicator = '<img style="position:absolute; width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + starIcon + '" />';
-        title = 'title="Data coming from spy (' + consolidatedData.Spy.Source + ') FF : ' + FFPredicted + ' "';
     }
     else if (consolidatedData.IsHOF) {
         extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + hofIcon + '" />';
-        title = 'title="Stats coming from the Top 100 HOF forum thread"';
     }
     else if (consolidatedData.isFFAttacks) {
         extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + FFAttacksIcon + '" />';
-        title = 'title="Stats coming from BSP users attacks"';
     }
     else if (consolidatedData.OldSpyStrongerThanPrediction) {
         extraIndicator = '<img style="position:absolute;width:13px; height:13px; margin:' + spyMargin + ';z-index: 101;" src="' + oldSpyIcon + '" />';
-        title = 'title="Old spy having greater TBS than prediction -> showing old spy data instead"';
-    }
-    else if (showScoreInstead) {
-        title = 'title="FF Predicted = ' + FFPredicted + '"';
     }
 
     let tipsDiv = document.createElement("div");
-    tipsDiv.innerHTML = extraIndicator + '<div style="z-index: 100;"><div class="iconStatsAttack" ' + title + ' style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div>';
+    tipsDiv.innerHTML = extraIndicator + '<div style="z-index: 100;"><div class="iconStatsAttack" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div>';
     nodeForAttackPage.appendChild(tipsDiv);
 
 }
@@ -3884,7 +3880,7 @@ function AutoSyncTornStatsPlayer(playerId) {
         let dateConsideredTooOld = new Date();
         dateConsideredTooOld.setDate(dateConsideredTooOld.getDate() - 1);
         if (new Date(lastDateAutoSyncThisFaction) > dateConsideredTooOld) {
-            LogInfo("AutoSyncTornStatsPlayer  - " + playerId + " - Too recent call in database, skipying");
+            LogInfo("AutoSyncTornStatsPlayer  - " + playerId + " - Too recent call in database, skipping");
             return;
         }
     }
