@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.4.2
+// @version     9.4.3
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -227,7 +227,7 @@ var oldSpyIcon = "https://i.ibb.co/b7982wh/oldSpy.png";
 var hofIcon = "https://i.ibb.co/fkFDrVx/HOF-v2.png";
 var FFAttacksIcon = "https://i.ibb.co/GJ04WJn/player-Data-v2.png";
 
-var URL_TORN_ATTACK = "https://www.torn.com/loader.php?sid=attack&user2ID=";
+var URL_TORN_ATTACK = "https://www.torn.com/page.php?sid=attack&user2ID=";
 
 // #endregion
 
