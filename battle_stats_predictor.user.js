@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.4.3
+// @version     9.4.4
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -114,6 +114,9 @@ const StorageKey = {
 };
 
 function CanQueryAnyAPI() {
+    // Not really needed following discussion with IBF since it doesn't trigger any notifaction, nor prevent any user of anything.
+    // Prevent any query to BSP server to retrieve data when page isn't actively focused, and enshittificate BSP
+    // Keeping it for now just to avoid any drama but it's annoying AF.
     return document.visibilityState === "visible" && document.hasFocus();
 }
 function GetBSPServer() {
@@ -272,7 +275,7 @@ styleToAdd.innerHTML += '.TDup_optionsTabContent label { margin:10px 0px; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent p { margin:10px 0px; }';
 styleToAdd.innerHTML += '.TDup_optionsTabContent a { color:black !important;}';
 
-styleToAdd.innerHTML += '.TDup_ColoredStatsInjectionDiv { position:absolute;}';
+styleToAdd.innerHTML += '.TDup_ColoredStatsInjectionDiv { position:absolute;display: inline-block;}';
 styleToAdd.innerHTML += '.TDup_ColoredStatsInjectionDivWithoutHonorBar { }';
 
 styleToAdd.innerHTML += '.TDup_optionsTabContent input { margin:0px 10px !important; }';
@@ -368,7 +371,8 @@ var mapPageTypeAddress = {
 var mapPageAddressEndWith = {
     [PageType.FactionControl]: '/tab=controls',
     [PageType.FactionControlPayday]: 'tab=controls&option=pay-day',
-    [PageType.FactionControlApplications]: 'tab=controls&option=application'
+    [PageType.FactionControlApplications]: 'tab=controls&option=application',
+    [PageType.Chain]: '/war/chain',
 }
 
 
@@ -1129,7 +1133,7 @@ function OnProfilePlayerStatsRetrieved(playerId, prediction) {
         '</tr>' +
         '</table> ';
 
-    divStats.innerHTML = statsDivContent;    
+    divStats.innerHTML = statsDivContent;
 }
 
 function ConvertLocalDateToUTCIgnoringTimezone(date) {
@@ -1202,20 +1206,28 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
 
     if (IsPage(PageType.FactionControl)) {
         if (IsPage(PageType.FactionControlPayday)) {
-            mainMarginWhenDisplayingHonorBars = '-25px 20px';
-            spyMargin = '-3px 12px';
+            return; // Will tweak that in a next version
+            //mainMarginWhenDisplayingHonorBars = '-25px 20px';
+            //spyMargin = '-3px 12px';
         }
         else if (IsPage(PageType.FactionControlApplications)) {
-            mainMarginWhenDisplayingHonorBars = '-10px 0px';
-            spyMargin = '-5px 23px';
+            return; // Will tweak that in a next version
+            //mainMarginWhenDisplayingHonorBars = '-10px 0px';
+            //spyMargin = '-5px 23px';
         }
         else {
-            mainMarginWhenDisplayingHonorBars = '0px';
-            spyMargin = '-5px 23px';
+            return; // Will tweak that in a next version
+            //mainMarginWhenDisplayingHonorBars = '0px';
+            //spyMargin = '-5px 23px';
         }
     }
-    else if (IsPage(PageType.Chain) && !isShowingHonorBars) {
-        spyMargin = '-1px 23px';
+    else if (IsPage(PageType.Chain)) {
+        if (isShowingHonorBars) {
+            spyMargin = '-15px 15px';
+        }
+        else {
+            spyMargin = '1px 24px';
+        }
     }
     else if (IsPage(PageType.Faction)) {
         if (isShowingHonorBars) {
@@ -1225,35 +1237,60 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             spyMargin = '0px 23px';
         }
     }
-    else if (IsPage(PageType.HallOfFame) && isShowingHonorBars) {
-        mainMarginWhenDisplayingHonorBars = "-10px -9px";
-        spyMargin = '-16px 17px';
+    else if (IsPage(PageType.HallOfFame)) {
+        if (isShowingHonorBars) {
+            mainMarginWhenDisplayingHonorBars = "-10px -9px";
+            spyMargin = '-16px 17px';
+        }
+        else {
+            spyMargin = '-2px 23px';
+        }
+
     }
     else if (IsPage(PageType.Search) && isShowingHonorBars) {
-        mainMarginWhenDisplayingHonorBars = '6px -8px';
+        mainMarginWhenDisplayingHonorBars = '6px 3px';
+        spyMargin = '-2px 28px';
     }
     else if (IsPage(PageType.Company) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '0px';
     }
-    else if (IsPage(PageType.RecruitCitizens) && isShowingHonorBars) {
-        mainMarginWhenDisplayingHonorBars = '0px';
+    else if (IsPage(PageType.RecruitCitizens)) {
+        if (isShowingHonorBars) {
+            mainMarginWhenDisplayingHonorBars = '7px 2px';
+            spyMargin = '0px 25px';
+        }
+        else {
+            spyMargin = '-3px 29px';
+        }
     }
     else if (IsPage(PageType.Friends) || IsPage(PageType.Enemies) || IsPage(PageType.Targets)) {
         spyMargin = '-5px 23px';
         if (isShowingHonorBars) {
             mainMarginWhenDisplayingHonorBars = '-10px 0px';
-            spyMargin = '-14px 23px';
+            spyMargin = '-17px 23px';
         }
     }
-    else if (IsPage(PageType.PointMarket) && isShowingHonorBars) {
-        mainMarginWhenDisplayingHonorBars = '5px -5px';
+    else if (IsPage(PageType.PointMarket)) {
+        if (isShowingHonorBars) {
+            mainMarginWhenDisplayingHonorBars = '5px -5px';
+            spyMargin = '0px 18px';
+        }
+        else {
+            spyMargin = '-2px 23px';
+        }
     }
     else if (IsPage(PageType.Market) && isShowingHonorBars) {
         mainMarginWhenDisplayingHonorBars = '-10px -10px';
         spyMargin = '-18px 13px';
     }
-    else if (IsPage(PageType.Hospital) && isShowingHonorBars) {
-        mainMarginWhenDisplayingHonorBars = '0px 6px';
+    else if (IsPage(PageType.Hospital)) {    
+        if (isShowingHonorBars) {
+            mainMarginWhenDisplayingHonorBars = '5px -2px';
+            spyMargin = '0px 22px';
+        }
+        else {
+            spyMargin = '-2px 23px';
+        }
     }
     else if (IsPage(PageType.Abroad)) {
         spyMargin = '0px 20px';
@@ -1269,8 +1306,8 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         if (isShowingHonorBars) {
             mainMarginWhenDisplayingHonorBars = '7px 0px';
             if (IsPage(PageType.ForumThread) || IsPage(PageType.ForumSearch)) {
-                spyMargin = '-5px 15px';
-                mainMarginWhenDisplayingHonorBars = '-26px 28px';
+                spyMargin = '-5px 25px';
+                mainMarginWhenDisplayingHonorBars = '0px';
             }
         }
     }
@@ -1279,9 +1316,12 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
         spyMargin = '1px 24px';
     }
     else if (IsPage(PageType.Properties)) {
-        mainMarginWhenDisplayingHonorBars = '0px';
         if (isShowingHonorBars) {
-            spyMargin = '-6px 15px';
+            mainMarginWhenDisplayingHonorBars = '6px 5px';
+            spyMargin = '-1px 28px';
+        }
+        else {
+            mainMarginWhenDisplayingHonorBars = '0px';
         }
     }
     else if (IsPage(PageType.War)) {
@@ -1356,12 +1396,20 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
     }
 
     for (let i = 0; i < dictDivPerPlayer[targetId].length; i++) {
+        let storedEl = dictDivPerPlayer[targetId][i];
 
-        if (IsThereMyNodeAlready(dictDivPerPlayer[targetId][i], urlAttack)) {
+        let injectionTarget = storedEl;
+        let insertBeforeNode = storedEl.firstChild;
+        if (storedEl.tagName === 'A') {
+            injectionTarget = storedEl.parentNode;
+            insertBeforeNode = storedEl;
+        }
+
+        if (IsThereMyNodeAlready(injectionTarget, urlAttack)) {
             continue;
         }
 
-        let isWall = IsPage(PageType.Faction) && !IsPage(PageType.FactionControl) && dictDivPerPlayer[targetId][i].className == "user name ";
+        let isWall = IsPage(PageType.Faction) && !IsPage(PageType.FactionControl) && storedEl.className == "user name ";
         if (isWall) {
             //WALL display
             if (isShowingHonorBars) {
@@ -1375,10 +1423,10 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
 
         if (IsPage(PageType.Competition) && isShowingHonorBars) {
             if (window.location.href.startsWith("https://www.torn.com/competition.php#/p=recent")) {
-                if (HasParentWithClass(dictDivPerPlayer[targetId][i], "name lost")) {
+                if (HasParentWithClass(storedEl, "name lost")) {
                     mainMarginWhenDisplayingHonorBars = "12px 0px";
                 }
-                else if (HasParentWithClass(dictDivPerPlayer[targetId][i], "name right")) {
+                else if (HasParentWithClass(storedEl, "name right")) {
                     mainMarginWhenDisplayingHonorBars = "0px 0px";
                 }
             }
@@ -1409,10 +1457,13 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="position: absolute;z-index: 100;margin: ' + mainMarginWhenDisplayingHonorBars + '"><div class="iconStats" data-bsp-stats="' + StatsToSort + '" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
         }
         else {
-            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="display: inline-block; margin-right:5px;"><div class="iconStats"data-bsp-stats="' + StatsToSort + '" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
+            let marginRight = IsPage(PageType.RecruitCitizens) ? '0px' : '5px';
+            let marginLeft = IsPage(PageType.RecruitCitizens) ? '5px' : '0px';
+
+            toInject = '<a href="' + urlAttack + '"' + newTabifNeeded + '>' + extraIndicator + '<div style="display: inline-block; margin-left:' + marginLeft +'; margin-right:' + marginRight +';"><div class="iconStats"data-bsp-stats="' + StatsToSort + '" style="background:' + colorComparedToUs + '">' + formattedBattleStats + '</div></div></a>';
 
             if (IsPage(PageType.War) && !IsPage(PageType.ChainReport) && !IsPage(PageType.RWReport)) {
-                dictDivPerPlayer[targetId][i].style.position = "absolute";
+                storedEl.style.position = "absolute";
             }
         }
 
@@ -1420,23 +1471,27 @@ function OnPlayerStatsRetrievedForGrid(targetId, prediction) {
             let coloredStatsInjectionDiv = document.createElement("div");
             coloredStatsInjectionDiv.className = "TDup_ColoredStatsInjectionDiv";
             coloredStatsInjectionDiv.innerHTML = toInject;
+            coloredStatsInjectionDiv.querySelector('a')?.addEventListener('click', e => e.stopPropagation());
 
-            // Get the first child element of the parent (or null if there are no child elements)
-            var firstChild = dictDivPerPlayer[targetId][i].firstChild;
-            dictDivPerPlayer[targetId][i].insertBefore(coloredStatsInjectionDiv, firstChild);
+            injectionTarget.insertBefore(coloredStatsInjectionDiv, insertBeforeNode);
         }
         else {
             if (IsPage(PageType.Elimination) && !IsPage(PageType.EliminationRevenge)) {
                 let coloredStatsInjectionDiv = document.createElement("div");
                 coloredStatsInjectionDiv.className = "TDup_ColoredStatsInjectionDivWithoutHonorBar";
                 coloredStatsInjectionDiv.innerHTML = toInject;
+                coloredStatsInjectionDiv.querySelector('a')?.addEventListener('click', e => e.stopPropagation());
 
-                // Get the first child element of the parent (or null if there are no child elements)
-                var firstChild = dictDivPerPlayer[targetId][i].firstChild;
-                dictDivPerPlayer[targetId][i].insertBefore(coloredStatsInjectionDiv, firstChild);
+                injectionTarget.insertBefore(coloredStatsInjectionDiv, insertBeforeNode);
             }
             else {
-                dictDivPerPlayer[targetId][i].innerHTML = toInject + dictDivPerPlayer[targetId][i].innerHTML;
+                let tempDiv = document.createElement('div');
+                tempDiv.innerHTML = toInject;
+                let anchorEl = tempDiv.firstElementChild;
+                if (anchorEl) {
+                    anchorEl.addEventListener('click', e => e.stopPropagation());
+                    injectionTarget.insertBefore(anchorEl, insertBeforeNode);
+                }
             }
         }
     }
@@ -1983,7 +2038,7 @@ function BuildOptionMenu_Pages(tabs, menu) {
 
     // Sort on faction page
     AddOption(contentDiv, StorageKey.HasSortByBSPButtonsOnFactionPage, true, 'Allow sorting by BSP on faction/war page?', 'HasSortByBSPButtonsOnFactionPage');
-    
+
 
     // Spy
     let spyNumberOfDaysDiv = document.createElement("div");
@@ -2057,10 +2112,10 @@ function BuildOptionMenu_Pages(tabs, menu) {
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.PointMarket, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Properties, true);
     BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.War, true);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.RussianRoulette, true, false);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Market, false, true);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Forum, false, true);
-    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Attack, false, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.RussianRoulette, true);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Market, false);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Forum, false);
+    BuildOptionsCheckboxPageWhereItsEnabled(divForCheckbox, PageType.Attack, false);
 
     contentDiv.appendChild(divForCheckbox);
 }
@@ -2909,7 +2964,7 @@ function InjectInFactionPage(node) {
                     if (!(playerId in dictDivPerPlayer)) {
                         dictDivPerPlayer[playerId] = new Array();
                     }
-                    dictDivPerPlayer[playerId].push(iter);
+                    dictDivPerPlayer[playerId].push(iter.rel == "noopener noreferrer" ? iter.parentNode : iter);
                     GetPredictionForPlayer(playerId, OnPlayerStatsRetrievedForGrid);
                     isDone = true;
                 }
