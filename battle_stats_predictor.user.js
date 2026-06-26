@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.4.5
+// @version     9.4.6
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -2600,7 +2600,7 @@ function BuildOptionMenu_Debug(tabs, menu) {
     buttonClearLocalCache.addEventListener("click", () => {
         buttonClearLocalCache.disabled = true;
         if (confirm("BSP - IMPORTANT \r\n \r\nAre you sure you want to clear BSP keys, stats, settings, spies and predictions from your local cache? \r\n \r\nIt will only impact this script: you will have to do the setup again (setup keys, import spies etc)") == true) {
-            ClearCache(eStorageType.All);
+            ClearCache(eStorageType.All_BSP);
             window.location.reload();
         }
         buttonClearLocalCache.disabled = false;
