@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Battle Stats Predictor
 // @description Show battle stats prediction, computed by a third party service
-// @version     9.4.6
+// @version     9.4.7
 // @namespace   tdup.battleStatsPredictor
 // @updateURL   https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
 // @downloadURL https://github.com/tdup-torn/userscripts/raw/master/battle_stats_predictor.user.js
@@ -341,9 +341,9 @@ var mapPageTypeAddress = {
     [PageType.Faction]: 'https://www.torn.com/factions.php',
     [PageType.Company]: 'https://www.torn.com/joblist.php',
     [PageType.Competition]: 'https://www.torn.com/competition.php',
-    [PageType.Elimination]: 'https://www.torn.com/page.php?sid=competition',
-    [PageType.EliminationAttacks]: 'https://www.torn.com/page.php?sid=competition#/attacks',
-    [PageType.EliminationRevenge]: 'https://www.torn.com/page.php?sid=competition#/revenge',
+    [PageType.Elimination]: 'https://www.torn.com/page.php?sid=elimination',
+    [PageType.EliminationAttacks]: 'https://www.torn.com/page.php?sid=elimination#/attacks',
+    [PageType.EliminationRevenge]: 'https://www.torn.com/page.php?sid=elimination#/revenge',
     [PageType.Bounty]: 'https://www.torn.com/bounties.php',
     [PageType.Search]: 'https://www.torn.com/page.php?sid=UserList',
     [PageType.Hospital]: 'https://www.torn.com/hospitalview.php',
